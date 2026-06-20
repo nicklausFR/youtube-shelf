@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101010">
+    <title>Youtube</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="mainbar" aria-label="Navigation">
+      <div class="leftTools">
+        <button id="toggleSidebar" class="iconButton" type="button" title="Collapse subscriptions" aria-label="Collapse subscriptions">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <button id="back" class="iconButton" type="button" title="Back" aria-label="Back" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button id="forward" class="iconButton" type="button" title="Forward" aria-label="Forward" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <button id="openAppSession" class="iconButton" type="button" title="New app session" aria-label="New app session">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h10v10H8z"/><path d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+
+      <form id="searchForm" class="searchBox" role="search">
+        <input id="searchInput" type="search" placeholder="Search / open URL" autocomplete="off">
+        <button class="searchButton" type="submit" title="Search or open" aria-label="Search or open">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+      </form>
+
+      <div class="rightTools">
+        <a class="signinButton" href="https://www.youtube.com/signin" target="_blank">YouTube sign in</a>
+      </div>
+    </header>
+
+    <main class="app">
+      <aside class="sidebar" aria-label="Subscriptions">
+        <div class="sidebarHeader">
+          <button id="addChannel" class="sidebarAction" type="button">+ Channel</button>
+          <button id="addCategory" class="sidebarAction" type="button">+ Category</button>
+        </div>
+        <div id="sidePanelPath" class="sidePanelPath"></div>
+        <div class="channelSearch">
+          <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
+            <span></span><span></span><span></span>
+          </button>
+          <button id="channelBack" class="channelNavButton" type="button" title="Back" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button id="channelForward" class="channelNavButton" type="button" title="Forward" aria-label="Forward">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <input id="channelSearchInput" type="search" placeholder="Search channels in current category" autocomplete="off" aria-label="Search channels in current category">
+        </div>
+        <div id="categories" class="categories"></div>
+        <div id="channels" class="channels"></div>
+        <div id="activeChannelSeparator" class="activeChannelSeparator" hidden></div>
+      </aside>
+
+      <section class="content">
+        <div class="contentToolbar">
+          <div id="sidePanelVideoPath" class="sidePanelPath sidePanelVideoPath"></div>
+          <button id="toggleListLayout" class="pathIconModeButton videoLayoutButton" type="button" aria-label="Show video rows" aria-pressed="false">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+        <header class="channelHeader">
+          <div class="titleBlock">
+            <h1 id="channelTitle"></h1>
+          </div>
+          <div id="channelActions" class="channelActions" hidden>
+            <button id="refresh" class="refreshButton" type="button" title="Refresh" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18 2v5h-5"/><path d="M6 22v-5h5"/></svg>
+            </button>
+            <button id="assignCategories" class="unsubscribeButton" type="button">Classify</button>
+            <button id="unsubscribe" class="unsubscribeButton" type="button">Unsubscribe</button>
+          </div>
+          <div id="videoTitleLine" class="videoTitleLine" hidden>
+            <span id="currentVideoTitle"></span>
+            <button id="playerWatchLater" class="unsubscribeButton small" type="button">Watch later</button>
+          </div>
+        </header>
+
+        <section id="listView" class="listView">
+          <span id="status" class="statusText" hidden></span>
+          <div id="videos" class="videos"></div>
+        </section>
+
+        <section id="playerView" class="playerView" hidden>
+          <div class="playerPanel" aria-label="Lecture">
+            <iframe
+              id="player"
+              class="player"
+              title="YouTube player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+              referrerpolicy="strict-origin-when-cross-origin"
+            ></iframe>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="seenPrompt" class="modalOverlay" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="seenPromptTitle">
+        <h2 id="seenPromptTitle">Mark as watched?</h2>
+        <p>This video is in Watch later.</p>
+        <div class="modalActions">
+          <button id="keepWatchLater" class="modalButton secondary" type="button">Keep in Watch later</button>
+          <button id="markSeen" class="modalButton primary" type="button">Mark as watched</button>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="categoryAssignPrompt" class="modalOverlay" hidden>
+      <div class="modal categoryModal" role="dialog" aria-modal="true" aria-labelledby="categoryAssignTitle">
+        <h2 id="categoryAssignTitle">Channel categories</h2>
+        <div id="categoryAssignList" class="categoryAssignList"></div>
+        <div class="categoryAddLine">
+          <input id="newCategoryName" type="text" placeholder="New category" autocomplete="off">
+          <button id="createCategoryFromModal" class="pathIconButton pathAddButton" type="button" title="Add category">+</button>
+        </div>
+        <div class="modalActions">
+          <button id="cancelCategoryAssign" class="modalButton secondary" type="button">Cancel</button>
+          <button id="saveCategoryAssign" class="modalButton primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="channelAssignPrompt" class="modalOverlay" hidden>
+      <div class="modal categoryModal" role="dialog" aria-modal="true" aria-labelledby="channelAssignTitle">
+        <h2 id="channelAssignTitle">Category channels</h2>
+        <div id="channelAssignList" class="categoryAssignList"></div>
+        <div class="modalActions">
+          <button id="cancelChannelAssign" class="modalButton secondary" type="button">Cancel</button>
+          <button id="saveChannelAssign" class="modalButton primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="importExportPrompt" class="modalOverlay" hidden>
+      <div class="modal importExportModal" role="dialog" aria-modal="true" aria-labelledby="importExportTitle">
+        <h2 id="importExportTitle">Import / Export</h2>
+        <div class="importExportGrid">
+          <button id="exportNativeConfig" class="modalButton secondary" type="button">Export YouTube Channel Shelf</button>
+          <button id="exportYoutubeConfig" class="modalButton secondary" type="button">Export YouTube format</button>
+          <button id="importNativeConfig" class="modalButton secondary" type="button">Import YouTube Channel Shelf</button>
+          <button id="importYoutubeConfig" class="modalButton secondary" type="button">Import YouTube</button>
+          <button id="importFreetubeConfig" class="modalButton secondary" type="button">Import FreeTube</button>
+        </div>
+        <div class="modalActions">
+          <button id="closeImportExport" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+

@@ -1,0 +1,33 @@
+﻿html.yt-companion-hide-comments #comments,
+html.yt-companion-hide-comments ytd-comments {
+  display: none !important;
+}
+
+html.yt-companion-panel-open #secondary,
+html.yt-companion-panel-open ytd-watch-next-secondary-results-renderer,
+html.yt-companion-panel-open ytd-related-chip-cloud-renderer {
+  display: none !important;
+}
+html.yt-companion-panel-open,
+html.yt-companion-panel-open body,
+html.yt-companion-panel-open ytd-app,
+html.yt-companion-panel-open ytd-page-manager,
+html.yt-companion-panel-open #page-manager,
+html.yt-companion-panel-open #content,
+html.yt-companion-panel-open #primary,
+html.yt-companion-panel-open ytd-watch-flexy {
+  scrollbar-width: none !important;
+}
+
+html.yt-companion-panel-open::-webkit-scrollbar,
+html.yt-companion-panel-open body::-webkit-scrollbar,
+html.yt-companion-panel-open ytd-app::-webkit-scrollbar,
+html.yt-companion-panel-open ytd-page-manager::-webkit-scrollbar,
+html.yt-companion-panel-open #page-manager::-webkit-scrollbar,
+html.yt-companion-panel-open #content::-webkit-scrollbar,
+html.yt-companion-panel-open #primary::-webkit-scrollbar,
+html.yt-companion-panel-open ytd-watch-flexy::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
