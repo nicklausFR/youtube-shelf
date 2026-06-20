@@ -1,0 +1,2451 @@
+﻿:root {
+  color-scheme: dark;
+  --bg: #101010;
+  --bar: #2b2b2b;
+  --bar-dark: #202020;
+  --panel: #181818;
+  --line: #070707;
+  --soft-line: #2a2a2a;
+  --text: #f1f1f1;
+  --muted: #a8a8a8;
+  --accent: #ef4f45;
+  --focus: #7ab7ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.25;
+}
+
+.mainbar {
+  align-items: center;
+  background: var(--bar);
+  border-bottom: 2px solid var(--line);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(260px, 1fr) auto;
+  height: 56px;
+  padding: 0 18px 0 6px;
+}
+
+.leftTools {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.rightTools {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.iconButton,
+.searchButton {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+}
+
+.iconButton {
+  color: #e5e5e5;
+  opacity: 0.92;
+}
+
+.iconButton:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.iconButton svg,
+.searchButton svg {
+  height: 23px;
+  width: 23px;
+}
+
+.iconButton:hover:not(:disabled),
+.searchButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.iconButton:focus-visible,
+.searchButton:focus-visible,
+.channel:focus-visible,
+.video:focus-visible,
+.searchBox input:focus-visible,
+.refreshButton:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.searchBox {
+  align-items: center;
+  background: var(--bar-dark);
+  border-radius: 5px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  height: 44px;
+}
+
+.searchBox input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  min-width: 0;
+  outline: 0;
+  padding: 0 0 0 16px;
+}
+
+.searchButton {
+  color: var(--muted);
+  height: 44px;
+  width: 40px;
+}
+
+.signinButton {
+  color: #f1f1f1;
+  font-size: 14px;
+  opacity: 0.9;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.signinButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  min-height: calc(100vh - 56px);
+}
+
+.sidebar {
+  background: #111;
+  border-right: 2px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 18px 12px 12px;
+  scrollbar-color: #555 #171717;
+  scrollbar-width: thin;
+}
+
+.sidebarHeader {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  min-height: 34px;
+}
+
+.sidebarAction {
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  min-height: 34px;
+  overflow: hidden;
+  padding: 0 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarAction:hover {
+  border-color: #555;
+}
+
+.channelSearch {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: auto auto auto minmax(0, 1fr);
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.channelSearch input {
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  min-height: 34px;
+  outline: 0;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.channelSearch input::placeholder {
+  color: var(--muted);
+}
+
+.channelSearch input:focus-visible {
+  border-color: var(--focus);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.channelSearchEmpty {
+  padding: 8px 2px;
+}
+
+.channelNavButton {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 26px;
+}
+
+.channelNavButton svg {
+  height: 17px;
+  width: 17px;
+}
+
+.channelNavButton:hover {
+  border-color: #666;
+  color: var(--text);
+}
+
+.channels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding-right: 12px;
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-right: 12px;
+}
+
+.category {
+  background: #191919;
+  border: 1px solid var(--soft-line);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.category.is-active {
+  background: #2b1a18;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.category.is-special {
+  border-color: #4b4b4b;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: #171717;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 8px;
+}
+
+.channel {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 44px;
+  padding: 5px;
+  text-align: left;
+  width: 100%;
+}
+
+.channel:hover {
+  background: #191919;
+}
+
+.channel.is-active {
+  background: #1f1614;
+  border-color: var(--accent);
+}
+
+.channel img {
+  border-radius: 50%;
+  display: block;
+  height: 34px;
+  object-fit: cover;
+  width: 34px;
+}
+
+.channelFallback {
+  align-items: center;
+  background: #2a2a2a;
+  border-radius: 50%;
+  color: var(--text);
+  display: flex;
+  font-size: 14px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.channelName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.sidebarCollapsed .app {
+  grid-template-columns: 82px minmax(0, 1fr);
+}
+
+body.sidebarCollapsed .sidebar {
+  padding-left: 10px;
+  padding-right: 8px;
+}
+
+body.sidebarCollapsed .sidebarHeader {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+body.sidebarCollapsed .sidebarAction {
+  font-size: 0;
+  height: 34px;
+  padding: 0;
+  width: 44px;
+}
+
+body.sidebarCollapsed .categories {
+  display: none;
+}
+
+body.sidebarCollapsed #addChannel::before {
+  content: "+";
+  font-size: 20px;
+}
+
+body.sidebarCollapsed #addCategory::before {
+  content: "#";
+  font-size: 18px;
+}
+
+body.sidebarCollapsed .channelName {
+  display: none;
+}
+
+body.sidebarCollapsed .channel {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  margin-right: 8px;
+  width: 44px;
+}
+
+.content {
+  display: grid;
+  gap: 12px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 20px 22px;
+}
+
+.contentToolbar {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 34px;
+}
+
+.sidePanelBack {
+  display: none;
+}
+
+
+.channelHeader {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 34px auto auto;
+  min-height: 36px;
+  width: 100%;
+}
+
+.channelHeader:has(#channelTitle:empty) {
+  display: none;
+}
+
+.channelActions {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-column: 2 / 5;
+  grid-template-columns: 34px auto auto;
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.titleBlock h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refreshButton {
+  align-items: center;
+  background: var(--accent);
+  border: 0;
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+}
+
+.refreshButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.refreshButton svg {
+  height: 18px;
+  width: 18px;
+}
+
+.unsubscribeButton {
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 34px;
+  padding: 0 11px;
+  white-space: nowrap;
+}
+
+.unsubscribeButton:hover {
+  border-color: #555;
+  color: var(--text);
+}
+
+.unsubscribeButton.small {
+  font-size: 15px;
+  min-height: 34px;
+  padding: 0 11px;
+}
+
+.unsubscribeButton.small.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.videoTitleLine {
+  align-items: center;
+  color: var(--muted);
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 34px auto auto;
+  margin-top: -8px;
+  min-height: 28px;
+  width: 100%;
+}
+
+.videoTitleLine span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#playerWatchLater {
+  grid-column: 4;
+  justify-self: end;
+  width: 146px;
+}
+
+#unsubscribe {
+  width: 146px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+p,
+#status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.playerPanel {
+  aspect-ratio: 16 / 9;
+  background: #050505;
+  border: 1px solid var(--soft-line);
+  max-height: calc(100vh - 154px);
+  position: relative;
+  width: 100%;
+}
+
+.content:has(#playerView:not([hidden])) {
+  justify-items: stretch;
+}
+
+.content:has(#playerView:not([hidden])) .channelHeader {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.content:has(#playerView:not([hidden])) .channelActions {
+  display: none;
+}
+
+.content:has(#playerView:not([hidden])) .videoTitleLine {
+  grid-column: 2;
+  grid-template-columns: auto;
+  margin-top: 0;
+}
+
+.content:has(#playerView:not([hidden])) .videoTitleLine span {
+  display: none;
+}
+
+.content:has(#playerView:not([hidden])) #playerWatchLater {
+  grid-column: 1;
+}
+
+.player {
+  border: 0;
+  inset: 0;
+  height: 100%;
+  position: absolute;
+  width: 100%;
+}
+
+.listView,
+.playerView {
+  min-width: 0;
+}
+
+.sectionTitle {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.statusText {
+  color: var(--muted);
+  display: block;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.videos {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.channels > .videos {
+  width: 100%;
+}
+
+body.videoListSingleColumn .videos {
+  grid-template-columns: 1fr;
+}
+
+body.videoListSingleColumn .video {
+  grid-template-columns: 128px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  min-height: 82px;
+}
+
+.video {
+  align-items: stretch;
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 128px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  min-height: 82px;
+  padding: 8px;
+  text-align: left;
+}
+
+body.videoWideColumns .videos {
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+}
+
+body.videoWideColumns .video {
+  grid-template-columns: 156px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  min-height: 102px;
+}
+
+.video:hover {
+  border-color: #555;
+}
+
+.video.is-active {
+  border-color: var(--accent);
+}
+
+.video.is-seen {
+  opacity: 0.56;
+}
+
+.thumb {
+  background: #060606;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.14);
+  width: 100%;
+}
+
+.thumbFrame {
+  background: #060606;
+  border-radius: 4px;
+  grid-row: 1 / 3;
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+
+.videoTitle {
+  display: -webkit-box;
+  font-size: 14px;
+  font-weight: 650;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.watchLaterButton {
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  grid-column: 2;
+  height: 28px;
+  justify-self: start;
+  padding: 0 8px;
+  white-space: nowrap;
+  width: auto;
+}
+
+.watchLaterButton:hover,
+.watchLaterButton.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.modalOverlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 20;
+}
+
+.modal {
+  background: #181818;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  max-width: 420px;
+  padding: 18px;
+  width: calc(100% - 32px);
+}
+
+.modal h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+.modal p {
+  margin-bottom: 18px;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modalButton {
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.modalButton.secondary {
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  color: var(--text);
+}
+
+.modalButton.primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--text);
+}
+
+@media (max-width: 820px) {
+  .mainbar {
+    gap: 6px;
+    grid-template-columns: auto minmax(120px, 1fr) auto;
+  }
+
+  .leftTools {
+    gap: 2px;
+  }
+
+  .signinButton {
+    font-size: 0;
+    padding: 0;
+  }
+
+  .signinButton::before {
+    content: "Sign in";
+    font-size: 12px;
+  }
+
+  .app {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding: 12px 8px;
+  }
+
+  .sidebarHeader {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .sidebarHeader div,
+  .channelName {
+    display: none;
+  }
+
+  .channel {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .content {
+    padding: 14px;
+  }
+
+  .channelHeader {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .videos {
+    grid-template-columns: 1fr;
+  }
+
+  .video {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+}
+
+@media (max-width: 860px) {
+  .mainbar {
+    display: none;
+  }
+
+  .app {
+    display: block;
+    min-height: auto;
+  }
+
+  .sidebar {
+    border-right: 0;
+    max-height: none;
+    min-height: 100vh;
+    padding: 10px 8px;
+  }
+
+
+  .sidebarHeader,
+  .categories {
+    display: none;
+  }
+
+  .channels {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 0;
+  }
+
+  .channel {
+    grid-template-columns: 34px minmax(0, 1fr);
+    justify-items: stretch;
+    min-height: 48px;
+    padding: 4px;
+  }
+
+  .channelName {
+    display: block;
+  }
+
+  .content {
+    display: none;
+  }
+
+  body.sidePanelVideos .sidebar {
+    display: none;
+  }
+
+  body.sidePanelVideos .content {
+    display: grid;
+    gap: 10px;
+    min-height: 100vh;
+    padding: 10px 8px;
+  }
+
+  body.sidePanelVideos .contentToolbar {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    min-height: 34px;
+  }
+
+
+
+  body.sidePanelVideos #toggleListLayout {
+    display: none;
+  }
+
+  body.sidePanelVideos .channelHeader {
+    display: none;
+  }
+
+  body.sidePanelVideos .channelActions,
+  body.sidePanelVideos .videoTitleLine {
+    display: none;
+  }
+
+
+  body.sidePanelVideos .videos {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  body.sidePanelVideos .video {
+    grid-template-columns: 96px minmax(0, 1fr);
+    min-height: 72px;
+    padding: 6px;
+  }
+
+  body.sidePanelVideos .watchLaterButton {
+    font-size: 11px;
+    height: 24px;
+    padding: 0 6px;
+  }
+}
+
+
+.sidePanelPath {
+  display: none;
+}
+
+.pathRow {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+
+.pathButton {
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 30px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 8px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.pathButton:hover {
+  border-color: #555;
+  color: var(--text);
+}
+
+.pathSettingsRow {
+  width: auto;
+}
+
+.pathSettingsButton {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  width: 30px;
+}
+
+.pathSettingsButton:hover {
+  border-color: #555;
+  color: var(--text);
+}
+
+.pathSettingsButton svg {
+  height: 17px;
+  width: 17px;
+}
+
+.pathButton-root {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-style: italic;
+  letter-spacing: 0;
+}
+
+
+.pathIconButton {
+  align-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 18px;
+  font-weight: 700;
+  height: 26px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 26px;
+}
+
+.pathAddButton {
+  background: var(--accent);
+}
+
+.pathAddButton:hover {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 860px) {
+  .sidebar,
+  body.sidePanelVideos .content {
+    scrollbar-width: none;
+  }
+
+  .sidebar::-webkit-scrollbar,
+  body.sidePanelVideos .content::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidePanelPath {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .sidePanelVideoPath {
+    flex: 1 1 auto;
+    margin-bottom: 0;
+    min-width: 0;
+  }
+}
+
+
+.pathRow.pathLevel1 {
+  margin-left: 10px;
+  width: calc(100% - 10px);
+}
+
+.pathRow.pathLevel2 {
+  margin-left: 20px;
+  width: calc(100% - 20px);
+}
+
+.pathRow.pathLevel3 {
+  margin-left: 30px;
+  width: calc(100% - 30px);
+}
+
+.pathButton.is-active {
+  background: rgba(255, 67, 61, 0.14);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 700;
+}
+
+
+.categoryModal {
+  max-width: 460px;
+}
+
+.categoryAssignList {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  max-height: min(320px, 45vh);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.categoryAssignItem {
+  align-items: center;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.categoryAssignItem:hover {
+  border-color: #555;
+}
+
+.categoryAssignItem input {
+  accent-color: var(--accent);
+}
+
+.categoryAddLine {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 12px 0 16px;
+}
+
+.categoryAddLine input {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+
+.contextMenu[hidden] {
+  display: none;
+}
+
+.contextMenu {
+  background: #181818;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  display: grid;
+  min-width: 190px;
+  padding: 4px;
+  position: fixed;
+  z-index: 40;
+}
+
+.contextMenu button {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  min-height: 30px;
+  padding: 0 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.contextMenu button:hover {
+  background: #252525;
+}
+
+.contextMenu button.is-danger {
+  color: #ff736d;
+}
+/* Extension side panel layout: keep the compact panel UI even when Chrome widens the side panel. */
+.mainbar {
+  display: none;
+}
+
+.app {
+  display: block;
+  min-height: auto;
+}
+
+.sidebar {
+  border-right: 0;
+  max-height: none;
+  min-height: 100vh;
+  padding: 10px 8px;
+}
+
+.sidebarHeader {
+  display: none;
+}
+
+.categories {
+  display: none;
+}
+
+.channels {
+  border-top: 2px solid #3f3f3f;
+  gap: 8px;
+  margin-top: 2px;
+  padding-right: 0;
+  padding-top: 10px;
+}
+
+.channel {
+  grid-template-columns: 34px minmax(0, 1fr);
+  justify-items: stretch;
+  min-height: 48px;
+  padding: 4px;
+}
+
+.channelName {
+  display: block;
+}
+
+.content {
+  display: none;
+}
+
+body.sidePanelVideos .sidebar {
+  display: none;
+}
+
+body.sidePanelVideos .content {
+  display: grid;
+  gap: 10px;
+  min-height: 100vh;
+  padding: 10px 8px;
+}
+
+body.sidePanelVideos .contentToolbar {
+  align-items: center;
+  border-top: 2px solid #3f3f3f;
+  display: flex;
+  justify-content: space-between;
+  min-height: 34px;
+  padding-top: 10px;
+}
+
+body.sidePanelVideos #toggleListLayout {
+  display: none !important;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+body.sidePanelVideos .channelHeader {
+  display: none;
+}
+
+body.sidePanelVideos .channelActions,
+body.sidePanelVideos .videoTitleLine {
+  display: none;
+}
+
+body.sidePanelVideos .videos {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+body.sidePanelVideos .video {
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-height: 72px;
+  padding: 6px;
+}
+
+body.sidePanelVideos .watchLaterButton {
+  font-size: 11px;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.sidePanelPath {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sidePanelVideoPath {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+  min-width: 0;
+}
+/* Two extension layouts only: narrow single column, wide split panel. */
+.pathButton.is-active,
+.category.is-active,
+.channel.is-active {
+  background: transparent;
+  border-color: var(--soft-line);
+  color: var(--text);
+  font-weight: 400;
+}
+
+.channel.is-active:hover,
+.channel:hover {
+  background: #191919;
+}
+
+body.sidePanelVideos .contentToolbar {
+  border-top: 2px solid #3f3f3f;
+}
+
+@media (max-width: 449px) {
+  body.sidePanelVideos #toggleListLayout {
+    display: none !important;
+  }
+}
+
+@media (min-width: 450px) {
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    display: flex !important;
+    max-height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebarHeader {
+    display: none;
+  }
+
+  .sidePanelPath {
+    flex: 0 0 auto;
+  }
+
+  .channels {
+    border-top: 2px solid #3f3f3f;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .channels::-webkit-scrollbar {
+    display: none;
+  }
+
+  .content {
+    border-left: 0;
+    display: none;
+    gap: 10px;
+    min-height: 100vh;
+    padding: 10px 8px 10px 12px;
+  }
+
+  body.useSplitColumns .content,
+  body.useSplitColumns.sidePanelVideos .content {
+    display: grid;
+  }
+
+  body.sidePanelVideos .sidebar {
+    display: flex !important;
+  }
+
+  body.useSplitColumns.sidePanelVideos .contentToolbar {
+    border-top: 0;
+    display: flex;
+    justify-content: flex-end;
+    min-height: 34px;
+    padding-top: 0;
+  }
+
+  body.sidePanelVideos .sidePanelVideoPath {
+    display: none;
+  }
+
+  body.useSplitColumns.sidePanelVideos #toggleListLayout {
+    display: inline-flex !important;
+  }
+}
+/* Final split behavior fixes. */
+@media (min-width: 450px) {
+  .contentToolbar {
+    justify-content: flex-end;
+  }
+
+  .sidePanelVideoPath {
+    display: none !important;
+  }
+
+  .videos {
+    min-height: 0;
+  }
+
+  body.sidePanelVideos #toggleListLayout {
+    pointer-events: auto;
+    position: relative;
+    z-index: 2;
+  }
+}
+@media (min-width: 450px) {
+  body.sidePanelVideos .videos {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+}
+@media (max-width: 449px) {
+  body.sidePanelVideos .sidebar {
+    display: flex;
+    max-height: none;
+    min-height: auto;
+    padding: 10px 8px 0;
+  }
+
+  body.sidePanelVideos .channels {
+    display: none;
+  }
+
+  body.sidePanelVideos .sidePanelPath {
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  body.sidePanelVideos .content {
+    min-height: auto;
+    padding-top: 10px;
+  }
+
+  body.sidePanelVideos .contentToolbar {
+    border-top: 0;
+    display: flex;
+    min-height: auto;
+    padding-top: 0;
+  }
+
+  body.sidePanelVideos .sidePanelVideoPath {
+    display: flex;
+  }
+
+  body.sidePanelVideos #toggleListLayout {
+    display: none !important;
+  }
+}
+@media (max-width: 449px) {
+  body.sidePanelVideos .contentToolbar {
+    border-bottom: 2px solid #3f3f3f;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+  }
+}
+/* Single separator rule: only between categories/path and channels. */
+.content,
+body.sidePanelVideos .content,
+body.sidePanelVideos .contentToolbar,
+body.sidePanelVideos .sidePanelPath,
+body.sidePanelVideos .sidePanelVideoPath,
+body.sidePanelVideos .videos {
+  border: 0 !important;
+}
+
+.channels {
+  border-top: 2px solid #3f3f3f !important;
+  margin-top: 2px;
+  padding-top: 10px;
+}
+/* Narrow video mode: keep the single separator before the active channel. */
+@media (max-width: 449px) {
+  body.sidePanelVideos .channels {
+    border-top: 2px solid #3f3f3f !important;
+    display: flex;
+    margin-top: 2px;
+    padding-top: 10px;
+  }
+
+  body.sidePanelVideos .channel:not(.is-active) {
+    display: none;
+  }
+
+  body.sidePanelVideos .sidePanelVideoPath {
+    display: none !important;
+  }
+}
+
+@media (min-width: 450px) {
+  .channel,
+  .channel.is-active {
+    background: transparent;
+    border: 1px solid var(--soft-line);
+    border-radius: 6px;
+  }
+
+  .channel:hover,
+  .channel.is-active:hover {
+    background: #191919;
+    border-color: #555;
+  }
+}
+.sidePanelPath.has-many-categories {
+  max-height: 108px;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidePanelPath.has-many-categories::after {
+  background: linear-gradient(to bottom, rgba(17, 17, 17, 0), #111 82%);
+  bottom: 0;
+  content: "";
+  height: 28px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+.sidePanelPath {
+  align-items: start;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sidePanelPath .pathRow {
+  display: inline-flex;
+  width: auto;
+}
+
+.sidePanelPath .pathButton {
+  min-height: 26px;
+  padding: 0 9px;
+  width: auto;
+}
+
+.sidePanelPath .pathSettingsButton {
+  height: 26px;
+  width: 26px;
+}
+
+.sidePanelPath .pathRow.pathLevel1,
+.sidePanelPath .pathRow.pathLevel2,
+.sidePanelPath .pathRow.pathLevel3 {
+  margin-left: 0;
+  width: auto;
+}
+
+.sidePanelPath.has-many-categories {
+  max-height: var(--category-panel-max-height, 90px);
+}
+.categoryResizeHandle {
+  background: #3f3f3f;
+  cursor: ns-resize;
+  height: 3px;
+  margin: 8px 0 7px;
+  width: 100%;
+}
+
+.categoryResizeHandle:hover {
+  background: #666;
+}
+/* The draggable handle is the only category/channel separator now. */
+.channels,
+body.sidePanelVideos .channels {
+  border-top: 0 !important;
+  margin-top: 0;
+  padding-top: 0;
+}
+/* Same separator handle rendering in one-column and two-column modes. */
+.categoryResizeHandle,
+body.sidePanelVideos .categoryResizeHandle {
+  background: #3f3f3f;
+  cursor: ns-resize;
+  display: block;
+  flex: 0 0 auto;
+  height: 3px;
+  margin: 8px 0 7px;
+  padding: 0;
+  width: 100%;
+}
+
+.categoryResizeHandle:hover,
+body.sidePanelVideos .categoryResizeHandle:hover {
+  background: #666;
+}
+.sidePanelPath.has-many-categories.is-fully-expanded::after {
+  display: none;
+}
+.contentToolbar .unsubscribeButton {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  line-height: 1;
+  min-height: 34px;
+  padding: 0 11px;
+  text-align: center;
+}
+.contentToolbar {
+  gap: 8px;
+}
+
+#toggleListLayout {
+  margin-left: 0;
+}
+.importExportModal {
+  max-width: 520px;
+}
+
+.importExportGrid {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 16px;
+}
+
+.importExportGrid .modalButton {
+  justify-content: flex-start;
+  text-align: left;
+}
+@media (max-width: 449px) {
+  body.sidePanelVideos .contentToolbar {
+    display: flex !important;
+    margin-top: 8px;
+  }
+
+  body.sidePanelVideos .sidePanelVideoPath {
+    display: flex !important;
+  }
+
+  body.sidePanelVideos .sidePanelVideoPath .pathRow {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 450px) {
+  body.sidePanelVideos .sidePanelVideoPath {
+    display: none !important;
+  }
+}
+
+.channelBody {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.channelCategoryList {
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.channel.is-active .channelCategoryList:not(:empty) {
+  display: flex;
+}
+
+.channelCategoryChip {
+  border: 1px solid var(--soft-line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.sidebarCollapsed .channelBody {
+  display: none;
+}
+
+/* Active channel metadata is rendered inside the active channel button. */
+body.sidePanelVideos .sidePanelVideoPath {
+  display: none !important;
+}
+
+.channelCategoryChip {
+  cursor: context-menu;
+}
+
+.channelCategoryChip:hover {
+  border-color: #666;
+  color: var(--text);
+}
+
+/* Channel cards aligned with the compact video-card language. */
+.channels {
+  gap: 8px;
+}
+
+.channel,
+.channel.is-active {
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-height: 72px;
+  padding: 6px;
+}
+
+.channel:hover,
+.channel.is-active:hover {
+  background: #191919;
+  border-color: #555;
+}
+
+.channel img,
+.channelFallback {
+  align-self: stretch;
+  border-radius: 4px;
+  height: 100%;
+  min-height: 60px;
+  object-fit: cover;
+  width: 96px;
+}
+
+.channelFallback {
+  font-size: 22px;
+}
+
+.channelBody {
+  align-content: start;
+  gap: 6px;
+}
+
+.channelName {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.channelCategoryList,
+.channel.is-active .channelCategoryList:not(:empty) {
+  display: flex;
+}
+
+body.sidePanelVideos .sidebar {
+  padding-bottom: 4px;
+}
+
+body.sidePanelVideos .channels {
+  margin-bottom: 2px;
+  padding-bottom: 0;
+}
+
+body.sidePanelVideos .content {
+  gap: 4px;
+  padding-top: 4px;
+}
+
+body.sidePanelVideos .videos {
+  margin-top: 0;
+}
+
+body.sidePanelVideos .channel,
+body.sidePanelVideos .channel.is-active {
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-height: 72px;
+}
+
+body.sidebarCollapsed .channel,
+body.sidebarCollapsed .channel.is-active {
+  grid-template-columns: 1fr;
+  min-height: 48px;
+  width: 44px;
+}
+
+body.sidebarCollapsed .channel img,
+body.sidebarCollapsed .channelFallback {
+  border-radius: 50%;
+  height: 34px;
+  min-height: 34px;
+  width: 34px;
+}
+
+body.sidebarCollapsed .channelBody {
+  display: none;
+}
+
+/* Final channel card sizing: compact logos, active channel text aligned with video titles. */
+.channel,
+.channel.is-active {
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 50px;
+  padding: 6px;
+}
+
+.channel img,
+.channelFallback,
+.channel.is-active img,
+.channel.is-active .channelFallback {
+  align-self: start;
+  border-radius: 50%;
+  height: 34px;
+  min-height: 34px;
+  object-fit: cover;
+  width: 34px;
+}
+
+.channelBody {
+  align-content: start;
+  gap: 4px;
+}
+
+.channelMeta {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+  min-height: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channelCategoryList:not(:empty) {
+  display: flex;
+}
+
+body.sidePanelVideos .channels {
+  gap: 4px;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+body.sidePanelVideos .channel.is-active {
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-height: 50px;
+  padding: 6px;
+}
+
+body.sidePanelVideos .channel.is-active img,
+body.sidePanelVideos .channel.is-active .channelFallback {
+  justify-self: center;
+}
+
+body.sidePanelVideos .content {
+  gap: 2px;
+  padding-top: 2px;
+}
+
+body.sidePanelVideos .videos {
+  margin-top: 0;
+}
+
+@media (max-width: 449px) {
+  body.sidePanelVideos .sidebar {
+    display: flex !important;
+  }
+
+  body.sidePanelVideos .content {
+    display: grid !important;
+  }
+
+  body.sidePanelVideos .channel:not(.is-active) {
+    display: none !important;
+  }
+}
+
+/* Larger active channel image only above the videos list. */
+body.sidePanelVideos .channel.is-active img,
+body.sidePanelVideos .channel.is-active .channelFallback {
+  align-self: stretch;
+  border-radius: 4px;
+  height: 100%;
+  min-height: 60px;
+  object-fit: cover;
+  width: 96px;
+}
+
+.channelMeta {
+  display: grid;
+  gap: 2px;
+  white-space: normal;
+}
+
+.channelCategoryAddChip {
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.channelCategoryAddChip {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.category.is-auto,
+.pathButton-root.is-auto {
+  border-color: #5f7f8f;
+  color: #b9e6f5;
+}
+
+.channelCategoryNewChip {
+  border-color: #5f7f8f;
+  color: #b9e6f5;
+  font-weight: 700;
+}
+
+.pathButton-auto {
+  border-color: #5f7f8f;
+  color: #b9e6f5;
+}
+
+/* Narrow video mode: keep channels and videos in separate views. */
+@media (max-width: 449px) {
+  body.sidePanelVideos .sidebar {
+    display: flex !important;
+    max-height: none;
+    min-height: auto;
+    padding: 10px 8px 0;
+  }
+
+  body.sidePanelVideos .content {
+    display: grid !important;
+    gap: 8px;
+    min-height: 100vh;
+    padding: 10px 8px;
+  }
+
+  body.sidePanelVideos .contentToolbar {
+    align-items: flex-start;
+    display: flex !important;
+    min-height: 0;
+  }
+
+  body.sidePanelVideos .sidePanelVideoPath {
+    display: flex !important;
+  }
+
+  body.sidePanelVideos .videos {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 449px) {
+  body.sidePanelVideos .channels {
+    display: flex !important;
+  }
+
+  body.sidePanelVideos .channel:not(.is-active) {
+    display: none !important;
+  }
+}
+
+body.isChannelSearching.sidePanelVideos .sidebar {
+  display: flex !important;
+}
+
+body.isChannelSearching.sidePanelVideos .channels {
+  display: flex !important;
+}
+
+body.isChannelSearching.sidePanelVideos .channel,
+body.isChannelSearching.sidePanelVideos .channel:not(.is-active) {
+  display: grid !important;
+}
+
+@media (max-width: 449px) {
+  body.isChannelSearching.sidePanelVideos .content {
+    display: none !important;
+  }
+}
+
+/* Progressive split: at 450px and above, available width drives the video layout. */
+@media (min-width: 450px) {
+  body:not(.useSplitColumns):not(.sidePanelVideos) .content {
+    display: none !important;
+  }
+
+  body.useSplitColumns .content,
+  body.useSplitColumns.sidePanelVideos .content {
+    display: grid !important;
+  }
+
+  body:not(.useSplitColumns).sidePanelVideos .channels {
+    display: flex !important;
+  }
+
+  body:not(.useSplitColumns).sidePanelVideos .channel:not(.is-active) {
+    display: none !important;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel {
+    display: grid !important;
+  }
+}
+
+/* Split mode keeps the channel list base layout aligned with the single-column channel list. */
+@media (min-width: 450px) {
+  body.useSplitColumns.sidePanelVideos .channels {
+    display: flex !important;
+    gap: 4px;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel {
+    background: var(--panel);
+    border: 1px solid var(--soft-line);
+    border-radius: 6px;
+    display: grid !important;
+    grid-template-columns: 34px minmax(0, 1fr);
+    min-height: 50px;
+    padding: 6px;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel:hover,
+  body.useSplitColumns.sidePanelVideos .channel.is-active:hover {
+    background: #191919;
+    border-color: #555;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel img,
+  body.useSplitColumns.sidePanelVideos .channelFallback {
+    align-self: start;
+    border-radius: 50%;
+    height: 34px;
+    min-height: 34px;
+    object-fit: cover;
+    width: 34px;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel.is-active {
+    align-items: stretch;
+    grid-template-columns: 96px minmax(0, 1fr);
+    min-height: 112px;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel.is-active img,
+  body.useSplitColumns.sidePanelVideos .channel.is-active .channelFallback {
+    align-self: stretch;
+    border-radius: 4px;
+    height: 100%;
+    min-height: 60px;
+    object-fit: cover;
+    width: 96px;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel.is-active .channelBody {
+    align-content: start;
+    gap: 6px;
+  }
+
+  body.useSplitColumns.sidePanelVideos .channel.is-active .channelMeta {
+    overflow: visible;
+  }
+}
+
+/* Active category emphasis. */
+.sidePanelPath .pathButton.is-active,
+.categories .category.is-active {
+  background: rgba(239, 79, 69, 0.14);
+  color: var(--text);
+  font-weight: inherit;
+}
+
+.sidePanelPath .pathButton.is-active {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.pathIconModeButton {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+}
+
+.pathIconModeButton span {
+  background: currentColor;
+  border-radius: 999px;
+  display: block;
+  height: 2px;
+  width: 14px;
+}
+
+.pathIconModeButton:hover,
+.pathIconModeButton.is-active {
+  border-color: #666;
+  color: var(--text);
+}
+
+.pathIconModeButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.pathIconModeButton:disabled:hover {
+  border-color: var(--soft-line);
+  color: var(--muted);
+}
+
+.pathIconModeButton.is-active {
+  background: #252525;
+  border-color: #777;
+  outline: 1px solid #777;
+  outline-offset: -1px;
+}
+
+body.channelIconMode .channels {
+  align-items: stretch;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+}
+
+body.channelIconMode .channel:not(.is-active) {
+  display: grid !important;
+  grid-template-columns: 1fr;
+  height: 48px;
+  justify-items: center;
+  min-height: 48px;
+  padding: 6px;
+  width: 100%;
+}
+
+body.channelIconMode .channel:not(.is-active) .channelBody {
+  display: none;
+}
+
+body.channelIconMode .channel:not(.is-active) img,
+body.channelIconMode .channel:not(.is-active) .channelFallback {
+  align-self: center;
+  border-radius: 50%;
+  height: 34px;
+  min-height: 34px;
+  object-fit: cover;
+  width: 34px;
+}
+
+body.channelIconMode .channel.is-active {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+@media (max-width: 360px) {
+  body.channelIconMode .channels {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  }
+
+  body.channelIconMode .channel:not(.is-active) {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    height: 44px;
+    min-height: 44px;
+    padding: 5px;
+    width: 100%;
+  }
+
+  body.channelIconMode .channel:not(.is-active) .channelBody {
+    display: none !important;
+  }
+
+  body.channelIconMode .channel:not(.is-active) img,
+  body.channelIconMode .channel:not(.is-active) .channelFallback {
+    height: 32px;
+    min-height: 32px;
+    width: 32px;
+  }
+}
+
+.activeChannelSeparator {
+  background: #3f3f3f;
+  display: block;
+  flex: 0 0 auto;
+  height: 3px;
+  margin: 12px 0 14px;
+  width: 100%;
+}
+
+/* Single-column channel view must still show the videos below the active channel summary. */
+body.sidePanelVideos:not(.useSplitColumns):not(.isChannelSearching) .content,
+body.stackedChannelView.sidePanelVideos .content {
+  display: grid !important;
+  gap: 0;
+  min-height: auto;
+  padding: 0 8px 10px;
+}
+
+body.sidePanelVideos:not(.useSplitColumns):not(.isChannelSearching) .contentToolbar,
+body.stackedChannelView.sidePanelVideos .contentToolbar {
+  display: none !important;
+}
+
+@media (min-width: 450px) {
+  body.sidePanelVideos:not(.useSplitColumns):not(.isChannelSearching) .app {
+    display: block !important;
+  }
+}
+
+@media (min-width: 450px) {
+  body.channelIconMode.useSplitColumns.sidePanelVideos .channels {
+    align-items: stretch;
+    display: grid !important;
+    gap: 6px;
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  }
+}
+
+/* Final guard: when split mode is off, selected-channel view is always stacked with videos visible. */
+@media (min-width: 450px) {
+  body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .app {
+    display: block !important;
+  }
+
+  body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .content {
+    display: grid !important;
+  }
+
+  body.stackedChannelView.sidePanelVideos:not(.useSplitColumns).isChannelSearching .content {
+    display: none !important;
+  }
+}
+
+body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .content {
+  display: grid !important;
+  gap: 0;
+  min-height: auto;
+  padding: 0 8px 10px;
+}
+
+body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .sidebar {
+  display: flex !important;
+  max-height: none !important;
+  min-height: auto !important;
+  overflow: visible !important;
+  padding-bottom: 0;
+}
+
+body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .channels {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .contentToolbar {
+  display: none !important;
+}
+
+body.stackedChannelView.sidePanelVideos:not(.useSplitColumns) .activeChannelSeparator {
+  display: block !important;
+  margin: 12px 0 16px;
+}
+
+.videoLayoutButton {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 450px) {
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .app {
+    display: block !important;
+    min-height: auto;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .sidebar {
+    border-right: 0;
+    display: flex !important;
+    max-height: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding: 10px 8px 0;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channels {
+    border-top: 0;
+    display: flex !important;
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding-right: 0;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channel:not(.is-active) {
+    display: none !important;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channel.is-active {
+    grid-template-columns: 96px minmax(0, 1fr);
+    min-height: 120px;
+    padding: 6px;
+    width: 100%;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channel.is-active img,
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channel.is-active .channelFallback {
+    align-self: stretch;
+    border-radius: 4px;
+    height: 100%;
+    min-height: 96px;
+    object-fit: cover;
+    width: 96px;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .activeChannelSeparator {
+    display: block !important;
+    margin: 12px 0 16px;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .content,
+  body.useSplitColumns.sidePanelVideos:not(.hasActiveChannel):not(.isChannelSearching) .content {
+    display: grid !important;
+    gap: 8px;
+    min-height: auto;
+    padding: 0 8px 10px;
+  }
+
+  body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .contentToolbar {
+    border-top: 0;
+    display: flex !important;
+    justify-content: flex-start;
+    min-height: 34px;
+    padding: 0;
+  }
+
+  body.useSplitColumns.sidePanelVideos:not(.isChannelSearching) .videos {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  body.useSplitColumns.sidePanelVideos:not(.isChannelSearching).videoWideColumns .videos {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+
+  body.useSplitColumns.sidePanelVideos:not(.isChannelSearching).videoListSingleColumn .videos {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .contentToolbar {
+  border-top: 0;
+  display: flex !important;
+  justify-content: flex-start;
+  min-height: 34px;
+  padding: 0;
+}
+
+body.videoSingleColumnOnly.sidePanelVideos:not(.isChannelSearching) .contentToolbar,
+body.sidePanelVideos:not(.hasActiveChannel):not(.isChannelSearching) .contentToolbar {
+  display: none !important;
+}
+
+/* Channel icon mode must stay a compact icon grid in the channel-list state, including very narrow widths. */
+body.channelIconMode:not(.sidePanelVideos) .channels {
+  align-items: stretch;
+  display: grid !important;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+}
+
+body.channelIconMode:not(.sidePanelVideos) .channel {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  height: 44px;
+  justify-items: center;
+  min-height: 44px;
+  padding: 5px;
+  width: 100%;
+}
+
+body.channelIconMode:not(.sidePanelVideos) .channelBody {
+  display: none !important;
+}
+
+body.channelIconMode:not(.sidePanelVideos) .channel img,
+body.channelIconMode:not(.sidePanelVideos) .channelFallback {
+  align-self: center;
+  border-radius: 50%;
+  height: 32px;
+  min-height: 32px;
+  object-fit: cover;
+  width: 32px;
+}
+
+/* In selected-channel view, stored icon mode must not mix the full channel list with the active channel. */
+body.channelIconMode.sidePanelVideos .channel:not(.is-active) {
+  display: none !important;
+}
+
+body.channelIconMode.sidePanelVideos .channels {
+  display: flex !important;
+}
+
+body.sidePanelVideos:not(.hasActiveChannel) .channels,
+.channels:empty {
+  border-top: 0 !important;
+  display: none !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Channel-list state uses the full available width and flows channel cards into columns. */
+@media (min-width: 450px) {
+  body:not(.sidePanelVideos) .app {
+    display: block !important;
+    min-height: 100vh;
+  }
+
+  body:not(.sidePanelVideos) .content {
+    display: none !important;
+  }
+
+  body:not(.sidePanelVideos) .sidebar {
+    border-right: 0;
+    max-height: 100vh;
+    min-height: 100vh;
+    width: 100%;
+  }
+
+  body:not(.channelIconMode):not(.sidePanelVideos) .channels {
+    align-items: stretch;
+    display: grid !important;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    padding-right: 0;
+  }
+
+  body:not(.channelIconMode):not(.sidePanelVideos) .channel {
+    min-height: 64px;
+    width: 100%;
+  }
+
+  body:not(.channelIconMode):not(.sidePanelVideos) .channel.has-multiple-category-lines {
+    min-height: calc(64px + var(--category-extra-height, 0px));
+  }
+
+  body:not(.channelIconMode):not(.sidePanelVideos) .channel img,
+  body:not(.channelIconMode):not(.sidePanelVideos) .channelFallback {
+    align-self: center;
+  }
+
+  body.channelListSingleColumn:not(.sidePanelVideos) .channels {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.channels,
+body.sidePanelVideos .channels {
+  border-top: 0 !important;
+}
+

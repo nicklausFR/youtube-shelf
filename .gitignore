@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Local exported/imported personal data
+exports/
+*.local.json
+*.private.json
+youtube-channel-shelf-*.json
+youtube-subscriptions-*.csv
+data/config.json
+public/subscriptions.json
+
+# Packaged extension artifacts
+*.crx
+*.pem
+*.zip
+dist/
+build/

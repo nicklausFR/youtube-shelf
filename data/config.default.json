@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "updatedAt": null,
+  "categories": [
+    {
+      "id": "dailys",
+      "name": "Daily's"
+    }
+  ],
+  "channels": [],
+  "seenVideos": {},
+  "watchLater": {}
+}
