@@ -6,27 +6,30 @@ Public repository: <https://github.com/nicklausFR/youtube-channel-shelf>
 
 ## Status
 
-Current version: `1.0.0`.
+Current version: `1.1.0`.
 
-This version is functional and ready for public source release. Dedicated `New videos` management is not implemented yet and is planned for a later version.
+This version is functional and focused on the side-panel workflow, with category browsing, `New videos`, and `Watch later` managed from the extension interface.
 
 ## Features
 
 - Organize YouTube channels with editable categories.
 - Browse channels as icons, multi-column cards, or a single-column list.
 - Open a channel and browse its latest RSS feed videos.
-- Switch video results between wide columns, dense columns, and one-column cards.
+- Browse automatic `New videos` and `Watch later` video lists.
+- Use the same icon/list display cycle for channel lists and hosted video lists.
+- Open the official YouTube channel page from the channel context menu.
+- Show an RSS feed limit card at the end of channel video lists, linking to the official YouTube channel page.
 - Search across channels, channel metadata, category names, and loaded video titles.
 - Search inside the selected channel's loaded videos.
 - Save videos to `Watch later`.
 - Mark watched videos and remove watched `Watch later` entries.
+- Add channels from the empty-area context menu.
 - Import and export the extension configuration.
 - Import subscriptions from YouTube-style or FreeTube-style exports.
 - Keep local personal data outside the public repository.
 
 ## Not Included Yet
 
-- Dedicated `New videos` category and new-video workflow.
 - Cloud sync beyond Chrome extension storage/local files.
 - Store packaging automation.
 
