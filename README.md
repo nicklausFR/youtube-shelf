@@ -49,4 +49,6 @@ node --check public/app.js
 
 ## License
 
+Copyright (C) 2026 nicklausFR
+
 GPL-3.0-or-later. See `LICENSE`.
