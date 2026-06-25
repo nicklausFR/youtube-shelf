@@ -31,3 +31,27 @@ html.yt-companion-panel-open ytd-watch-flexy::-webkit-scrollbar {
   height: 0 !important;
   width: 0 !important;
 }
+
+
+html.yt-companion-focus-player ytd-masthead,
+html.yt-companion-focus-player #masthead-container,
+html.yt-companion-focus-player #below,
+html.yt-companion-focus-player ytd-watch-metadata,
+html.yt-companion-focus-player ytd-merch-shelf-renderer,
+html.yt-companion-focus-player ytd-structured-description-content-renderer,
+html.yt-companion-focus-player ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-structured-description"] {
+  display: none !important;
+}
+
+html.yt-companion-focus-player ytd-watch-flexy,
+html.yt-companion-focus-player ytd-watch-flexy[theater],
+html.yt-companion-focus-player ytd-watch-flexy:not([theater]) {
+  --ytd-watch-flexy-masthead-height: 0px !important;
+  --ytd-watch-flexy-top-margin: 0px !important;
+}
+
+html.yt-companion-focus-player ytd-watch-flexy #player-theater-container,
+html.yt-companion-focus-player ytd-watch-flexy #player-container,
+html.yt-companion-focus-player ytd-watch-flexy #player-container-outer {
+  margin-top: 0 !important;
+}

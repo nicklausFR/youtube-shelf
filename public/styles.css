@@ -1175,6 +1175,7 @@ body.videoWideColumns .video {
 }
 
 .pathSettingsRow {
+  gap: 6px;
   width: auto;
 }
 
@@ -1195,6 +1196,12 @@ body.videoWideColumns .video {
 .pathSettingsButton:hover {
   border-color: #555;
   color: var(--text);
+}
+
+.pathFocusButton.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .pathSettingsButton svg {
