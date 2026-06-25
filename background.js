@@ -1,6 +1,10 @@
 ﻿const openWindows = new Set();
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
+const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
+const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
+const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
+const HEARTBEAT_TTL_MS = 2500;
 
 chrome.sidePanel?.onOpened?.addListener?.((info) => {
   if (info.windowId !== undefined) openWindows.add(info.windowId);
@@ -34,6 +38,13 @@ function createContextMenus() {
       id: "hideComments",
       parentId: "displayOptions",
       title: "Hide comments",
+      type: "checkbox",
+      contexts: ["action"]
+    });
+    chrome.contextMenus.create({
+      id: "hideSuggestions",
+      parentId: "displayOptions",
+      title: "Hide suggestion list",
       type: "checkbox",
       contexts: ["action"]
     });
@@ -88,22 +99,36 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
+  if (info.menuItemId === "hideSuggestions") {
+    chrome.storage.local.set({ [SUGGESTIONS_MODE_KEY]: Boolean(info.checked) });
+    return;
+  }
+
   if (["exportNative", "importNative", "importFreetube", "cleanSlate"].includes(info.menuItemId)) {
     await openDataPopup(info.menuItemId);
   }
 });
 
-chrome.storage.local.get(COMMENTS_MODE_KEY, (result) => {
-  chrome.contextMenus.update("hideComments", {
-    checked: Boolean(result[COMMENTS_MODE_KEY])
-  }).catch(() => {});
-});
+function syncDisplayContextMenus() {
+  chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, PANEL_OPEN_KEY, PANEL_HEARTBEAT_KEY], (result) => {
+    const displayOptionsEnabled = Boolean(result[PANEL_OPEN_KEY]) && Date.now() - Number(result[PANEL_HEARTBEAT_KEY] || 0) < HEARTBEAT_TTL_MS;
+    chrome.contextMenus.update("hideComments", {
+      checked: Boolean(result[COMMENTS_MODE_KEY]),
+      enabled: displayOptionsEnabled
+    }).catch(() => {});
+    chrome.contextMenus.update("hideSuggestions", {
+      checked: result[SUGGESTIONS_MODE_KEY] === undefined ? true : Boolean(result[SUGGESTIONS_MODE_KEY]),
+      enabled: displayOptionsEnabled
+    }).catch(() => {});
+  });
+}
+
+syncDisplayContextMenus();
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !changes[COMMENTS_MODE_KEY]) return;
-  chrome.contextMenus.update("hideComments", {
-    checked: Boolean(changes[COMMENTS_MODE_KEY].newValue)
-  }).catch(() => {});
+  if (areaName !== "local") return;
+  if (!changes[COMMENTS_MODE_KEY] && !changes[SUGGESTIONS_MODE_KEY] && !changes[PANEL_OPEN_KEY] && !changes[PANEL_HEARTBEAT_KEY]) return;
+  syncDisplayContextMenus();
 });
 
 

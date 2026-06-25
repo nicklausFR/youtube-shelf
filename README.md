@@ -6,12 +6,16 @@ Current version: `1.1.0`.
 
 ## Main Features
 
-- Add YouTube channels by drag and drop.
+- Add YouTube channels by drag and drop or by searching YouTube from the extension.
+- Add and manage categories from the extension UI.
 - Classify channels into categories.
 - Show recent videos from the week in `New`.
 - Browse each channel's latest RSS videos.
 - Save videos to `Watch later`.
+- Search channels and videos using titles, declared tags, keywords, topics, categories, and type metadata when available.
 - Switch display between icon, multi-column, and single-column views.
+- Zoom the channel/video list area locally.
+- Hide YouTube comments and suggestion lists while the extension panel is active.
 - Open the official YouTube channel page when the RSS feed limit is reached.
 - Import and export the extension configuration.
 
@@ -41,10 +45,12 @@ For development, `data/config.json` can be used as a private local configuration
 
 No build step is required.
 
-Useful check:
+Useful checks:
 
 ```powershell
 node --check public/app.js
+node --check background.js
+node --check youtube-live.js
 ```
 
 ## License

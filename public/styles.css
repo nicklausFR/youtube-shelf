@@ -197,7 +197,7 @@ svg {
   align-items: center;
   display: grid;
   gap: 4px;
-  grid-template-columns: auto auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto auto auto auto minmax(0, 1fr);
   flex: 0 0 auto;
   width: 100%;
 }
@@ -227,6 +227,33 @@ svg {
   padding: 8px 2px;
 }
 
+.channelZoomButton {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 650;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 24px;
+}
+
+.channelZoomButton:hover {
+  border-color: #666;
+  color: var(--text);
+}
+
+.channelZoomButton:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .channelNavButton {
   align-items: center;
   background: var(--panel);
@@ -252,6 +279,7 @@ svg {
 }
 
 .channels {
+  --list-zoom: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -791,6 +819,141 @@ body.videoWideColumns .video {
   color: var(--text);
 }
 
+.displayOptionsModal {
+  max-width: 360px;
+}
+
+.modalCheckbox {
+  align-items: center;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.modalCheckbox input {
+  accent-color: var(--accent);
+}
+
+.modalCheckbox:has(input:disabled) {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.modalHint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 14px;
+}
+
+.addChannelModal {
+  max-width: 520px;
+}
+
+.addCategoryModal {
+  max-width: 420px;
+}
+
+.modalSearch {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 10px 0 12px;
+}
+
+.modalSearch input {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.addChannelResults {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(52vh, 460px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.addChannelResult {
+  align-items: center;
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-height: 64px;
+  overflow: hidden;
+  padding: 7px;
+  text-align: left;
+}
+
+.addChannelResult:hover {
+  border-color: #666;
+}
+
+.addChannelResultAvatar {
+  align-items: center;
+  aspect-ratio: 1;
+  background: #242424;
+  border-radius: 50%;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 18px;
+  font-weight: 700;
+  height: 48px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  width: 48px;
+}
+
+.addChannelResultAvatar img {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
+.addChannelResultDetails {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.addChannelResultDetails strong,
+.addChannelResultDetails span,
+.addChannelResultDetails small {
+  display: block;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addChannelResultDetails strong {
+  font-size: 14px;
+}
+
+.addChannelResultDetails span,
+.addChannelResultDetails small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .infoPrompt {
   background: rgba(0, 0, 0, 0.42);
 }
@@ -1202,6 +1365,10 @@ body.videoWideColumns .video {
 
 .contextMenu button:hover {
   background: #252525;
+}
+
+.contextMenu button.has-submenu {
+  padding-right: 24px;
 }
 
 .contextMenu button.is-danger {
@@ -2754,4 +2921,40 @@ body:not(.channelIconMode):not(.channelListSingleColumn) .channels.videoListHost
 
 body.channelIconMode .channels.videoListHost > .videos {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)) !important;
+}
+
+
+/* Compact hosted video lists: thumbnails only. */
+body.channelIconMode .channels.videoListHost .video,
+body.channelIconMode .channels.videoListHost .video:not(.is-active) {
+  aspect-ratio: 16 / 9;
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden;
+  padding: 4px !important;
+}
+
+body.channelIconMode .channels.videoListHost .thumbFrame {
+  display: block !important;
+  grid-row: auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 100% !important;
+}
+
+body.channelIconMode .channels.videoListHost .videoDetails,
+body.channelIconMode .channels.videoListHost .watchLaterButton,
+body.channelIconMode .channels.videoListHost .freshAgeBadge {
+  display: none !important;
+}
+
+
+/* The video layout button is retired; the main list/icon button controls every list. */
+#toggleListLayout,
+#toggleListLayout[hidden],
+body.sidePanelVideos #toggleListLayout,
+body.useSplitColumns.sidePanelVideos #toggleListLayout,
+body.virtualVideoListView #toggleListLayout {
+  display: none !important;
 }

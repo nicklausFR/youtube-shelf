@@ -47,6 +47,8 @@
           <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
             <span></span><span></span><span></span>
           </button>
+          <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">-</button>
+          <button id="channelZoomIn" class="channelZoomButton" type="button" title="Zoom in list" aria-label="Zoom in list">+</button>
           <button id="channelBack" class="channelNavButton" type="button" title="Back" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
           </button>
@@ -155,6 +157,50 @@
         </div>
         <div class="modalActions">
           <button id="closeImportExport" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+    <div id="displayOptionsPrompt" class="modalOverlay" hidden>
+      <div class="modal displayOptionsModal" role="dialog" aria-modal="true" aria-labelledby="displayOptionsTitle">
+        <h2 id="displayOptionsTitle">Display options</h2>
+        <label class="modalCheckbox">
+          <input id="hideCommentsOption" type="checkbox" />
+          <span>Hide comments</span>
+        </label>
+        <label class="modalCheckbox">
+          <input id="hideSuggestionsOption" type="checkbox" />
+          <span>Hide suggestion list</span>
+        </label>
+        <p id="displayOptionsInactive" class="modalHint" hidden>Options apply only while the extension panel is open.</p>
+        <div class="modalActions">
+          <button id="closeDisplayOptions" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="addChannelPrompt" class="modalOverlay" hidden>
+      <div class="modal addChannelModal" role="dialog" aria-modal="true" aria-labelledby="addChannelTitle">
+        <h2 id="addChannelTitle">Add channel</h2>
+        <form id="addChannelSearchForm" class="modalSearch" role="search">
+          <input id="addChannelSearchInput" type="search" placeholder="Search YouTube channels" autocomplete="off">
+          <button class="modalButton primary" type="submit">Search</button>
+        </form>
+        <div id="addChannelResults" class="addChannelResults"></div>
+        <div class="modalActions">
+          <button id="closeAddChannel" class="modalButton secondary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="addCategoryPrompt" class="modalOverlay" hidden>
+      <div class="modal addCategoryModal" role="dialog" aria-modal="true" aria-labelledby="addCategoryTitle">
+        <h2 id="addCategoryTitle">Add category</h2>
+        <form id="addCategoryForm" class="modalSearch">
+          <input id="addCategoryName" type="text" placeholder="Category name" autocomplete="off">
+          <button class="modalButton primary" type="submit">Add</button>
+        </form>
+        <div class="modalActions">
+          <button id="closeAddCategory" class="modalButton secondary" type="button">Close</button>
         </div>
       </div>
     </div>
