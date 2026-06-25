@@ -2,7 +2,7 @@
 
 Browser extension for managing a personal YouTube channel shelf from the side panel.
 
-Current version: `1.1.0`.
+Current version: `1.2.0`.
 
 ## Main Features
 
