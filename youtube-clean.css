@@ -3,9 +3,9 @@ html.yt-companion-hide-comments ytd-comments {
   display: none !important;
 }
 
-html.yt-companion-panel-open #secondary,
-html.yt-companion-panel-open ytd-watch-next-secondary-results-renderer,
-html.yt-companion-panel-open ytd-related-chip-cloud-renderer {
+html.yt-companion-hide-suggestions #secondary,
+html.yt-companion-hide-suggestions ytd-watch-next-secondary-results-renderer,
+html.yt-companion-hide-suggestions ytd-related-chip-cloud-renderer {
   display: none !important;
 }
 html.yt-companion-panel-open,

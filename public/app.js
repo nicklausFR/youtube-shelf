@@ -10,6 +10,8 @@ const addCategoryEl = document.querySelector("#addCategory");
 const sidePanelPathEl = document.querySelector("#sidePanelPath");
 const sidePanelVideoPathEl = document.querySelector("#sidePanelVideoPath");
 const channelIconModeEl = document.querySelector("#channelIconMode");
+const channelZoomOutEl = document.querySelector("#channelZoomOut");
+const channelZoomInEl = document.querySelector("#channelZoomIn");
 const channelBackEl = document.querySelector("#channelBack");
 const channelForwardEl = document.querySelector("#channelForward");
 const channelSearchInputEl = document.querySelector("#channelSearchInput");
@@ -52,6 +54,20 @@ const importNativeConfigEl = document.querySelector("#importNativeConfig");
 const importYoutubeConfigEl = document.querySelector("#importYoutubeConfig");
 const importFreetubeConfigEl = document.querySelector("#importFreetubeConfig");
 const closeImportExportEl = document.querySelector("#closeImportExport");
+const displayOptionsPromptEl = document.querySelector("#displayOptionsPrompt");
+const hideCommentsOptionEl = document.querySelector("#hideCommentsOption");
+const hideSuggestionsOptionEl = document.querySelector("#hideSuggestionsOption");
+const closeDisplayOptionsEl = document.querySelector("#closeDisplayOptions");
+const displayOptionsInactiveEl = document.querySelector("#displayOptionsInactive");
+const addChannelPromptEl = document.querySelector("#addChannelPrompt");
+const addChannelSearchFormEl = document.querySelector("#addChannelSearchForm");
+const addChannelSearchInputEl = document.querySelector("#addChannelSearchInput");
+const addChannelResultsEl = document.querySelector("#addChannelResults");
+const closeAddChannelEl = document.querySelector("#closeAddChannel");
+const addCategoryPromptEl = document.querySelector("#addCategoryPrompt");
+const addCategoryFormEl = document.querySelector("#addCategoryForm");
+const addCategoryNameEl = document.querySelector("#addCategoryName");
+const closeAddCategoryEl = document.querySelector("#closeAddCategory");
 
 let activeVideoId = "";
 let activeChannel = null;
@@ -66,6 +82,7 @@ let currentVideos = [];
 let seenVideos = {};
 let watchLater = {};
 let currentWatchLaterVideoId = "";
+let pendingAddChannelCategoryId = "";
 let currentWatchLaterStartedAt = 0;
 let seenPromptResolve = null;
 let configLoaded = false;
@@ -91,11 +108,17 @@ const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
+const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const SNIFF_YOUTUBE_KEY = "youtubeChannelShelfSniffYoutube";
+const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
+const LIST_ZOOM_MIN = 0.7;
+const LIST_ZOOM_MAX = 1.5;
+const LIST_ZOOM_STEP = 0.1;
 const SPLIT_COLUMN_MIN_WIDTH = 450;
 const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
+let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
 
 async function readBundledConfig() {
   let lastError = null;
@@ -121,8 +144,13 @@ function setPanelOpenState(open) {
   });
 }
 
+function isExtensionPanelActive() {
+  return document.visibilityState === "visible";
+}
+
 function syncPanelVisibilityState() {
-  setPanelOpenState(document.visibilityState === "visible");
+  setPanelOpenState(isExtensionPanelActive());
+  syncDisplayOptionsAvailability();
 }
 
 function isSidePanelView() {
@@ -187,11 +215,62 @@ function appendSettingsPathItem(container) {
   container.append(row);
 }
 
-function toggleDisplayOptions() {
-  if (!globalThis.chrome?.storage?.local) return;
-  chrome.storage.local.get(COMMENTS_MODE_KEY, (result) => {
-    chrome.storage.local.set({ [COMMENTS_MODE_KEY]: !Boolean(result[COMMENTS_MODE_KEY]) });
+function broadcastDisplayOptions() {
+  if (!globalThis.chrome?.tabs?.query) return;
+  const message = {
+    type: "youtubeChannelShelfDisplayOptions",
+    hideComments: Boolean(hideCommentsOptionEl?.checked),
+    hideSuggestions: hideSuggestionsOptionEl ? Boolean(hideSuggestionsOptionEl.checked) : true
+  };
+  chrome.tabs.query({ url: ["*://www.youtube.com/watch*", "*://youtube.com/watch*"] }, (tabs = []) => {
+    for (const tab of tabs) {
+      if (tab.id !== undefined) chrome.tabs.sendMessage(tab.id, message).catch?.(() => {});
+    }
   });
+}
+
+function setDisplayOption(key, value) {
+  if (!globalThis.chrome?.storage?.local) return;
+  const checked = Boolean(value);
+  if (key === COMMENTS_MODE_KEY && hideCommentsOptionEl) hideCommentsOptionEl.checked = checked;
+  if (key === SUGGESTIONS_MODE_KEY && hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = checked;
+  chrome.storage.local.set({ [key]: checked });
+  broadcastDisplayOptions();
+}
+
+function toggleDisplayOption(key, fallback = false) {
+  if (!globalThis.chrome?.storage?.local) return;
+  chrome.storage.local.get(key, (result) => {
+    const current = result[key] === undefined ? fallback : Boolean(result[key]);
+    setDisplayOption(key, !current);
+  });
+}
+
+function syncDisplayOptionsAvailability() {
+  const active = isExtensionPanelActive();
+  hideCommentsOptionEl?.toggleAttribute("disabled", !active);
+  hideSuggestionsOptionEl?.toggleAttribute("disabled", !active);
+  if (displayOptionsInactiveEl) displayOptionsInactiveEl.hidden = active;
+}
+
+function syncDisplayOptionsDialog() {
+  syncDisplayOptionsAvailability();
+  if (!globalThis.chrome?.storage?.local) return;
+  chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY], (result) => {
+    if (hideCommentsOptionEl) hideCommentsOptionEl.checked = Boolean(result[COMMENTS_MODE_KEY]);
+    if (hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = result[SUGGESTIONS_MODE_KEY] === undefined ? true : Boolean(result[SUGGESTIONS_MODE_KEY]);
+  });
+}
+
+function openDisplayOptionsDialog() {
+  if (!displayOptionsPromptEl) return;
+  syncDisplayOptionsDialog();
+  displayOptionsPromptEl.hidden = false;
+  hideCommentsOptionEl?.focus();
+}
+
+function closeDisplayOptionsDialog() {
+  if (displayOptionsPromptEl) displayOptionsPromptEl.hidden = true;
 }
 
 function setSniffYoutubeEnabled(value) {
@@ -209,8 +288,10 @@ function toggleSniffYoutube() {
 
 function settingsContextActions() {
   return [
+    { label: "Add channel", action: () => addChannel(activeCategoryId) },
+    { label: "Add category", action: () => addCategoryEl.click() },
     { label: "Import / Export", action: openImportExportDialog },
-    { label: "Display options", action: toggleDisplayOptions },
+    { label: "Display options", action: openDisplayOptionsDialog },
     { label: `Sniff YouTube metadata: ${sniffYoutubeEnabled ? "On" : "Off"}`, action: toggleSniffYoutube },
     { label: "Clean Slate", action: cleanSlate, danger: true }
   ];
@@ -317,12 +398,13 @@ function showContextMenu(event, actions) {
     ...actions.map((item) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = item.checked ? `[x] ${item.label}` : item.label;
+      button.textContent = item.checked ? "[x] " + item.label : item.submenu ? item.label + " >" : item.label;
       if (item.danger) button.classList.add("is-danger");
-      button.addEventListener("click", async () => {
-        hideContextMenu();
+      if (item.submenu) button.classList.add("has-submenu");
+      button.addEventListener("click", async (clickEvent) => {
+        if (!item.submenu) hideContextMenu();
         await maybePromptSeenForWatchLater();
-        await Promise.resolve(item.action());
+        await Promise.resolve(item.action(clickEvent));
       });
       return button;
     })
@@ -540,6 +622,27 @@ function applyListLayout() {
   updateSplitColumnState();
 }
 
+function clampListZoom(value) {
+  return Math.min(LIST_ZOOM_MAX, Math.max(LIST_ZOOM_MIN, Math.round(value * 10) / 10));
+}
+
+function applyListZoom() {
+  listZoom = clampListZoom(listZoom);
+  channelsEl.style.setProperty("--list-zoom", String(listZoom));
+  channelsEl.style.zoom = String(listZoom);
+  localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
+  const percent = Math.round(listZoom * 100);
+  channelZoomOutEl?.toggleAttribute("disabled", listZoom <= LIST_ZOOM_MIN);
+  channelZoomInEl?.toggleAttribute("disabled", listZoom >= LIST_ZOOM_MAX);
+  channelZoomOutEl?.setAttribute("title", `Zoom out list (${percent}%)`);
+  channelZoomInEl?.setAttribute("title", `Zoom in list (${percent}%)`);
+}
+
+function changeListZoom(delta) {
+  listZoom = clampListZoom(listZoom + delta);
+  applyListZoom();
+}
+
 function syncChannelIconModeButton() {
   if (!channelIconModeEl) return;
   channelIconModeEl.classList.toggle("is-active", channelListMode === "icons");
@@ -554,7 +657,7 @@ function syncChannelIconModeButton() {
     columns: "List in one column",
     single: "Icons only"
   };
-  const label = activeChannel ? "Back to channel list" : `${labels[channelListMode]}. Next: ${nextLabels[channelListMode]}`;
+  const label = `${labels[channelListMode]}. Next: ${nextLabels[channelListMode]}`;
   channelIconModeEl.title = label;
   channelIconModeEl.setAttribute("aria-label", label);
   channelIconModeEl.setAttribute("aria-pressed", String(channelListMode === "icons"));
@@ -564,6 +667,8 @@ function syncVideoLayoutButton() {
   if (!toggleListLayoutEl) return;
   const label = "Video layout adjusts automatically";
   toggleListLayoutEl.classList.remove("is-active");
+  toggleListLayoutEl.hidden = true;
+  toggleListLayoutEl.disabled = true;
   toggleListLayoutEl.title = label;
   toggleListLayoutEl.setAttribute("aria-label", label);
   toggleListLayoutEl.setAttribute("aria-pressed", "false");
@@ -614,16 +719,23 @@ function textFrom(entry, selector) {
   return entry.querySelector(selector)?.textContent?.trim() || "";
 }
 
+function xmlTextFrom(entry, tagName) {
+  return entry.getElementsByTagName(tagName)[0]?.textContent?.trim() || "";
+}
+
 function parseFeed(xmlText) {
   const doc = new DOMParser().parseFromString(xmlText, "application/xml");
   const entries = [...doc.querySelectorAll("entry")];
 
   return entries.map((entry) => {
     const videoId = textFrom(entry, "videoId");
+    const keywords = xmlTextFrom(entry, "media:keywords") || xmlTextFrom(entry, "keywords");
     return {
       id: videoId,
       title: textFrom(entry, "title"),
       published: textFrom(entry, "published"),
+      description: xmlTextFrom(entry, "media:description") || xmlTextFrom(entry, "description") || "",
+      tags: keywords ? keywords.split(",").map((item) => item.trim()).filter(Boolean) : [],
       thumbnail: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
     };
   });
@@ -678,6 +790,8 @@ function videoWithChannel(video, channel) {
     ...video,
     channel: channel.title || "",
     channelId: channel.id || video.channelId || "",
+    channelCategories: channel.categories || [],
+    channelTags: metadataTextValues(channel),
     thumbnail: video.thumbnail || `https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`
   };
 }
@@ -774,7 +888,10 @@ async function openOfficialYoutube(video) {
     seenVideos[videoId] = {
       seenAt: new Date().toISOString(),
       channelId: activeChannel?.id || video.channelId || "",
-      title: video.title || ""
+      title: video.title || "",
+      description: video.description || "",
+      tags: video.tags || video.keywords || video.topics || [],
+      channel: video.channel || activeChannel?.title || ""
     };
     await saveConfig().catch(() => {});
   }
@@ -1238,7 +1355,10 @@ async function toggleWatchLater(video) {
       savedAt: new Date().toISOString(),
       seenAt: "",
       channelId: activeChannel?.id || video.channelId || "",
-      title: video.title || ""
+      title: video.title || "",
+      description: video.description || "",
+      tags: video.tags || video.keywords || video.topics || [],
+      channel: video.channel || activeChannel?.title || ""
     };
   }
   await saveConfig();
@@ -1762,21 +1882,51 @@ function normalizeSearchText(value) {
     .toLowerCase();
 }
 
-function savedVideoTextsForChannel(channelId) {
-  const entries = [
-    ...Object.values(seenVideos || {}),
-    ...Object.values(watchLater || {})
-  ];
-
-  return entries
-    .filter((item) => item?.channelId === channelId)
-    .map((item) => item.title || "");
+function searchWordsFromText(value) {
+  return normalizeSearchText(value)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 }
 
-function channelContentTypeTexts(channel) {
-  const fields = [
-    "description",
-    "content",
+function searchAliasesFromText(value) {
+  const words = searchWordsFromText(value);
+  if (!words.length) return [];
+  const aliases = new Set();
+  aliases.add(words.join(""));
+  return [...aliases].filter((alias) => alias.length > 1);
+}
+
+function searchPartScore(value, query, weights) {
+  const text = normalizeSearchText(value);
+  if (!text) return 0;
+  const words = searchWordsFromText(value);
+  const joined = words.join("");
+  if (text === query || joined === query) return weights.exact;
+  if (text.startsWith(query) || joined.startsWith(query)) return weights.prefix;
+  if (words.some((word) => word.startsWith(query))) return weights.wordPrefix;
+  if (text.includes(query) || joined.includes(query)) return weights.includes;
+  return 0;
+}
+
+function valuesFromFields(item, fields) {
+  return fields.flatMap((field) => {
+    const value = item?.[field];
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") return Object.values(value);
+    return value ? [value] : [];
+  });
+}
+
+function channelDeclaredMetadataValues(channel) {
+  return valuesFromFields(channel, [
+    "tag",
+    "tags",
+    "keyword",
+    "keywords",
+    "topic",
+    "topics",
+    "category",
+    "categories",
     "contentType",
     "contentTypes",
     "content_type",
@@ -1785,21 +1935,50 @@ function channelContentTypeTexts(channel) {
     "genre",
     "genres",
     "niche",
-    "niches",
-    "topic",
-    "topics",
+    "niches"
+  ]);
+}
+
+function videoDeclaredMetadataValues(video) {
+  return valuesFromFields(video, [
     "tag",
     "tags",
     "keyword",
-    "keywords"
+    "keywords",
+    "topic",
+    "topics",
+    "contentType",
+    "contentTypes",
+    "content_type",
+    "type",
+    "types",
+    "genre",
+    "genres"
+  ]);
+}
+
+function descriptiveMetadataValues(item) {
+  return valuesFromFields(item, ["description", "summary", "content"]);
+}
+
+function metadataTextValues(item) {
+  return [
+    ...channelDeclaredMetadataValues(item),
+    ...videoDeclaredMetadataValues(item),
+    ...descriptiveMetadataValues(item),
+    ...valuesFromFields(item, ["handle", "author", "channel", "channelTitle", "channelName"])
+  ];
+}
+
+function savedVideoTextsForChannel(channelId) {
+  const entries = [
+    ...Object.values(seenVideos || {}),
+    ...Object.values(watchLater || {})
   ];
 
-  return fields.flatMap((field) => {
-    const value = channel?.[field];
-    if (Array.isArray(value)) return value;
-    if (value && typeof value === "object") return Object.values(value);
-    return value ? [value] : [];
-  });
+  return entries
+    .filter((item) => item?.channelId === channelId)
+    .flatMap((item) => [item.title || "", ...metadataTextValues(item)]);
 }
 
 function searchableTextForChannel(channel) {
@@ -1810,14 +1989,19 @@ function searchableTextForChannel(channel) {
     .map((video) => video?.title || "")
     .filter(Boolean);
 
-  return normalizeSearchText([
+  const parts = [
     channel.id,
     channel.title,
     channel.feedLatestTitle,
-    ...channelContentTypeTexts(channel),
+    ...metadataTextValues(channel),
     ...categoryNames,
     ...videoTitles,
     ...savedVideoTextsForChannel(channel.id)
+  ].filter(Boolean);
+
+  return normalizeSearchText([
+    ...parts,
+    ...parts.flatMap(searchAliasesFromText)
   ].join(" "));
 }
 
@@ -1858,11 +2042,23 @@ function clearChannelSearch() {
 }
 
 function searchableTextForVideo(video) {
-  return normalizeSearchText([
+  const channel = allChannels.find((item) => item.id === video?.channelId) || activeChannel || null;
+  const saved = [seenVideos?.[video?.id], watchLater?.[video?.id]].filter(Boolean);
+  const parts = [
     video?.id,
     video?.title,
     video?.published,
-    video?.channel
+    ...videoDeclaredMetadataValues(video),
+    ...saved.flatMap((item) => [item.title || "", ...videoDeclaredMetadataValues(item)]),
+    video?.channel,
+    channel?.title,
+    ...descriptiveMetadataValues(video),
+    ...saved.flatMap(descriptiveMetadataValues)
+  ].filter(Boolean);
+
+  return normalizeSearchText([
+    ...parts,
+    ...parts.flatMap(searchAliasesFromText)
   ].join(" "));
 }
 
@@ -1904,10 +2100,35 @@ function renderSearchResults() {
   renderChannels(sourceChannelsForSearch());
 }
 
+function channelSearchScore(channel, query) {
+  if (!query) return 1;
+  let score = 0;
+  score = Math.max(score, searchPartScore(channel.title, query, { exact: 1000, prefix: 900, wordPrefix: 760, includes: 420 }));
+  score = Math.max(score, searchPartScore(channelDeclaredMetadataValues(channel).join(" "), query, { exact: 760, prefix: 650, wordPrefix: 520, includes: 300 }));
+  score = Math.max(score, searchPartScore(categoryNamesForChannel(channel).join(" "), query, { exact: 700, prefix: 600, wordPrefix: 500, includes: 280 }));
+  score = Math.max(score, searchPartScore([channel.handle, channel.id].filter(Boolean).join(" "), query, { exact: 560, prefix: 500, wordPrefix: 380, includes: 220 }));
+  score = Math.max(score, searchPartScore(descriptiveMetadataValues(channel).join(" "), query, { exact: 260, prefix: 220, wordPrefix: 180, includes: 80 }));
+
+  const feedVideos = Array.isArray(channel.feedVideos) ? channel.feedVideos : [];
+  const videoText = [
+    channel.feedLatestTitle,
+    ...feedVideos.flatMap((video) => [video?.title || "", ...videoDeclaredMetadataValues(video)]),
+    ...savedVideoTextsForChannel(channel.id)
+  ].join(" ");
+  score = Math.max(score, searchPartScore(videoText, query, { exact: 180, prefix: 150, wordPrefix: 120, includes: 50 }));
+
+  if (!score && searchableTextForChannel(channel).includes(query)) score = 20;
+  return score;
+}
+
 function filterChannelsForSearch(channels) {
   const query = normalizeSearchText(channelSearchQuery.trim());
   if (!query) return channels;
-  return channels.filter((channel) => searchableTextForChannel(channel).includes(query));
+  return channels
+    .map((channel, index) => ({ channel, index, score: channelSearchScore(channel, query) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.channel.title.localeCompare(b.channel.title, "fr") || a.index - b.index)
+    .map((item) => item.channel);
 }
 
 async function saveConfig() {
@@ -2003,6 +2224,9 @@ function renderWatchLater() {
     title: item.title || id,
     published: item.savedAt || "",
     channelId: item.channelId || "",
+    channel: item.channel || allChannels.find((channel) => channel.id === item.channelId)?.title || "",
+    description: item.description || "",
+    tags: item.tags || item.keywords || item.topics || [],
     thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
   }));
   videosEl.replaceChildren();
@@ -2252,7 +2476,9 @@ async function loadFeed() {
       feedVideos: currentVideos.map((video) => ({
         id: video.id,
         title: video.title,
-        published: video.published
+        published: video.published,
+        description: video.description || "",
+        tags: video.tags || []
       }))
     };
     allChannels = allChannels.map((channel) => (channel.id === activeChannel.id ? { ...channel, ...activeChannel } : channel));
@@ -2303,7 +2529,9 @@ async function refreshChannelSummaries() {
         feedVideos: videos.map((video) => ({
           id: video.id,
           title: video.title,
-          published: video.published
+          published: video.published,
+          description: video.description || "",
+          tags: video.tags || []
         }))
       };
       if (
@@ -2539,7 +2767,8 @@ channelForwardEl?.addEventListener("click", () => {
   navigateHistory(1);
 });
 
-toggleListLayoutEl.addEventListener("click", () => {
+toggleListLayoutEl?.addEventListener("click", (event) => {
+  event.preventDefault();
   syncVideoLayoutAvailability();
 });
 
@@ -2604,16 +2833,34 @@ exportYoutubeConfigEl.addEventListener("click", exportYoutubeCsv);
 importNativeConfigEl.addEventListener("click", () => runImportFilePicker("native"));
 importYoutubeConfigEl.addEventListener("click", () => runImportFilePicker("youtube"));
 importFreetubeConfigEl.addEventListener("click", () => runImportFilePicker("freetube"));
+closeDisplayOptionsEl?.addEventListener("click", closeDisplayOptionsDialog);
+closeAddChannelEl?.addEventListener("click", closeAddChannelDialog);
+closeAddCategoryEl?.addEventListener("click", closeAddCategoryDialog);
+addChannelSearchFormEl?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  runAddChannelSearch();
+});
+addCategoryFormEl?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveNewCategoryFromDialog().catch((error) => setStatus(`Category error: ${error.message}`, true));
+});
+hideCommentsOptionEl?.addEventListener("click", (event) => {
+  event.preventDefault();
+  toggleDisplayOption(COMMENTS_MODE_KEY, false);
+});
+hideSuggestionsOptionEl?.addEventListener("click", (event) => {
+  event.preventDefault();
+  toggleDisplayOption(SUGGESTIONS_MODE_KEY, true);
+});
 
 channelIconModeEl?.addEventListener("click", () => {
-  if (activeChannel) {
-    showSidePanelChannels().catch((error) => setStatus(`Navigation error: ${error.message}`, true));
-    return;
-  }
   channelListMode = channelListMode === "icons" ? "columns" : channelListMode === "columns" ? "single" : "icons";
   localStorage.setItem("channelListMode", channelListMode);
   applyListLayout();
 });
+
+channelZoomOutEl?.addEventListener("click", () => changeListZoom(-LIST_ZOOM_STEP));
+channelZoomInEl?.addEventListener("click", () => changeListZoom(LIST_ZOOM_STEP));
 
 channelSearchInputEl?.addEventListener("input", () => {
   channelSearchQuery = channelSearchInputEl.value;
@@ -2800,28 +3047,175 @@ async function addDroppedChannel(value) {
   await addChannelById(channelId);
 }
 
-async function addChannel(categoryId = activeCategoryId) {
-  const channelId = prompt("YouTube channel ID, format UC...");
-  if (!channelId) return;
-  await addChannelById(channelId, categoryId);
+function extractJsonObjectAfter(text, marker) {
+  const markerIndex = text.indexOf(marker);
+  if (markerIndex < 0) return null;
+  const start = text.indexOf("{", markerIndex + marker.length);
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === "\"") inString = false;
+      continue;
+    }
+    if (char === "\"") inString = true;
+    else if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, index + 1);
+    }
+  }
+  return null;
 }
 
-addChannelEl.addEventListener("click", () => {
-  addChannel(activeCategoryId);
-});
+function textFromRuns(value) {
+  return value?.simpleText || value?.runs?.map((run) => run.text || "").join("") || "";
+}
 
-addCategoryEl.addEventListener("click", async () => {
-  const name = prompt("Category name");
-  if (!name) return;
+function collectChannelRenderers(node, results = []) {
+  if (!node || typeof node !== "object") return results;
+  if (node.channelRenderer) results.push(node.channelRenderer);
+  for (const value of Object.values(node)) {
+    if (value && typeof value === "object") collectChannelRenderers(value, results);
+  }
+  return results;
+}
+
+function channelResultFromRenderer(renderer) {
+  const id = renderer.channelId || renderer.navigationEndpoint?.browseEndpoint?.browseId || "";
+  if (!/^UC[-_a-zA-Z0-9]+$/.test(id)) return null;
+  const title = textFromRuns(renderer.title).trim() || "Untitled channel";
+  const handle = textFromRuns(renderer.subscriberCountText).trim() || textFromRuns(renderer.videoCountText).trim();
+  const description = textFromRuns(renderer.descriptionSnippet).trim();
+  const thumbnails = renderer.thumbnail?.thumbnails || [];
+  const thumbnail = thumbnails.at(-1)?.url || thumbnails[0]?.url || "";
+  return { id, title, handle, description, thumbnail };
+}
+
+async function searchYoutubeChannels(query) {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(trimmed) + "&sp=EgIQAg%253D%253D";
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const html = await response.text();
+  const initialData = extractJsonObjectAfter(html, "ytInitialData") || extractJsonObjectAfter(html, "var ytInitialData =");
+  if (!initialData) return [];
+  const data = JSON.parse(initialData);
+  const seen = new Set();
+  return collectChannelRenderers(data)
+    .map(channelResultFromRenderer)
+    .filter(Boolean)
+    .filter((channel) => {
+      if (seen.has(channel.id)) return false;
+      seen.add(channel.id);
+      return true;
+    })
+    .slice(0, 8);
+}
+
+function renderAddChannelResults(results) {
+  if (!addChannelResultsEl) return;
+  if (!results.length) {
+    addChannelResultsEl.textContent = "No channel found.";
+    return;
+  }
+  addChannelResultsEl.replaceChildren(...results.map((channel) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "addChannelResult";
+    const avatar = document.createElement("span");
+    avatar.className = "addChannelResultAvatar";
+    avatar.textContent = channel.title.slice(0, 1).toUpperCase();
+    if (channel.thumbnail) {
+      const image = document.createElement("img");
+      image.alt = "";
+      image.src = channel.thumbnail;
+      image.addEventListener("error", () => image.remove());
+      avatar.append(image);
+    }
+    const details = document.createElement("span");
+    details.className = "addChannelResultDetails";
+    const title = document.createElement("strong");
+    title.textContent = channel.title;
+    const meta = document.createElement("span");
+    meta.textContent = channel.handle || channel.id;
+    const description = document.createElement("small");
+    description.textContent = channel.description;
+    details.append(title, meta, description);
+    button.append(avatar, details);
+    button.addEventListener("click", async () => {
+      const added = await addChannelById(channel.id, pendingAddChannelCategoryId || activeCategoryId);
+      if (added) closeAddChannelDialog();
+    });
+    return button;
+  }));
+}
+
+async function runAddChannelSearch() {
+  const query = addChannelSearchInputEl?.value || "";
+  if (!addChannelResultsEl) return;
+  addChannelResultsEl.textContent = "Searching...";
+  try {
+    renderAddChannelResults(await searchYoutubeChannels(query));
+  } catch (error) {
+    addChannelResultsEl.textContent = "Search failed: " + error.message;
+  }
+}
+
+function openAddChannelDialog(categoryId = activeCategoryId) {
+  pendingAddChannelCategoryId = categoryId || "";
+  if (!addChannelPromptEl) return;
+  addChannelPromptEl.hidden = false;
+  if (addChannelResultsEl) addChannelResultsEl.textContent = "";
+  addChannelSearchInputEl?.select();
+  addChannelSearchInputEl?.focus();
+}
+
+function closeAddChannelDialog() {
+  if (addChannelPromptEl) addChannelPromptEl.hidden = true;
+}
+
+async function addChannel(categoryId = activeCategoryId) {
+  openAddChannelDialog(categoryId);
+}
+
+function openAddCategoryDialog() {
+  if (!addCategoryPromptEl) return;
+  addCategoryPromptEl.hidden = false;
+  if (addCategoryNameEl) addCategoryNameEl.value = "";
+  addCategoryNameEl?.focus();
+}
+
+function closeAddCategoryDialog() {
+  if (addCategoryPromptEl) addCategoryPromptEl.hidden = true;
+}
+
+async function saveNewCategoryFromDialog() {
+  const name = addCategoryNameEl?.value || "";
+  if (!name.trim()) return;
   const category = createCategory(name);
   if (!category) return;
   await saveConfig();
   renderCategories();
   renderChannels(channelsForActiveCategory());
   renderSidePanelPath();
+  closeAddCategoryDialog();
+}
+
+addChannelEl.addEventListener("click", () => {
+  addChannel(activeCategoryId);
 });
 
+addCategoryEl.addEventListener("click", openAddCategoryDialog);
+
 applyListLayout();
+applyListZoom();
 syncPanelVisibilityState();
 if (globalThis.chrome?.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -2831,6 +3225,9 @@ if (globalThis.chrome?.storage?.onChanged) {
     }
     if (changes[DATA_COMMAND_KEY]?.newValue) {
       handleIncomingDataCommand(changes[DATA_COMMAND_KEY].newValue);
+    }
+    if (changes[COMMENTS_MODE_KEY] || changes[SUGGESTIONS_MODE_KEY]) {
+      syncDisplayOptionsDialog();
     }
   });
 }
