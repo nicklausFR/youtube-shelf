@@ -92,9 +92,17 @@ let sessionFeedBaseline = new Map();
 let listLayout = localStorage.getItem("listLayout") || "grid";
 if (listLayout === "rows" || listLayout === "thumbs") listLayout = "wide";
 if (!["wide", "grid", "single"].includes(listLayout)) listLayout = "grid";
+const CHANNEL_LIST_MODE_KEY_PREFIX = "channelListMode:";
+const CHANNEL_LIST_MODE_SCOPES = ["channels", "category", "channelVideos", "newVideos", "watchLater"];
 const storedChannelListMode = localStorage.getItem("channelListMode");
-let channelListMode = storedChannelListMode || (localStorage.getItem("channelIconMode") === "true" ? "icons" : "columns");
-if (!["icons", "columns", "single"].includes(channelListMode)) channelListMode = "columns";
+const fallbackChannelListMode = ["icons", "columns", "single"].includes(storedChannelListMode)
+  ? storedChannelListMode
+  : localStorage.getItem("channelIconMode") === "true" ? "icons" : "columns";
+let channelListMode = fallbackChannelListMode;
+let channelListModes = Object.fromEntries(CHANNEL_LIST_MODE_SCOPES.map((scope) => {
+  const value = localStorage.getItem(CHANNEL_LIST_MODE_KEY_PREFIX + scope) || fallbackChannelListMode;
+  return [scope, ["icons", "columns", "single"].includes(value) ? value : "columns"];
+}));
 let sidePanelCategoriesExpanded = false;
 let categoryAssignChannel = null;
 let channelAssignCategory = null;
@@ -625,6 +633,7 @@ function renderSidePanelPath() {
   sidePanelPathEl.after(makeCategoryResizeHandle());
   appendActiveChannelSummary(sidePanelVideoPathEl);
   syncStackedChannelViewState();
+  if (channelIconModeEl) applyListLayout();
 }
 
 async function showSidePanelChannels() {
@@ -647,7 +656,26 @@ async function showSidePanelChannels() {
   pushHistory(channelListHistoryEntry());
 }
 
+function currentListLayoutScope() {
+  if (activeView === "newVideos") return "newVideos";
+  if (activeView === "watchLater") return "watchLater";
+  if (activeChannel) return "channelVideos";
+  if (activeView === "channels" && activeCategoryId) return "category";
+  return "channels";
+}
+
+function listModeForScope(scope = currentListLayoutScope()) {
+  return channelListModes[scope] || "columns";
+}
+
+function setListModeForScope(scope, mode) {
+  if (!["icons", "columns", "single"].includes(mode)) return;
+  channelListModes = { ...channelListModes, [scope]: mode };
+  localStorage.setItem(CHANNEL_LIST_MODE_KEY_PREFIX + scope, mode);
+}
+
 function applyListLayout() {
+  channelListMode = listModeForScope();
   document.body.classList.toggle("channelIconMode", channelListMode === "icons");
   document.body.classList.toggle("channelListSingleColumn", channelListMode === "single");
   syncChannelIconModeButton();
@@ -678,6 +706,14 @@ function changeListZoom(delta) {
 
 function syncChannelIconModeButton() {
   if (!channelIconModeEl) return;
+  const scope = currentListLayoutScope();
+  const scopeLabels = {
+    channels: "all channels",
+    category: "category channels",
+    channelVideos: "channel videos",
+    newVideos: "New videos",
+    watchLater: "Watch later"
+  };
   channelIconModeEl.classList.toggle("is-active", channelListMode === "icons");
   channelIconModeEl.disabled = false;
   const labels = {
@@ -690,7 +726,7 @@ function syncChannelIconModeButton() {
     columns: "List in one column",
     single: "Icons only"
   };
-  const label = `${labels[channelListMode]}. Next: ${nextLabels[channelListMode]}`;
+  const label = `${scopeLabels[scope]}: ${labels[channelListMode]}. Next: ${nextLabels[channelListMode]}`;
   channelIconModeEl.title = label;
   channelIconModeEl.setAttribute("aria-label", label);
   channelIconModeEl.setAttribute("aria-pressed", String(channelListMode === "icons"));
@@ -3023,8 +3059,10 @@ hideSuggestionsOptionEl?.addEventListener("click", (event) => {
 });
 
 channelIconModeEl?.addEventListener("click", () => {
-  channelListMode = channelListMode === "icons" ? "columns" : channelListMode === "columns" ? "single" : "icons";
-  localStorage.setItem("channelListMode", channelListMode);
+  const scope = currentListLayoutScope();
+  const currentMode = listModeForScope(scope);
+  const nextMode = currentMode === "icons" ? "columns" : currentMode === "columns" ? "single" : "icons";
+  setListModeForScope(scope, nextMode);
   applyListLayout();
 });
 

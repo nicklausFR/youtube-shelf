@@ -2,7 +2,7 @@
 
 Browser extension for managing a personal YouTube channel shelf from the side panel.
 
-Current version: `1.2.2`.
+Current version: `1.2.3`.
 
 ## Main Features
 
@@ -13,7 +13,7 @@ Current version: `1.2.2`.
 - Browse each channel's latest RSS videos.
 - Save videos to `Watch later`.
 - Search channels and videos using titles, declared tags, keywords, topics, categories, and type metadata when available.
-- Switch display between icon, multi-column, and single-column views.
+- Switch display between icon, multi-column, and single-column views, with separate local preferences per list context.
 - Zoom the channel/video list area locally.
 - Hide YouTube comments and suggestion lists while the extension panel is active.
 - Toggle a focused YouTube player view from the side panel toolbar.
