@@ -111,6 +111,7 @@ const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
+const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const SNIFF_YOUTUBE_KEY = "youtubeChannelShelfSniffYoutube";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
 const LIST_ZOOM_MIN = 0.7;
@@ -201,7 +202,7 @@ function makeSettingsButton() {
   button.type = "button";
   button.title = "Settings";
   button.setAttribute("aria-label", "Settings");
-  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.3.37.63.6 1 .6h.6a2 2 0 0 1 0 4h-.6a1.7 1.7 0 0 0-1 .6Z"/></svg>';
+  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06A2 2 0 0 1 20.11 7l-.06.06A1.7 1.7 0 0 0 19.4 9c.3.37.63.6 1 .6h.6a2 2 0 0 1 0 4h-.6a1.7 1.7 0 0 0-1 .6Z"/></svg>';
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -210,19 +211,36 @@ function makeSettingsButton() {
   return button;
 }
 
+function makeFocusPlayerButton() {
+  const button = document.createElement("button");
+  button.className = "pathSettingsButton pathFocusButton";
+  button.type = "button";
+  button.title = "Focus video player";
+  button.setAttribute("aria-label", "Focus video player");
+  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a3 3 0 0 1 3-3h2v2H7a1 1 0 0 0-1 1v2H4V7Zm11-3h2a3 3 0 0 1 3 3v2h-2V7a1 1 0 0 0-1-1h-2V4ZM4 15h2v2a1 1 0 0 0 1 1h2v2H7a3 3 0 0 1-3-3v-2Zm14 0h2v2a3 3 0 0 1-3 3h-2v-2h2a1 1 0 0 0 1-1v-2ZM9 9h6v6H9V9Z"/></svg>';
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleDisplayOption(FOCUS_PLAYER_MODE_KEY, false);
+  });
+  return button;
+}
+
 function appendSettingsPathItem(container) {
   const row = document.createElement("div");
   row.className = "pathRow pathSettingsRow";
-  row.append(makeSettingsButton());
+  row.append(makeSettingsButton(), makeFocusPlayerButton());
   container.append(row);
+  syncFocusPlayerButtonState();
 }
 
-function broadcastDisplayOptions() {
+function broadcastDisplayOptions(overrides = {}) {
   if (!globalThis.chrome?.tabs?.query) return;
   const message = {
     type: "youtubeChannelShelfDisplayOptions",
     hideComments: Boolean(hideCommentsOptionEl?.checked),
-    hideSuggestions: hideSuggestionsOptionEl ? Boolean(hideSuggestionsOptionEl.checked) : true
+    hideSuggestions: hideSuggestionsOptionEl ? Boolean(hideSuggestionsOptionEl.checked) : true,
+    focusPlayer: Boolean(overrides.focusPlayer ?? document.querySelector(".pathFocusButton")?.classList.contains("is-active"))
   };
   chrome.tabs.query({ url: ["*://www.youtube.com/watch*", "*://youtube.com/watch*"] }, (tabs = []) => {
     for (const tab of tabs) {
@@ -236,8 +254,9 @@ function setDisplayOption(key, value) {
   const checked = Boolean(value);
   if (key === COMMENTS_MODE_KEY && hideCommentsOptionEl) hideCommentsOptionEl.checked = checked;
   if (key === SUGGESTIONS_MODE_KEY && hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = checked;
+  if (key === FOCUS_PLAYER_MODE_KEY) document.querySelector(".pathFocusButton")?.classList.toggle("is-active", checked);
   chrome.storage.local.set({ [key]: checked });
-  broadcastDisplayOptions();
+  broadcastDisplayOptions(key === FOCUS_PLAYER_MODE_KEY ? { focusPlayer: checked } : {});
 }
 
 function toggleDisplayOption(key, fallback = false) {
@@ -248,10 +267,22 @@ function toggleDisplayOption(key, fallback = false) {
   });
 }
 
+function syncFocusPlayerButtonState() {
+  const button = document.querySelector(".pathFocusButton");
+  if (!button) return;
+  const active = isExtensionPanelActive();
+  button.toggleAttribute("disabled", !active);
+  if (!globalThis.chrome?.storage?.local) return;
+  chrome.storage.local.get(FOCUS_PLAYER_MODE_KEY, (result) => {
+    button.classList.toggle("is-active", Boolean(result[FOCUS_PLAYER_MODE_KEY]));
+  });
+}
+
 function syncDisplayOptionsAvailability() {
   const active = isExtensionPanelActive();
   hideCommentsOptionEl?.toggleAttribute("disabled", !active);
   hideSuggestionsOptionEl?.toggleAttribute("disabled", !active);
+  syncFocusPlayerButtonState();
   if (displayOptionsInactiveEl) displayOptionsInactiveEl.hidden = active;
 }
 
@@ -3367,7 +3398,7 @@ if (globalThis.chrome?.storage?.onChanged) {
     if (changes[DATA_COMMAND_KEY]?.newValue) {
       handleIncomingDataCommand(changes[DATA_COMMAND_KEY].newValue);
     }
-    if (changes[COMMENTS_MODE_KEY] || changes[SUGGESTIONS_MODE_KEY]) {
+    if (changes[COMMENTS_MODE_KEY] || changes[SUGGESTIONS_MODE_KEY] || changes[FOCUS_PLAYER_MODE_KEY]) {
       syncDisplayOptionsDialog();
     }
   });

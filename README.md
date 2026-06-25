@@ -2,7 +2,7 @@
 
 Browser extension for managing a personal YouTube channel shelf from the side panel.
 
-Current version: `1.2.0`.
+Current version: `1.2.1`.
 
 ## Main Features
 
@@ -16,6 +16,7 @@ Current version: `1.2.0`.
 - Switch display between icon, multi-column, and single-column views.
 - Zoom the channel/video list area locally.
 - Hide YouTube comments and suggestion lists while the extension panel is active.
+- Toggle a focused YouTube player view from the side panel toolbar.
 - Open the official YouTube channel page when the RSS feed limit is reached.
 - Import and export the extension configuration.
 
