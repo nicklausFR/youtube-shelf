@@ -2953,7 +2953,12 @@ playerWatchLaterEl.addEventListener("click", async () => {
 });
 
 
-function generalContextActions() {
+function generalContextActions(target) {
+  if (target?.closest(".sidePanelPath")) {
+    return [
+      { label: "Add category", action: () => addCategoryEl.click() }
+    ];
+  }
   return [
     { label: "Add channel", action: () => addChannel(activeView === "channels" ? activeCategoryId : "") }
   ];
@@ -2965,7 +2970,7 @@ function handleGeneralContextMenu(event) {
   if (!target.closest(".sidebar, .sidePanelPath, .videos")) return;
   if (target.closest(".channel, .category, .pathButton, .pathIconButton, .video, .watchMoreCard, button, input, a")) return;
   event.preventDefault();
-  showContextMenu(event, generalContextActions());
+  showContextMenu(event, generalContextActions(target));
 }
 
 document.addEventListener("contextmenu", handleGeneralContextMenu);
