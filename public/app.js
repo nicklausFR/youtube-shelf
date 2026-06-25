@@ -83,6 +83,8 @@ let seenVideos = {};
 let watchLater = {};
 let currentWatchLaterVideoId = "";
 let pendingAddChannelCategoryId = "";
+let channelSearchMetadataRefreshTimer = 0;
+let channelSearchMetadataRefreshInFlight = false;
 let currentWatchLaterStartedAt = 0;
 let seenPromptResolve = null;
 let configLoaded = false;
@@ -856,6 +858,65 @@ function parseChannelVideoCount(html = "") {
     if (count) return count;
   }
   return 0;
+}
+
+function uniqueTextValues(values) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+function collectJsonStringValues(html, keyNames) {
+  const values = [];
+  for (const key of keyNames) {
+    const pattern = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "gi");
+    for (const match of html.matchAll(pattern)) {
+      try {
+        values.push(JSON.parse(`"${match[1]}"`));
+      } catch {
+        values.push(match[1]);
+      }
+    }
+  }
+  return uniqueTextValues(values);
+}
+
+function collectJsonArrayValues(html, keyNames) {
+  const values = [];
+  for (const key of keyNames) {
+    const pattern = new RegExp(`"${key}"\\s*:\\s*\\[([^\\]]+)\\]`, "gi");
+    for (const match of html.matchAll(pattern)) {
+      values.push(...collectJsonStringValues(match[1], ["simpleText", "text", "name"]));
+      for (const item of match[1].matchAll(/"((?:\\.|[^"\\])+)"/g)) {
+        try {
+          values.push(JSON.parse(`"${item[1]}"`));
+        } catch {
+          values.push(item[1]);
+        }
+      }
+    }
+  }
+  return uniqueTextValues(values);
+}
+
+function parseChannelMetadata(html = "") {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const metaContent = (name) => doc.querySelector(`meta[name="${name}"], meta[property="${name}"]`)?.getAttribute("content")?.trim() || "";
+  const description = metaContent("description") || metaContent("og:description") || collectJsonStringValues(html, ["description", "shortDescription"]).join(" ");
+  const keywordText = metaContent("keywords");
+  const tags = uniqueTextValues([
+    ...(keywordText ? keywordText.split(/[,;]+/) : []),
+    ...collectJsonArrayValues(html, ["keywords", "tags", "topicDetails", "channelTags"]),
+    ...collectJsonStringValues(html, ["category", "title"])
+  ]);
+  return { description, tags };
+}
+
+async function fetchChannelMetadata(channelId) {
+  if (!sniffYoutubeEnabled) return {};
+  const response = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channelId)}/about`, {
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return parseChannelMetadata(await response.text());
 }
 
 async function fetchChannelVideoCount(channelId) {
@@ -2083,6 +2144,58 @@ function renderWatchLaterVideoResults(videos) {
   renderVideos(videos, watchLaterList);
 }
 
+function channelNeedsMetadata(channel) {
+  return sniffYoutubeEnabled && channel?.id && !channel.description && !(Array.isArray(channel.tags) && channel.tags.length);
+}
+
+async function enrichChannelsForSearch(channels) {
+  if (channelSearchMetadataRefreshInFlight) return;
+  const query = normalizeSearchText(channelSearchQuery.trim());
+  if (!query || query.length < 3) return;
+  const candidates = channels.filter(channelNeedsMetadata);
+  if (!candidates.length) return;
+  channelSearchMetadataRefreshInFlight = true;
+  let changed = false;
+  let nextIndex = 0;
+  const workerCount = Math.min(6, candidates.length);
+
+  async function enrichNextChannel() {
+    while (nextIndex < candidates.length && normalizeSearchText(channelSearchQuery.trim()) === query) {
+      const channel = candidates[nextIndex++];
+      try {
+        const metadata = await fetchChannelMetadata(channel.id);
+        if (!metadata.description && !metadata.tags?.length) continue;
+        allChannels = allChannels.map((item) => item.id === channel.id ? {
+          ...item,
+          description: metadata.description || item.description || "",
+          tags: metadata.tags?.length ? metadata.tags : item.tags || []
+        } : item);
+        changed = true;
+        if (activeChannel?.id) activeChannel = allChannels.find((item) => item.id === activeChannel.id) || activeChannel;
+        renderCategories();
+        renderChannels(sourceChannelsForSearch());
+      } catch {
+        // Search metadata is opportunistic.
+      }
+    }
+  }
+
+  try {
+    await Promise.all(Array.from({ length: workerCount }, enrichNextChannel));
+  } finally {
+    if (changed && configLoaded) await saveConfig().catch(() => {});
+    channelSearchMetadataRefreshInFlight = false;
+  }
+}
+
+function scheduleSearchMetadataRefresh(channels) {
+  if (!sniffYoutubeEnabled || !channelSearchQuery.trim()) return;
+  window.clearTimeout(channelSearchMetadataRefreshTimer);
+  channelSearchMetadataRefreshTimer = window.setTimeout(() => {
+    enrichChannelsForSearch(channels).catch(() => {});
+  }, 250);
+}
+
 function renderSearchResults() {
   syncChannelSearchState();
   if (isSelectedChannelSearchScope()) {
@@ -2097,7 +2210,9 @@ function renderSearchResults() {
     setStatus(filteredVideos.length ? "" : `No videos found in ${scopeLabel}.`, !filteredVideos.length);
     return;
   }
-  renderChannels(sourceChannelsForSearch());
+  const sourceChannels = sourceChannelsForSearch();
+  renderChannels(sourceChannels);
+  scheduleSearchMetadataRefresh(sourceChannels);
 }
 
 function channelSearchScore(channel, query) {
@@ -2461,16 +2576,24 @@ async function loadFeed() {
 
     currentVideos = parseFeed(await response.text()).map((video) => videoWithChannel(video, activeChannel));
     let channelVideoCount = activeChannel.channelVideoCount || 0;
+    let channelMetadata = { description: activeChannel.description || "", tags: activeChannel.tags || [] };
     try {
       channelVideoCount = await fetchChannelVideoCount(activeChannel.id) || channelVideoCount;
     } catch {
       // The RSS feed remains usable even when YouTube page parsing fails.
+    }
+    try {
+      channelMetadata = { ...channelMetadata, ...await fetchChannelMetadata(activeChannel.id) };
+    } catch {
+      // Metadata is optional.
     }
     const latestPublished = currentVideos[0]?.published || "";
     activeChannel = {
       ...activeChannel,
       feedVideoCount: currentVideos.length,
       channelVideoCount,
+      description: channelMetadata.description || activeChannel.description || "",
+      tags: channelMetadata.tags?.length ? channelMetadata.tags : activeChannel.tags || [],
       feedLatestPublished: latestPublished,
       feedLatestTitle: currentVideos[0]?.title || "",
       feedVideos: currentVideos.map((video) => ({
@@ -2514,16 +2637,24 @@ async function refreshChannelSummaries() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const videos = parseFeed(await response.text()).map((video) => videoWithChannel(video, channel));
       let channelVideoCount = channel.channelVideoCount || 0;
+      let channelMetadata = { description: channel.description || "", tags: channel.tags || [] };
       try {
         channelVideoCount = await fetchChannelVideoCount(channel.id) || channelVideoCount;
       } catch {
         // Keep the previous count when the page parser cannot read YouTube.
+      }
+      try {
+        channelMetadata = { ...channelMetadata, ...await fetchChannelMetadata(channel.id) };
+      } catch {
+        // Metadata is optional.
       }
       const latestPublished = videos[0]?.published || "";
       const next = {
         ...channel,
         feedVideoCount: videos.length,
         channelVideoCount,
+        description: channelMetadata.description || channel.description || "",
+        tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
         feedLatestPublished: latestPublished,
         feedLatestTitle: videos[0]?.title || "",
         feedVideos: videos.map((video) => ({
@@ -2538,7 +2669,9 @@ async function refreshChannelSummaries() {
         next.feedLatestPublished !== channel.feedLatestPublished ||
         next.feedLatestTitle !== channel.feedLatestTitle ||
         next.feedVideoCount !== channel.feedVideoCount ||
-        next.channelVideoCount !== channel.channelVideoCount
+        next.channelVideoCount !== channel.channelVideoCount ||
+        next.description !== channel.description ||
+        JSON.stringify(next.tags || []) !== JSON.stringify(channel.tags || [])
       ) {
         changed = true;
       }
@@ -3005,16 +3138,24 @@ async function addChannelById(channelId, categoryId = activeCategoryId) {
     const doc = new DOMParser().parseFromString(await response.text(), "application/xml");
     const title = doc.querySelector("feed > title")?.textContent?.trim() || "Untitled channel";
     let channelVideoCount = 0;
+    let channelMetadata = { description: "", tags: [] };
     try {
       channelVideoCount = await fetchChannelVideoCount(cleanId);
     } catch {
       // Count is optional; the channel can still be added from RSS.
+    }
+    try {
+      channelMetadata = await fetchChannelMetadata(cleanId);
+    } catch {
+      // Metadata is optional; the channel can still be added from RSS.
     }
     allChannels.push({
       id: cleanId,
       title,
       thumbnail: "",
       channelVideoCount,
+      description: channelMetadata.description || "",
+      tags: channelMetadata.tags || [],
       newVideosSeenAt: new Date().toISOString(),
       categories: categoryId ? [categoryId] : []
     });
