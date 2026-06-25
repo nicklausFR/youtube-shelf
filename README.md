@@ -22,14 +22,11 @@ Current version: `1.2.2`.
 
 ## Local Installation
 
-### Firefox
+This extension currently targets Chrome-based browsers, such as Chrome, Brave, and Edge.
 
-1. Open `about:debugging#/runtime/this-firefox`.
-2. Click `Load Temporary Add-on...`.
-3. Select `manifest.json` from this repository folder.
-4. Open YouTube and click the extension icon.
+Firefox compatibility is planned for a later version.
 
-### Chromium-based Browsers
+### Chrome-based Browsers
 
 1. Open the browser extension management page.
 2. Enable developer mode.
