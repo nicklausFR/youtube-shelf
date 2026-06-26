@@ -129,15 +129,21 @@ const LIST_ZOOM_STEP = 0.1;
 const SPLIT_COLUMN_MIN_WIDTH = 450;
 const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
+const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
 let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
 let categoryPanelHeight = Number(localStorage.getItem(CATEGORY_PANEL_HEIGHT_KEY)) || 90;
 
-function setPanelOpenState(open) {
+function setPanelOpenState(open, options = {}) {
   if (!globalThis.chrome?.storage?.local) return;
+  const heartbeat = open ? Date.now() : 0;
   chrome.storage.local.set({
     [PANEL_OPEN_KEY]: open,
-    [PANEL_HEARTBEAT_KEY]: open ? Date.now() : 0
+    [PANEL_HEARTBEAT_KEY]: heartbeat
+  }, () => {
+    if (open && options.broadcast) {
+      broadcastDisplayOptions({ panelOpen: true, panelHeartbeat: heartbeat });
+    }
   });
 }
 
@@ -145,8 +151,8 @@ function isExtensionPanelActive() {
   return document.visibilityState === "visible";
 }
 
-function syncPanelVisibilityState() {
-  setPanelOpenState(isExtensionPanelActive());
+function syncPanelVisibilityState(options = {}) {
+  setPanelOpenState(isExtensionPanelActive(), options);
   syncDisplayOptionsAvailability();
 }
 
@@ -157,6 +163,7 @@ function isSidePanelView() {
 function currentCategoryName() {
   if (activeView === "watchLater") return "Watch later";
   if (activeView === "newVideos") return "New";
+  if (activeCategoryId === UNCATEGORIZED_CATEGORY_ID) return "Uncategorized";
   if (!activeCategoryId) return "";
   return allCategories.find((category) => category.id === activeCategoryId)?.name || "";
 }
@@ -228,13 +235,38 @@ function appendSettingsPathItem(container) {
   syncFocusPlayerButtonState();
 }
 
-function broadcastDisplayOptions(overrides = {}) {
+function readDisplayOptionState() {
+  return new Promise((resolve) => {
+    if (!globalThis.chrome?.storage?.local) {
+      resolve({
+        hideComments: Boolean(hideCommentsOptionEl?.checked),
+        hideSuggestions: hideSuggestionsOptionEl ? Boolean(hideSuggestionsOptionEl.checked) : true,
+        focusPlayer: Boolean(document.querySelector(".pathFocusButton")?.classList.contains("is-active"))
+      });
+      return;
+    }
+
+    chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY], (result) => {
+      resolve({
+        hideComments: Boolean(result[COMMENTS_MODE_KEY]),
+        hideSuggestions: result[SUGGESTIONS_MODE_KEY] === undefined ? true : Boolean(result[SUGGESTIONS_MODE_KEY]),
+        focusPlayer: Boolean(result[FOCUS_PLAYER_MODE_KEY])
+      });
+    });
+  });
+}
+
+async function broadcastDisplayOptions(overrides = {}) {
   if (!globalThis.chrome?.tabs?.query) return;
+  const state = await readDisplayOptionState();
+  const panelOpen = isExtensionPanelActive();
+  const panelHeartbeat = panelOpen ? Date.now() : 0;
   const message = {
     type: "youtubeChannelShelfDisplayOptions",
-    hideComments: Boolean(hideCommentsOptionEl?.checked),
-    hideSuggestions: hideSuggestionsOptionEl ? Boolean(hideSuggestionsOptionEl.checked) : true,
-    focusPlayer: Boolean(overrides.focusPlayer ?? document.querySelector(".pathFocusButton")?.classList.contains("is-active"))
+    ...state,
+    panelOpen,
+    panelHeartbeat,
+    ...overrides
   };
   chrome.tabs.query({ url: ["*://www.youtube.com/watch*", "*://youtube.com/watch*"] }, (tabs = []) => {
     for (const tab of tabs) {
@@ -250,7 +282,11 @@ function setDisplayOption(key, value) {
   if (key === SUGGESTIONS_MODE_KEY && hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = checked;
   if (key === FOCUS_PLAYER_MODE_KEY) document.querySelector(".pathFocusButton")?.classList.toggle("is-active", checked);
   chrome.storage.local.set({ [key]: checked });
-  broadcastDisplayOptions(key === FOCUS_PLAYER_MODE_KEY ? { focusPlayer: checked } : {});
+  const overrides = {};
+  if (key === COMMENTS_MODE_KEY) overrides.hideComments = checked;
+  if (key === SUGGESTIONS_MODE_KEY) overrides.hideSuggestions = checked;
+  if (key === FOCUS_PLAYER_MODE_KEY) overrides.focusPlayer = checked;
+  broadcastDisplayOptions(overrides);
 }
 
 function toggleDisplayOption(key, fallback = false) {
@@ -483,6 +519,9 @@ function categoryContextActions(category) {
 }
 
 async function assignChannelToCategory(channelId, categoryId) {
+  const previousView = activeView;
+  const previousCategoryId = activeCategoryId;
+  const previousChannelId = activeChannel?.id || "";
   const channel = allChannels.find((item) => item.id === channelId);
   const category = allCategories.find((item) => item.id === categoryId);
   if (!channel || !category) return;
@@ -495,6 +534,9 @@ async function assignChannelToCategory(channelId, categoryId) {
   allChannels = allChannels.map((item) => item.id === channelId ? channel : item);
   if (activeChannel?.id === channelId) activeChannel = channel;
   await saveConfig();
+  activeView = previousView;
+  activeCategoryId = previousCategoryId;
+  if (previousChannelId) activeChannel = allChannels.find((item) => item.id === previousChannelId) || activeChannel;
   renderCategories();
   renderChannels(channelsForActiveCategory());
   renderSidePanelPath();
@@ -523,7 +565,7 @@ function attachCategoryDropTarget(element, categoryId) {
 }
 
 function appendCategoryPath(container) {
-  container.classList.toggle("has-many-categories", allCategories.length > 4);
+  container.classList.toggle("has-many-categories", allCategories.length > 3);
 
   appendSettingsPathItem(container);
 
@@ -554,9 +596,9 @@ function appendCategoryPath(container) {
     renderCategories();
     renderChannels([]);
     renderWatchLater();
-  }, { active: activeView === "watchLater" });
+  }, { active: activeView === "watchLater", kind: "auto" });
 
-  for (const category of allCategories) {
+  for (const category of sortedManualCategories()) {
     appendPathItem(container, category.name, () => {
       showCategoryChannels(category.id);
     }, {
@@ -565,6 +607,12 @@ function appendCategoryPath(container) {
       dropCategoryId: category.id
     });
   }
+
+  appendPathItem(container, "Uncategorized", () => {
+    showCategoryChannels(UNCATEGORIZED_CATEGORY_ID);
+  }, {
+    active: activeView === "channels" && activeCategoryId === UNCATEGORIZED_CATEGORY_ID && !activeChannel
+  });
 }
 
 function appendActiveChannelCategories(container) {
@@ -1069,6 +1117,31 @@ async function writeStoredConfig(value) {
   });
 }
 
+async function readLegacyFileConfig() {
+  try {
+    const response = await fetch("../data/config.json", { cache: "no-store" });
+    if (!response.ok) return null;
+    const parsed = await response.json();
+    if (!parsed || typeof parsed !== "object") return null;
+    return { ...emptyConfig(), ...parsed };
+  } catch {
+    return null;
+  }
+}
+
+async function loadInitialConfig() {
+  const storedConfig = await readStoredConfig();
+  if (storedConfig) return storedConfig;
+
+  const legacyConfig = await readLegacyFileConfig();
+  if (legacyConfig) {
+    await writeStoredConfig({ ...legacyConfig, updatedAt: new Date().toISOString() });
+    return legacyConfig;
+  }
+
+  return emptyConfig();
+}
+
 
 
 function videoIdFromInput(value) {
@@ -1435,6 +1508,13 @@ function createVideoCard(video) {
         age.textContent = elapsedShort(video.published);
         card.append(age);
       }
+      if (seenVideos[video.id]) {
+        const watched = document.createElement("span");
+        watched.className = "watchedCheck";
+        watched.textContent = "✓";
+        watched.title = "Watched";
+        card.append(watched);
+      }
 
       const meta = document.createElement("div");
       meta.className = "meta";
@@ -1457,8 +1537,12 @@ function createVideoCard(video) {
         await toggleWatchLater(video);
       });
 
+      const actions = document.createElement("div");
+      actions.className = "videoActions";
+      actions.append(watchButton);
+
       details.append(title, meta);
-      card.append(thumbFrame, details, watchButton);
+      card.append(thumbFrame, details, actions);
       return card;
 }
 
@@ -2001,13 +2085,32 @@ function channelContextActions(channel) {
   return [
     { label: "Open YouTube channel", action: () => openChannelVideosOnYouTube(channel) },
     { label: "Subscribe on YouTube", action: () => openSubscribeOnYouTube(channel) },
-    { label: "Classify", action: () => openCategoryAssignment(channel) },
-    { label: "Delete channel", action: () => unsubscribeChannel(channel), danger: true }
+    { label: "Add to category", action: () => openCategoryAssignment(channel) },
+    { label: "Remove channel", action: () => unsubscribeChannel(channel), danger: true }
   ];
+}
+
+function isManualCategoryId(categoryId) {
+  return Boolean(categoryId && categoryId !== NEW_VIDEOS_CATEGORY_ID && categoryId !== UNCATEGORIZED_CATEGORY_ID);
+}
+
+function channelCountForCategory(categoryId) {
+  return allChannels.filter((channel) => (channel.categories || []).includes(categoryId)).length;
+}
+
+function sortedManualCategories() {
+  return [...allCategories].sort((a, b) => {
+    const countDelta = channelCountForCategory(b.id) - channelCountForCategory(a.id);
+    if (countDelta) return countDelta;
+    return (a.name || "").localeCompare(b.name || "", "fr");
+  });
 }
 
 function channelsForActiveCategory() {
   if (activeCategoryId === NEW_VIDEOS_CATEGORY_ID) return [];
+  if (activeCategoryId === UNCATEGORIZED_CATEGORY_ID) {
+    return allChannels.filter((channel) => !(channel.categories || []).length);
+  }
   if (!activeCategoryId) return allChannels;
   return allChannels.filter((channel) => (channel.categories || []).includes(activeCategoryId));
 }
@@ -2144,6 +2247,9 @@ function searchableTextForChannel(channel) {
 
 function sourceChannelsForSearch() {
   if (activeView === "watchLater" || activeView === "newVideos") return [];
+  if (activeCategoryId === UNCATEGORIZED_CATEGORY_ID) {
+    return allChannels.filter((channel) => !(channel.categories || []).length);
+  }
   if (!activeCategoryId) return allChannels;
   return allChannels.filter((channel) => (channel.categories || []).includes(activeCategoryId));
 }
@@ -2347,8 +2453,9 @@ function renderCategories() {
   const buttons = [
     { id: "", name: "All channels" },
     { id: NEW_VIDEOS_CATEGORY_ID, name: `New${channelsWithNewVideos().length ? ` (${channelsWithNewVideos().length})` : ""}`, automatic: true },
-    { id: "__watch_later", name: "Watch later", special: true },
-    ...allCategories
+    { id: "__watch_later", name: "Watch later", automatic: true },
+    ...sortedManualCategories(),
+    { id: UNCATEGORIZED_CATEGORY_ID, name: "Uncategorized" }
   ].map((category) => {
     const button = document.createElement("button");
     button.className = "category";
@@ -2794,7 +2901,7 @@ async function loadChannels() {
         localStorage.setItem(SNIFF_YOUTUBE_KEY, String(sniffYoutubeEnabled));
       }
     }
-    config = await readStoredConfig() || emptyConfig();
+    config = await loadInitialConfig();
     allCategories = config.categories || [];
     allChannels = (config.channels || [])
       .filter((channel) => channel.id)
@@ -3195,6 +3302,7 @@ async function resolveDroppedChannelId(value = "") {
 
 async function addChannelById(channelId, categoryId = activeCategoryId) {
   const cleanId = String(channelId || "").trim();
+  const targetCategoryId = isManualCategoryId(categoryId) ? categoryId : "";
   if (!/^UC[-_a-zA-Z0-9]+$/.test(cleanId)) {
     showInfoPopup("Unsupported channel identifier. Drop a YouTube URL that contains /channel/UC...", "error");
     return false;
@@ -3238,7 +3346,7 @@ async function addChannelById(channelId, categoryId = activeCategoryId) {
       description: channelMetadata.description || "",
       tags: channelMetadata.tags || [],
       newVideosSeenAt: new Date().toISOString(),
-      categories: categoryId ? [categoryId] : []
+      categories: targetCategoryId ? [targetCategoryId] : []
     });
     allChannels.sort((a, b) => a.title.localeCompare(b.title, "fr"));
     await saveConfig();
@@ -3478,7 +3586,7 @@ addCategoryEl.addEventListener("click", openAddCategoryDialog);
 
 applyListLayout();
 applyListZoom();
-syncPanelVisibilityState();
+syncPanelVisibilityState({ broadcast: true });
 if (globalThis.chrome?.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
@@ -3510,7 +3618,7 @@ async function handlePendingDataCommand() {
     await handleIncomingDataCommand(payload);
   }
 }
-document.addEventListener("visibilitychange", syncPanelVisibilityState);
+document.addEventListener("visibilitychange", () => syncPanelVisibilityState({ broadcast: true }));
 window.setInterval(syncPanelVisibilityState, 1000);
 window.setInterval(() => {
   checkCurrentWatchLaterVisibility().catch(() => {});
@@ -3526,24 +3634,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
