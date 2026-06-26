@@ -28,6 +28,7 @@
     "permissions":  [
                         "storage",
                         "tabs",
+                        "scripting",
                         "sidePanel",
                         "contextMenus"
                     ],
@@ -41,8 +42,8 @@
     "content_scripts":  [
                             {
                                 "matches":  [
-                                                "https://www.youtube.com/watch*",
-                                                "https://youtube.com/watch*"
+                                                "https://www.youtube.com/*",
+                                                "https://youtube.com/*"
                                             ],
                                 "css":  [
                                             "youtube-clean.css"

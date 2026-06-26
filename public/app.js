@@ -329,11 +329,26 @@ async function broadcastDisplayOptions(overrides = {}) {
     panelHeartbeat,
     ...overrides
   };
-  chrome.tabs.query({ url: ["*://www.youtube.com/watch*", "*://youtube.com/watch*"] }, (tabs = []) => {
+  chrome.tabs.query({ url: ["*://www.youtube.com/*", "*://youtube.com/*"] }, (tabs = []) => {
     for (const tab of tabs) {
-      if (tab.id !== undefined) chrome.tabs.sendMessage(tab.id, message).catch?.(() => {});
+      if (tab.id === undefined) continue;
+      ensureYoutubeCompanion(tab.id).finally(() => {
+        chrome.tabs.sendMessage(tab.id, message).catch?.(() => {});
+      });
     }
   });
+}
+
+async function ensureYoutubeCompanion(tabId) {
+  if (!globalThis.chrome?.scripting || tabId === undefined) return;
+  await chrome.scripting.insertCSS({
+    target: { tabId },
+    files: ["youtube-clean.css"]
+  }).catch(() => {});
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ["youtube-live.js"]
+  }).catch(() => {});
 }
 
 function setDisplayOption(key, value) {
@@ -3734,7 +3749,7 @@ async function handlePendingDataCommand() {
 }
 document.addEventListener("visibilitychange", () => syncPanelVisibilityState({ broadcast: true }));
 window.addEventListener("resize", scheduleCategoryOverflowSync);
-window.setInterval(syncPanelVisibilityState, 1000);
+window.setInterval(() => syncPanelVisibilityState({ broadcast: true }), 1000);
 window.setInterval(() => {
   checkCurrentWatchLaterVisibility().catch(() => {});
 }, 1500);
@@ -3749,9 +3764,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
 
 
 
