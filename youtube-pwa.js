@@ -4,12 +4,6 @@ const SHELF_STYLE_ID = "youtube-channel-shelf-pwa-style";
 if (!window.__youtubeChannelShelfPwaButtonInjected) {
   window.__youtubeChannelShelfPwaButtonInjected = true;
 
-  function isStandaloneAppWindow() {
-    return window.matchMedia?.("(display-mode: standalone)")?.matches
-      || window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches
-      || window.navigator.standalone === true;
-  }
-
   function ensureShelfButtonStyle() {
     if (document.getElementById(SHELF_STYLE_ID)) return;
     const style = document.createElement("style");
@@ -55,10 +49,6 @@ if (!window.__youtubeChannelShelfPwaButtonInjected) {
   }
 
   function ensureShelfButton() {
-    if (!isStandaloneAppWindow()) {
-      document.getElementById(SHELF_BUTTON_ID)?.remove();
-      return;
-    }
     ensureShelfButtonStyle();
     let button = document.getElementById(SHELF_BUTTON_ID);
     if (button) return;
@@ -70,13 +60,13 @@ if (!window.__youtubeChannelShelfPwaButtonInjected) {
     button.addEventListener("click", () => {
       if (button.dataset.state === "opening") return;
       button.dataset.state = "opening";
-      chrome.runtime.sendMessage({ type: "youtubeChannelShelfOpenShelf" }, (response) => {
+      chrome.runtime.sendMessage({ type: "youtubeChannelShelfOpenShelf", preferPopup: true }, (response) => {
         button.dataset.state = "";
         if (chrome.runtime.lastError || response?.ok === false) {
           button.title = chrome.runtime.lastError?.message || response?.error || "Could not open YouTube Channel Shelf";
           return;
         }
-        button.title = response?.mode === "popup" ? "Opened YouTube Channel Shelf popup" : "Opened YouTube Channel Shelf";
+        button.title = "Opened YouTube Channel Shelf popup";
       });
     });
     document.documentElement.append(button);
