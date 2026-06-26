@@ -50,6 +50,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "youtubeChannelShelfOpenShelf") return false;
   (async () => {
     try {
+      if (message.preferPopup) {
+        await openShelfPopup(sender.tab?.windowId);
+        sendResponse({ ok: true, mode: "popup" });
+        return;
+      }
       await openShelfForTab(sender.tab || {}, { toggle: false });
       sendResponse({ ok: true, mode: "sidePanel" });
     } catch (error) {
@@ -167,7 +172,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (!changes[COMMENTS_MODE_KEY] && !changes[SUGGESTIONS_MODE_KEY] && !changes[PANEL_OPEN_KEY] && !changes[PANEL_HEARTBEAT_KEY]) return;
   syncDisplayContextMenus();
 });
-
 
 
 
