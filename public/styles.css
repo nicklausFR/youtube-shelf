@@ -1748,25 +1748,61 @@ body.sidePanelVideos .videos {
 }
 .sidePanelPath {
   align-items: start;
+  --category-path-zoom: 1;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .sidePanelPath .pathRow {
+  flex: 1 1 auto;
   display: inline-flex;
   width: auto;
 }
 
+.sidePanelPath .pathSettingsRow {
+  flex: 0 0 auto;
+}
+
 .sidePanelPath .pathButton {
-  min-height: 26px;
-  padding: 0 9px;
-  width: auto;
+  font-size: calc(13px * var(--category-path-zoom, 1));
+  min-height: calc(26px * var(--category-path-zoom, 1));
+  padding: 0 calc(9px * var(--category-path-zoom, 1));
+  text-align: center;
+  width: 100%;
+}
+
+.sidePanelPath .pathCategoryZoomButton {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sidePanelPath .pathCategoryZoomButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.sidePanelPath .pathMoreRow {
+  position: relative;
+  z-index: 2;
+}
+
+.sidePanelPath .pathButton-more {
+  border-color: #555;
+  color: var(--text);
+  font-weight: 700;
+  opacity: 1;
+}
+
+.sidePanelPath .pathRow.is-overflow-hidden {
+  display: none !important;
 }
 
 .sidePanelPath .pathSettingsButton {
+  flex: 0 0 auto;
   height: 26px;
   width: 26px;
 }
@@ -3036,7 +3072,7 @@ body.virtualVideoListView #toggleListLayout {
 .sidebar > .sidePanelPath {
   display: flex !important;
   flex: 0 0 auto;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-height: 26px;
 }
 

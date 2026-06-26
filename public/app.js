@@ -110,6 +110,7 @@ let confirmDialogResolve = null;
 let lastHandledDataCommandAt = 0;
 let categoryResizeStartY = 0;
 let categoryResizeStartHeight = 0;
+let categoryOverflowSyncFrame = 0;
 let pendingImportKind = "";
 const STORAGE_KEY = "youtubeChannelShelfConfig";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
@@ -121,9 +122,13 @@ const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const SNIFF_YOUTUBE_KEY = "youtubeChannelShelfSniffYoutube";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
 const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
+const CATEGORY_ZOOM_KEY = "youtubeChannelShelfCategoryZoom";
 const LIST_ZOOM_MIN = 0.7;
 const LIST_ZOOM_MAX = 1.5;
 const LIST_ZOOM_STEP = 0.1;
+const CATEGORY_ZOOM_MIN = 0.8;
+const CATEGORY_ZOOM_MAX = 1.4;
+const CATEGORY_ZOOM_STEP = 0.1;
 const SPLIT_COLUMN_MIN_WIDTH = 450;
 const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
@@ -131,6 +136,7 @@ const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
 let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
 let categoryPanelHeight = Number(localStorage.getItem(CATEGORY_PANEL_HEIGHT_KEY)) || 90;
+let categoryZoom = Number(localStorage.getItem(CATEGORY_ZOOM_KEY)) || 1;
 
 function setPanelOpenState(open, options = {}) {
   if (!globalThis.chrome?.storage?.local) return;
@@ -195,6 +201,30 @@ function appendPathItem(container, text, onClick, options = {}) {
   container.append(row);
 }
 
+function expandCategoryPanelToContent() {
+  if (!sidePanelPathEl) return;
+  clearCategoryOverflowIndicator();
+  const nextHeight = Math.max(52, sidePanelPathEl.scrollHeight);
+  categoryPanelHeight = nextHeight;
+  document.documentElement.style.setProperty("--category-panel-max-height", `${nextHeight}px`);
+  localStorage.setItem(CATEGORY_PANEL_HEIGHT_KEY, String(Math.round(categoryPanelHeight)));
+  syncCategoryOverflowState();
+}
+
+function makePathMoreIndicator(count) {
+  const row = document.createElement("div");
+  row.className = "pathRow pathMoreRow";
+  const button = document.createElement("button");
+  button.className = "pathButton pathButton-more";
+  button.type = "button";
+  button.title = "Show all categories";
+  button.setAttribute("aria-label", `Show ${count} more categories`);
+  button.textContent = `+${count} more`;
+  button.addEventListener("click", expandCategoryPanelToContent);
+  row.append(button);
+  return row;
+}
+
 function makeSettingsButton() {
   const button = document.createElement("button");
   button.className = "pathSettingsButton";
@@ -228,9 +258,20 @@ function makeFocusPlayerButton() {
 function appendSettingsPathItem(container) {
   const row = document.createElement("div");
   row.className = "pathRow pathSettingsRow";
-  row.append(makeSettingsButton(), makeFocusPlayerButton());
+  row.append(makeSettingsButton(), makeFocusPlayerButton(), makeCategoryZoomButton(-1), makeCategoryZoomButton(1));
   container.append(row);
   syncFocusPlayerButtonState();
+  syncCategoryZoomButtons();
+}
+
+function makeCategoryZoomButton(direction) {
+  const button = document.createElement("button");
+  const isZoomIn = direction > 0;
+  button.className = `pathSettingsButton pathCategoryZoomButton ${isZoomIn ? "pathCategoryZoomIn" : "pathCategoryZoomOut"}`;
+  button.type = "button";
+  button.textContent = isZoomIn ? "+" : "-";
+  button.addEventListener("click", () => changeCategoryZoom(isZoomIn ? CATEGORY_ZOOM_STEP : -CATEGORY_ZOOM_STEP));
+  return button;
 }
 
 function readDisplayOptionState() {
@@ -645,15 +686,84 @@ function applyCategoryPanelHeight() {
   document.documentElement.style.setProperty("--category-panel-max-height", `${height}px`);
 }
 
+function clampCategoryZoom(value) {
+  return Math.min(CATEGORY_ZOOM_MAX, Math.max(CATEGORY_ZOOM_MIN, Math.round(value * 10) / 10));
+}
+
+function syncCategoryZoomButtons() {
+  const percent = Math.round(categoryZoom * 100);
+  document.querySelectorAll(".pathCategoryZoomOut").forEach((button) => {
+    button.toggleAttribute("disabled", categoryZoom <= CATEGORY_ZOOM_MIN);
+    button.setAttribute("title", `Zoom out categories (${percent}%)`);
+    button.setAttribute("aria-label", `Zoom out categories (${percent}%)`);
+  });
+  document.querySelectorAll(".pathCategoryZoomIn").forEach((button) => {
+    button.toggleAttribute("disabled", categoryZoom >= CATEGORY_ZOOM_MAX);
+    button.setAttribute("title", `Zoom in categories (${percent}%)`);
+    button.setAttribute("aria-label", `Zoom in categories (${percent}%)`);
+  });
+}
+
+function applyCategoryZoom() {
+  categoryZoom = clampCategoryZoom(categoryZoom);
+  sidePanelPathEl?.style.setProperty("--category-path-zoom", String(categoryZoom));
+  localStorage.setItem(CATEGORY_ZOOM_KEY, String(categoryZoom));
+  syncCategoryZoomButtons();
+  scheduleCategoryOverflowSync();
+}
+
+function changeCategoryZoom(delta) {
+  categoryZoom = clampCategoryZoom(categoryZoom + delta);
+  applyCategoryZoom();
+}
+
+function clearCategoryOverflowIndicator() {
+  if (!sidePanelPathEl) return;
+  sidePanelPathEl.classList.remove("has-overflow-indicator");
+  sidePanelPathEl.querySelector(".pathMoreRow")?.remove();
+  sidePanelPathEl.querySelectorAll(".is-overflow-hidden").forEach((row) => row.classList.remove("is-overflow-hidden"));
+}
+
 function syncCategoryOverflowState() {
   if (!sidePanelPathEl) return;
+  clearCategoryOverflowIndicator();
   if (!sidePanelPathEl.classList.contains("has-many-categories")) {
     sidePanelPathEl.classList.remove("is-fully-expanded");
     return;
   }
   const visibleHeight = sidePanelPathEl.getBoundingClientRect().height;
   const contentHeight = sidePanelPathEl.scrollHeight;
-  sidePanelPathEl.classList.toggle("is-fully-expanded", contentHeight <= visibleHeight + 2);
+  const isFullyExpanded = contentHeight <= visibleHeight + 2;
+  sidePanelPathEl.classList.toggle("is-fully-expanded", isFullyExpanded);
+  if (isFullyExpanded) return;
+
+  const rows = [...sidePanelPathEl.querySelectorAll(":scope > .pathRow:not(.pathMoreRow)")];
+  const containerTop = sidePanelPathEl.getBoundingClientRect().top;
+  const visibleBottom = containerTop + visibleHeight;
+  let firstHiddenIndex = rows.findIndex((row) => row.getBoundingClientRect().bottom > visibleBottom + 1);
+  if (firstHiddenIndex < 0) return;
+
+  while (firstHiddenIndex >= 0) {
+    sidePanelPathEl.querySelector(".pathMoreRow")?.remove();
+    rows.forEach((row) => row.classList.remove("is-overflow-hidden"));
+
+    const hiddenCount = rows.length - firstHiddenIndex;
+    const indicator = makePathMoreIndicator(hiddenCount);
+    sidePanelPathEl.insertBefore(indicator, rows[firstHiddenIndex]);
+    sidePanelPathEl.classList.add("has-overflow-indicator");
+    rows.slice(firstHiddenIndex).forEach((row) => row.classList.add("is-overflow-hidden"));
+
+    if (indicator.getBoundingClientRect().bottom <= visibleBottom + 1 || firstHiddenIndex === 0) break;
+    firstHiddenIndex -= 1;
+  }
+}
+
+function scheduleCategoryOverflowSync() {
+  if (categoryOverflowSyncFrame) cancelAnimationFrame(categoryOverflowSyncFrame);
+  categoryOverflowSyncFrame = requestAnimationFrame(() => {
+    categoryOverflowSyncFrame = 0;
+    syncCategoryOverflowState();
+  });
 }
 
 function makeCategoryResizeHandle() {
@@ -668,6 +778,7 @@ function makeCategoryResizeHandle() {
   });
   handle.addEventListener("pointermove", (event) => {
     if (!handle.hasPointerCapture(event.pointerId)) return;
+    clearCategoryOverflowIndicator();
     const maxHeight = Math.max(90, sidePanelPathEl.scrollHeight);
     const nextHeight = Math.max(52, Math.min(maxHeight, categoryResizeStartHeight + event.clientY - categoryResizeStartY));
     categoryPanelHeight = nextHeight;
@@ -687,6 +798,7 @@ function renderSidePanelPath() {
   if (!sidePanelPathEl || !sidePanelVideoPathEl) return;
   updateChannelSearchPlaceholder();
   applyCategoryPanelHeight();
+  applyCategoryZoom();
   sidePanelPathEl.replaceChildren();
   sidePanelVideoPathEl.replaceChildren();
   appendCategoryPath(sidePanelPathEl);
@@ -3599,6 +3711,7 @@ async function handlePendingDataCommand() {
   }
 }
 document.addEventListener("visibilitychange", () => syncPanelVisibilityState({ broadcast: true }));
+window.addEventListener("resize", scheduleCategoryOverflowSync);
 window.setInterval(syncPanelVisibilityState, 1000);
 window.setInterval(() => {
   checkCurrentWatchLaterVisibility().catch(() => {});
@@ -3614,13 +3727,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
-
-
-
-
 
 
 
