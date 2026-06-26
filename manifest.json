@@ -41,6 +41,16 @@
     "content_scripts":  [
                             {
                                 "matches":  [
+                                                "https://www.youtube.com/*",
+                                                "https://youtube.com/*"
+                                            ],
+                                "js":  [
+                                           "youtube-pwa.js"
+                                       ],
+                                "run_at":  "document_idle"
+                            },
+                            {
+                                "matches":  [
                                                 "https://www.youtube.com/watch*",
                                                 "https://youtube.com/watch*"
                                             ],
