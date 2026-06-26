@@ -1,3 +1,6 @@
+if (!globalThis.__youtubeChannelShelfLiveInjected) {
+globalThis.__youtubeChannelShelfLiveInjected = true;
+
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
@@ -67,3 +70,4 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 window.setInterval(applyDisplayOptions, 1000);
+}

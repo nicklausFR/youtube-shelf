@@ -3162,13 +3162,18 @@ body.virtualVideoListView .sidebar > .channelSearch {
   order: 3;
 }
 
-body.virtualVideoListView .sidebar > .categories,
-body.virtualVideoListView .sidebar > .channelListSeparator {
+body.virtualVideoListView .sidebar > .categories {
   display: none !important;
+}
+
+body.virtualVideoListView .sidebar > .channelListSeparator {
+  display: block !important;
+  flex: 0 0 auto;
+  order: 4;
 }
 
 body.virtualVideoListView .sidebar > .channels {
   flex: 1 1 auto !important;
   min-height: 0 !important;
-  order: 4;
+  order: 5;
 }
