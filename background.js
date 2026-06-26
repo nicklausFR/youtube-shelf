@@ -15,12 +15,9 @@ chrome.sidePanel?.onClosed?.addListener?.((info) => {
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
-  await openShelfForTab(tab, { toggle: true });
-});
-
-async function openShelfForTab(tab = {}, options = {}) {
   const windowId = tab.windowId || chrome.windows.WINDOW_ID_CURRENT;
-  if (options.toggle && openWindows.has(windowId) && chrome.sidePanel.close) {
+
+  if (openWindows.has(windowId) && chrome.sidePanel.close) {
     await chrome.sidePanel.close({ windowId });
     openWindows.delete(windowId);
     return;
@@ -28,45 +25,6 @@ async function openShelfForTab(tab = {}, options = {}) {
 
   await chrome.sidePanel.open({ windowId });
   openWindows.add(windowId);
-}
-
-async function openShelfPopup(windowId) {
-  const current = windowId === undefined ? await chrome.windows.getCurrent().catch(() => null) : await chrome.windows.get(windowId).catch(() => null);
-  const width = 430;
-  const height = 760;
-  const left = current ? Math.max(0, Math.round(current.left + current.width - width - 24)) : undefined;
-  const top = current ? Math.max(0, Math.round(current.top + 48)) : undefined;
-  await chrome.windows.create({
-    url: chrome.runtime.getURL("public/index.html"),
-    type: "popup",
-    width,
-    height,
-    left,
-    top
-  });
-}
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "youtubeChannelShelfOpenShelf") return false;
-  (async () => {
-    try {
-      if (message.preferPopup) {
-        await openShelfPopup(sender.tab?.windowId);
-        sendResponse({ ok: true, mode: "popup" });
-        return;
-      }
-      await openShelfForTab(sender.tab || {}, { toggle: false });
-      sendResponse({ ok: true, mode: "sidePanel" });
-    } catch (error) {
-      try {
-        await openShelfPopup(sender.tab?.windowId);
-        sendResponse({ ok: true, mode: "popup", sidePanelError: error?.message || String(error) });
-      } catch (popupError) {
-        sendResponse({ ok: false, error: popupError?.message || error?.message || String(popupError || error) });
-      }
-    }
-  })();
-  return true;
 });
 
 function createContextMenus() {
@@ -172,7 +130,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (!changes[COMMENTS_MODE_KEY] && !changes[SUGGESTIONS_MODE_KEY] && !changes[PANEL_OPEN_KEY] && !changes[PANEL_HEARTBEAT_KEY]) return;
   syncDisplayContextMenus();
 });
-
 
 
 
