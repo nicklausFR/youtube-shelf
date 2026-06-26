@@ -1804,8 +1804,11 @@ body.sidePanelVideos .categoryResizeHandle {
 body.sidePanelVideos .categoryResizeHandle:hover {
   background: #666;
 }
-.sidePanelPath.has-many-categories.is-fully-expanded::after {
-  display: none;
+.sidePanelPath.has-many-categories.is-fully-expanded::after,
+body.sidePanelVideos .sidePanelPath.has-many-categories.is-fully-expanded::after,
+.sidebar > .sidePanelPath.has-many-categories.is-fully-expanded::after {
+  content: none !important;
+  display: none !important;
 }
 .contentToolbar .unsubscribeButton {
   align-items: center;
@@ -2964,4 +2967,73 @@ body.sidePanelVideos #toggleListLayout,
 body.useSplitColumns.sidePanelVideos #toggleListLayout,
 body.virtualVideoListView #toggleListLayout {
   display: none !important;
+}
+
+
+/* Stable category strip and draggable separator. */
+.sidebar > .sidePanelPath {
+  display: flex !important;
+  flex: 0 0 auto;
+  min-height: 26px;
+}
+
+.sidebar > .sidePanelPath.has-many-categories {
+  max-height: var(--category-panel-max-height, 90px);
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar > .sidePanelPath.has-many-categories.is-fully-expanded::after {
+  content: none !important;
+  display: none !important;
+}
+
+.sidebar > .categoryResizeHandle {
+  background: #3f3f3f;
+  cursor: ns-resize;
+  display: block !important;
+  flex: 0 0 auto;
+  height: 3px;
+  margin: 8px 0 7px;
+  width: 100%;
+}
+
+.sidebar > .categoryResizeHandle:hover {
+  background: #666;
+}
+
+
+/* Keep category strip visible in virtual video views. */
+body.virtualVideoListView .sidebar {
+  display: flex !important;
+  flex-direction: column;
+}
+
+body.virtualVideoListView .sidebar > .sidePanelPath {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  min-height: 26px;
+  order: 1;
+}
+
+body.virtualVideoListView .sidebar > .categoryResizeHandle {
+  display: block !important;
+  flex: 0 0 auto !important;
+  order: 2;
+}
+
+body.virtualVideoListView .sidebar > .channelSearch {
+  flex: 0 0 auto;
+  order: 3;
+}
+
+body.virtualVideoListView .sidebar > .categories,
+body.virtualVideoListView .sidebar > .channelListSeparator {
+  display: none !important;
+}
+
+body.virtualVideoListView .sidebar > .channels {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  order: 4;
 }

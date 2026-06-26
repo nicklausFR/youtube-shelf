@@ -122,6 +122,7 @@ const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const SNIFF_YOUTUBE_KEY = "youtubeChannelShelfSniffYoutube";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
+const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
 const LIST_ZOOM_MIN = 0.7;
 const LIST_ZOOM_MAX = 1.5;
 const LIST_ZOOM_STEP = 0.1;
@@ -130,6 +131,7 @@ const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
 let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
+let categoryPanelHeight = Number(localStorage.getItem(CATEGORY_PANEL_HEIGHT_KEY)) || 90;
 
 async function readBundledConfig() {
   let lastError = null;
@@ -599,6 +601,22 @@ function appendActiveChannelSummary(container) {
   appendActiveChannelCategories(container);
 }
 
+function applyCategoryPanelHeight() {
+  const height = Math.max(52, Number(categoryPanelHeight) || 90);
+  document.documentElement.style.setProperty("--category-panel-max-height", `${height}px`);
+}
+
+function syncCategoryOverflowState() {
+  if (!sidePanelPathEl) return;
+  if (!sidePanelPathEl.classList.contains("has-many-categories")) {
+    sidePanelPathEl.classList.remove("is-fully-expanded");
+    return;
+  }
+  const visibleHeight = sidePanelPathEl.getBoundingClientRect().height;
+  const contentHeight = sidePanelPathEl.scrollHeight;
+  sidePanelPathEl.classList.toggle("is-fully-expanded", contentHeight <= visibleHeight + 2);
+}
+
 function makeCategoryResizeHandle() {
   const handle = document.createElement("div");
   handle.className = "categoryResizeHandle";
@@ -613,11 +631,15 @@ function makeCategoryResizeHandle() {
     if (!handle.hasPointerCapture(event.pointerId)) return;
     const maxHeight = Math.max(90, sidePanelPathEl.scrollHeight);
     const nextHeight = Math.max(52, Math.min(maxHeight, categoryResizeStartHeight + event.clientY - categoryResizeStartY));
+    categoryPanelHeight = nextHeight;
     document.documentElement.style.setProperty("--category-panel-max-height", `${nextHeight}px`);
     sidePanelPathEl.classList.toggle("is-fully-expanded", nextHeight >= maxHeight - 2);
+    requestAnimationFrame(syncCategoryOverflowState);
   });
   handle.addEventListener("pointerup", (event) => {
     if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    localStorage.setItem(CATEGORY_PANEL_HEIGHT_KEY, String(Math.round(categoryPanelHeight)));
+    requestAnimationFrame(syncCategoryOverflowState);
   });
   return handle;
 }
@@ -625,12 +647,14 @@ function makeCategoryResizeHandle() {
 function renderSidePanelPath() {
   if (!sidePanelPathEl || !sidePanelVideoPathEl) return;
   updateChannelSearchPlaceholder();
+  applyCategoryPanelHeight();
   sidePanelPathEl.replaceChildren();
   sidePanelVideoPathEl.replaceChildren();
   appendCategoryPath(sidePanelPathEl);
   sidePanelPathEl.classList.remove("is-fully-expanded");
   sidePanelPathEl.parentElement?.querySelectorAll(".categoryResizeHandle").forEach((handle) => handle.remove());
   sidePanelPathEl.after(makeCategoryResizeHandle());
+  requestAnimationFrame(syncCategoryOverflowState);
   appendActiveChannelSummary(sidePanelVideoPathEl);
   syncStackedChannelViewState();
   if (channelIconModeEl) applyListLayout();
