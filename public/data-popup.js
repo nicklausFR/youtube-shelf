@@ -48,10 +48,6 @@ function downloadText(filename, text, type = "application/json") {
   URL.revokeObjectURL(url);
 }
 
-function csvValue(value) {
-  return `"${String(value || "").replace(/"/g, '""')}"`;
-}
-
 function channelIdFromAny(value = "") {
   const match = String(value).match(/UC[-_a-zA-Z0-9]{10,}/);
   return match ? match[0] : "";
@@ -200,16 +196,6 @@ function mergeChannels(config, imported) {
 async function exportNative() {
   const config = await readConfig();
   downloadText(`youtube-channel-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(config, null, 2));
-  setStatus("Export complete.");
-}
-
-async function exportYoutube() {
-  const config = await readConfig();
-  const rows = [
-    ["Channel Id", "Channel Url", "Channel Title"],
-    ...(config.channels || []).map((channel) => [channel.id, `https://www.youtube.com/channel/${channel.id}`, channel.title || channel.id])
-  ];
-  downloadText(`youtube-subscriptions-${new Date().toISOString().slice(0, 10)}.csv`, rows.map((row) => row.map(csvValue).join(",")).join("\n"), "text/csv");
   setStatus("Export complete.");
 }
 

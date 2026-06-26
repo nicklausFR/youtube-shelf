@@ -49,9 +49,7 @@ const cancelChannelAssignEl = document.querySelector("#cancelChannelAssign");
 const saveChannelAssignEl = document.querySelector("#saveChannelAssign");
 const importExportPromptEl = document.querySelector("#importExportPrompt");
 const exportNativeConfigEl = document.querySelector("#exportNativeConfig");
-const exportYoutubeConfigEl = document.querySelector("#exportYoutubeConfig");
 const importNativeConfigEl = document.querySelector("#importNativeConfig");
-const importYoutubeConfigEl = document.querySelector("#importYoutubeConfig");
 const importFreetubeConfigEl = document.querySelector("#importFreetubeConfig");
 const closeImportExportEl = document.querySelector("#closeImportExport");
 const displayOptionsPromptEl = document.querySelector("#displayOptionsPrompt");
@@ -1648,19 +1646,6 @@ function exportNativeConfig() {
   downloadText(`youtube-channel-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(currentExportConfig(), null, 2));
 }
 
-function csvValue(value) {
-  return `"${String(value || "").replace(/"/g, '""')}"`;
-}
-
-function exportYoutubeCsv() {
-  const rows = [["Channel Id", "Channel Url", "Channel Title"]];
-  for (const channel of allChannels) {
-    rows.push([channel.id, `https://www.youtube.com/channel/${channel.id}`, channel.title || channel.id]);
-  }
-  const csv = rows.map((row) => row.map(csvValue).join(",")).join("\n");
-  downloadText(`youtube-subscriptions-${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv");
-}
-
 function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -1843,13 +1828,12 @@ function openImportPickerDialog(kind) {
   importExportPromptEl.hidden = false;
   const labels = {
     native: "Import YouTube Channel Shelf",
-    youtube: "Import YouTube",
     freetube: "Import FreeTube"
   };
-  for (const button of [exportNativeConfigEl, exportYoutubeConfigEl, importNativeConfigEl, importYoutubeConfigEl, importFreetubeConfigEl]) {
+  for (const button of [exportNativeConfigEl, importNativeConfigEl, importFreetubeConfigEl]) {
     button.hidden = true;
   }
-  const target = kind === "native" ? importNativeConfigEl : kind === "youtube" ? importYoutubeConfigEl : importFreetubeConfigEl;
+  const target = kind === "native" ? importNativeConfigEl : importFreetubeConfigEl;
   target.hidden = false;
   target.textContent = labels[kind] || "Import";
 }
@@ -1858,12 +1842,9 @@ function openFullImportExportDialog() {
   pendingImportKind = "";
   importExportPromptEl.hidden = false;
   exportNativeConfigEl.hidden = false;
-  exportYoutubeConfigEl.hidden = false;
   importNativeConfigEl.hidden = false;
-  importYoutubeConfigEl.hidden = false;
   importFreetubeConfigEl.hidden = false;
   importNativeConfigEl.textContent = "Import YouTube Channel Shelf";
-  importYoutubeConfigEl.textContent = "Import YouTube";
   importFreetubeConfigEl.textContent = "Import FreeTube";
 }
 function openImportExportDialog() {
@@ -1879,14 +1860,12 @@ async function handleDataCommand(command) {
     openImportExportDialog();
     return;
   }
-  if (!configLoaded && command !== "importNative" && command !== "importYoutube" && command !== "importFreetube") {
+  if (!configLoaded && command !== "importNative" && command !== "importFreetube") {
     setStatus("Configuration is not loaded yet", true);
     return;
   }
   if (command === "exportNative") exportNativeConfig();
-  else if (command === "exportYoutube") exportYoutubeCsv();
   else if (command === "importNative") await runImportFilePicker("native");
-  else if (command === "importYoutube") await runImportFilePicker("youtube");
   else if (command === "importFreetube") await runImportFilePicker("freetube");
   else if (command === "cleanSlate") await cleanSlate();
 }
@@ -3151,9 +3130,7 @@ saveChannelAssignEl.addEventListener("click", () => {
 });
 closeImportExportEl.addEventListener("click", closeImportExportDialog);
 exportNativeConfigEl.addEventListener("click", exportNativeConfig);
-exportYoutubeConfigEl.addEventListener("click", exportYoutubeCsv);
 importNativeConfigEl.addEventListener("click", () => runImportFilePicker("native"));
-importYoutubeConfigEl.addEventListener("click", () => runImportFilePicker("youtube"));
 importFreetubeConfigEl.addEventListener("click", () => runImportFilePicker("freetube"));
 closeDisplayOptionsEl?.addEventListener("click", closeDisplayOptionsDialog);
 closeAddChannelEl?.addEventListener("click", closeAddChannelDialog);
@@ -3637,10 +3614,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
-
 
 
 
