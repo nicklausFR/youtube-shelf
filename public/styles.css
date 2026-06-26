@@ -699,10 +699,6 @@ body.videoWideColumns .video {
   border-color: var(--accent);
 }
 
-.video.is-seen {
-  opacity: 0.56;
-}
-
 .thumb {
   background: #060606;
   height: 100%;
@@ -742,6 +738,15 @@ body.videoWideColumns .video {
 .videoChannelMeta:empty,
 .videoDateMeta:empty {
   display: none;
+}
+
+.videoActions {
+  align-self: end;
+  display: flex;
+  gap: 6px;
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: start;
 }
 
 .watchLaterButton {
@@ -2156,13 +2161,13 @@ body.sidePanelVideos .channel.is-active .channelFallback {
 
 .category.is-auto,
 .pathButton-root.is-auto {
-  border-color: #5f7f8f;
-  color: #b9e6f5;
+  border-color: #3f7f55;
+  color: #bff0c9;
 }
 
 .pathButton-auto {
-  border-color: #5f7f8f;
-  color: #b9e6f5;
+  border-color: #3f7f55;
+  color: #bff0c9;
 }
 
 /* Narrow video mode: keep channels and videos in separate views. */
@@ -2735,15 +2740,13 @@ body.sidePanelVideos .channels {
   overflow: hidden;
 }
 
-.channels > .videos.watchLaterVideos .watchLaterButton,
-.channels > .videos.newVideos .watchLaterButton {
+.channels > .videos.watchLaterVideos .videoActions,
+.channels > .videos.newVideos .videoActions {
   align-self: end;
   grid-column: 2;
   grid-row: 3;
-  height: 24px;
   justify-self: start;
   margin-top: 6px;
-  padding: 0 8px;
 }
 .channelTitleRow {
   min-width: 0;
@@ -2767,6 +2770,38 @@ body.sidePanelVideos .channels {
   white-space: nowrap;
   z-index: 1;
 }
+
+.watchedCheck {
+  align-items: center;
+  background: #12345d;
+  border: 1px solid #4b86d9;
+  border-radius: 999px;
+  color: #b8d7ff;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  height: 17px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 17px;
+  z-index: 2;
+}
+
+.video:has(.videoFreshAgeBadge) .watchedCheck {
+  right: 46px;
+}
+
+.video:has(.watchedCheck) .videoTitle {
+  padding-right: 30px;
+}
+
+.video:has(.videoFreshAgeBadge):has(.watchedCheck) .videoTitle {
+  padding-right: 58px;
+}
+
 .watchMoreCard {
   background: #151515;
   border: 1px solid #343434;
@@ -2885,12 +2920,11 @@ body.channelIconMode .channels.videoListHost .videoDetails {
   overflow: hidden !important;
 }
 
-.channels.videoListHost .watchLaterButton,
-body.channelIconMode .channels.videoListHost .watchLaterButton {
+.channels.videoListHost .videoActions,
+body.channelIconMode .channels.videoListHost .videoActions {
   align-self: end !important;
   grid-column: 2 !important;
   grid-row: 2 !important;
-  height: 24px !important;
   justify-self: start !important;
   margin-top: 6px !important;
 }
@@ -2954,9 +2988,55 @@ body.channelIconMode .channels.videoListHost .thumbFrame {
 }
 
 body.channelIconMode .channels.videoListHost .videoDetails,
-body.channelIconMode .channels.videoListHost .watchLaterButton,
+body.channelIconMode .channels.videoListHost .videoActions,
 body.channelIconMode .channels.videoListHost .freshAgeBadge {
   display: none !important;
+}
+
+/* Channel video lists use the same three-state icon/list cycle. */
+body.sidePanelVideos.channelListSingleColumn .content .videos {
+  grid-template-columns: 1fr !important;
+}
+
+body.sidePanelVideos:not(.channelIconMode):not(.channelListSingleColumn) .content .videos {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)) !important;
+}
+
+body.sidePanelVideos.channelIconMode .content .videos {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)) !important;
+}
+
+body.sidePanelVideos.channelIconMode .content .video,
+body.sidePanelVideos.channelIconMode .content .video:not(.is-active) {
+  aspect-ratio: 16 / 9;
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden;
+  padding: 4px !important;
+}
+
+body.sidePanelVideos.channelIconMode .content .thumbFrame {
+  display: block !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 100% !important;
+}
+
+body.sidePanelVideos.channelIconMode .content .videoDetails,
+body.sidePanelVideos.channelIconMode .content .videoActions,
+body.sidePanelVideos.channelIconMode .content .freshAgeBadge {
+  display: none !important;
+}
+
+/* Keep the selected channel framed like the active category button. */
+.channel.is-active,
+body.sidePanelVideos .channel.is-active,
+body.useSplitColumns.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channel.is-active {
+  background: rgba(239, 79, 69, 0.14) !important;
+  border-color: var(--accent) !important;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 

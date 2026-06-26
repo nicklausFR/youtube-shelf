@@ -57,6 +57,12 @@ chrome.runtime.onMessage.addListener((message) => {
   commentsModeEnabled = Boolean(message.hideComments);
   suggestionsModeEnabled = message.hideSuggestions === undefined ? true : Boolean(message.hideSuggestions);
   focusPlayerModeEnabled = Boolean(message.focusPlayer);
+  if (message.panelOpen !== undefined) {
+    panelOpen = Boolean(message.panelOpen);
+  }
+  if (message.panelHeartbeat !== undefined) {
+    panelHeartbeat = Number(message.panelHeartbeat || 0);
+  }
   applyDisplayOptions();
 });
 
