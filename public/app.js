@@ -106,6 +106,7 @@ let channelListModes = Object.fromEntries(CHANNEL_LIST_MODE_SCOPES.map((scope) =
 let sidePanelCategoriesExpanded = false;
 let categoryAssignChannel = null;
 let channelAssignCategory = null;
+let categoryBeingRenamed = null;
 let contextMenuEl = null;
 let confirmDialogResolve = null;
 let lastHandledDataCommandAt = 0;
@@ -492,6 +493,7 @@ function categoryContextActions(category) {
     { label: "Add a channel here", action: () => openChannelAssignment(category) }
   ];
   if (category.id) {
+    actions.push({ label: "Rename category", action: () => openRenameCategoryDialog(category) });
     actions.push({ label: "Delete category", action: () => removeCategory(category.id), danger: true });
   }
   return actions;
@@ -3425,19 +3427,59 @@ async function addChannel(categoryId = activeCategoryId) {
 }
 
 function openAddCategoryDialog() {
+  categoryBeingRenamed = null;
   if (!addCategoryPromptEl) return;
+  const title = addCategoryPromptEl.querySelector("#addCategoryTitle");
+  const submit = addCategoryFormEl?.querySelector("button[type='submit']");
+  if (title) title.textContent = "Add category";
+  if (submit) submit.textContent = "Add";
   addCategoryPromptEl.hidden = false;
   if (addCategoryNameEl) addCategoryNameEl.value = "";
   addCategoryNameEl?.focus();
 }
 
+function openRenameCategoryDialog(category) {
+  if (!category?.id || !addCategoryPromptEl) return;
+  categoryBeingRenamed = category;
+  const title = addCategoryPromptEl.querySelector("#addCategoryTitle");
+  const submit = addCategoryFormEl?.querySelector("button[type='submit']");
+  if (title) title.textContent = "Rename category";
+  if (submit) submit.textContent = "Rename";
+  addCategoryPromptEl.hidden = false;
+  if (addCategoryNameEl) addCategoryNameEl.value = category.name || "";
+  addCategoryNameEl?.select();
+  addCategoryNameEl?.focus();
+}
+
 function closeAddCategoryDialog() {
   if (addCategoryPromptEl) addCategoryPromptEl.hidden = true;
+  categoryBeingRenamed = null;
 }
 
 async function saveNewCategoryFromDialog() {
   const name = addCategoryNameEl?.value || "";
   if (!name.trim()) return;
+  if (categoryBeingRenamed) {
+    const trimmed = name.trim();
+    const duplicate = allCategories.find((category) => (
+      category.id !== categoryBeingRenamed.id
+      && category.name.toLocaleLowerCase("fr") === trimmed.toLocaleLowerCase("fr")
+    ));
+    if (duplicate) {
+      showInfoPopup(`Category "${duplicate.name}" already exists.`, "info");
+      return;
+    }
+    categoryBeingRenamed.name = trimmed;
+    allCategories = allCategories.map((category) => (
+      category.id === categoryBeingRenamed.id ? categoryBeingRenamed : category
+    ));
+    await saveConfig();
+    renderCategories();
+    renderChannels(channelsForActiveCategory());
+    renderSidePanelPath();
+    closeAddCategoryDialog();
+    return;
+  }
   const category = createCategory(name);
   if (!category) return;
   await saveConfig();
@@ -3503,7 +3545,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
 
 
 
