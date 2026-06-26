@@ -114,7 +114,6 @@ let categoryResizeStartY = 0;
 let categoryResizeStartHeight = 0;
 let pendingImportKind = "";
 const STORAGE_KEY = "youtubeChannelShelfConfig";
-const CONFIG_URLS = ["../data/config.json", "../data/config.default.json"];
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
@@ -133,22 +132,6 @@ const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
 let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
 let categoryPanelHeight = Number(localStorage.getItem(CATEGORY_PANEL_HEIGHT_KEY)) || 90;
-
-async function readBundledConfig() {
-  let lastError = null;
-
-  for (const url of CONFIG_URLS) {
-    try {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError || new Error("No configuration file available");
-}
 
 function setPanelOpenState(open) {
   if (!globalThis.chrome?.storage?.local) return;
@@ -2811,9 +2794,7 @@ async function loadChannels() {
         localStorage.setItem(SNIFF_YOUTUBE_KEY, String(sniffYoutubeEnabled));
       }
     }
-    const storedConfig = await readStoredConfig();
-    const bundledConfig = await readBundledConfig();
-    config = storedConfig || bundledConfig;
+    config = await readStoredConfig() || emptyConfig();
     allCategories = config.categories || [];
     allChannels = (config.channels || [])
       .filter((channel) => channel.id)
@@ -3545,9 +3526,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
 
 
 

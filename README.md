@@ -35,9 +35,9 @@ Firefox compatibility is planned for a later version.
 
 ## Local Data
 
-The extension stores channels, categories, watched state, and `Watch later` locally.
+The extension stores channels, categories, watched state, and `Watch later` in browser local storage.
 
-For development, `data/config.json` can be used as a private local configuration file. It is ignored by Git. If absent, the extension falls back to `data/config.default.json`.
+No personal configuration file is committed to Git. Use the extension import/export actions to back up or transfer your configuration.
 
 ## Development
 
