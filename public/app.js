@@ -438,21 +438,29 @@ function requestConfirmation(message) {
 }
 
 function videoContextActions(video) {
+  const isWatched = Boolean(seenVideos[video.id]);
   return [
     {
       label: watchLater[video.id] ? "Remove from Watch later" : "Watch later",
       action: () => toggleWatchLater(video)
     },
     {
-      label: "Mark as watched",
+      label: isWatched ? "Mark as unwatched" : "Mark as watched",
       action: async () => {
-        markVideoSeen(video.id);
-        if (activeView === "watchLater") renderWatchLater();
-        else if (activeView === "newVideos") renderNewVideos();
-        else renderVideos(currentVideos);
+        if (isWatched) delete seenVideos[video.id];
+        else markVideoSeen(video.id);
+        await saveConfig();
+        refreshCurrentVideoList();
       }
     }
   ];
+}
+
+function refreshCurrentVideoList() {
+  if (activeView === "watchLater") renderWatchLater();
+  else if (activeView === "newVideos") renderNewVideos();
+  else if (activeChannel) renderChannelVideos(currentVideos);
+  else renderVideos(currentVideos);
 }
 
 function showContextMenu(event, actions) {
@@ -576,7 +584,7 @@ function appendCategoryPath(container) {
     ]
   });
 
-  appendPathItem(container, `New${channelsWithNewVideos().length ? ` (${channelsWithNewVideos().length})` : ""}`, async () => {
+  appendPathItem(container, `This week${channelsWithNewVideos().length ? ` (${channelsWithNewVideos().length})` : ""}`, async () => {
     await maybePromptSeenForWatchLater();
     showNewVideos();
   }, {
@@ -584,7 +592,7 @@ function appendCategoryPath(container) {
     contextActions: [
       ...newVideosContextActions()
     ],
-    kind: "auto"
+    kind: "new"
   });
 
   appendPathItem(container, "Watch later", async () => {
@@ -768,7 +776,7 @@ function syncChannelIconModeButton() {
     channels: "all channels",
     category: "category channels",
     channelVideos: "channel videos",
-    newVideos: "New videos",
+    newVideos: "This week",
     watchLater: "Watch later"
   };
   channelIconModeEl.classList.toggle("is-active", channelListMode === "icons");
@@ -1466,6 +1474,7 @@ function createVideoCard(video) {
       const card = document.createElement("div");
       card.className = "video";
       card.classList.toggle("is-seen", Boolean(seenVideos[video.id]));
+      card.classList.toggle("is-unseen", !seenVideos[video.id]);
       card.tabIndex = 0;
       card.role = "button";
       card.dataset.videoId = video.id;
@@ -1508,14 +1517,6 @@ function createVideoCard(video) {
         age.textContent = elapsedShort(video.published);
         card.append(age);
       }
-      if (seenVideos[video.id]) {
-        const watched = document.createElement("span");
-        watched.className = "watchedCheck";
-        watched.textContent = "✓";
-        watched.title = "Watched";
-        card.append(watched);
-      }
-
       const meta = document.createElement("div");
       meta.className = "meta";
       const channelMeta = document.createElement("div");
@@ -1529,7 +1530,8 @@ function createVideoCard(video) {
 
       const watchButton = document.createElement("button");
       watchButton.className = "watchLaterButton";
-      watchButton.classList.toggle("is-active", Boolean(watchLater[video.id]));
+      const isWatchLater = Boolean(watchLater[video.id]);
+      watchButton.classList.toggle("is-active", isWatchLater);
       watchButton.type = "button";
       watchButton.textContent = "Watch later";
       watchButton.addEventListener("click", async (event) => {
@@ -2265,7 +2267,7 @@ function updateChannelSearchPlaceholder() {
     : activeView === "watchLater"
       ? "Search Watch later"
       : activeView === "newVideos"
-      ? "Search New videos"
+      ? "Search this week"
       : activeCategoryId
       ? `Search channels in ${currentCategoryName()}`
       : "Search all channels";
@@ -2452,7 +2454,7 @@ async function saveConfig() {
 function renderCategories() {
   const buttons = [
     { id: "", name: "All channels" },
-    { id: NEW_VIDEOS_CATEGORY_ID, name: `New${channelsWithNewVideos().length ? ` (${channelsWithNewVideos().length})` : ""}`, automatic: true },
+    { id: NEW_VIDEOS_CATEGORY_ID, name: `This week${channelsWithNewVideos().length ? ` (${channelsWithNewVideos().length})` : ""}`, automatic: true },
     { id: "__watch_later", name: "Watch later", automatic: true },
     ...sortedManualCategories(),
     { id: UNCATEGORIZED_CATEGORY_ID, name: "Uncategorized" }
@@ -2461,6 +2463,7 @@ function renderCategories() {
     button.className = "category";
     button.classList.toggle("is-special", Boolean(category.special));
     button.classList.toggle("is-auto", Boolean(category.automatic));
+    button.classList.toggle("is-new", category.id === NEW_VIDEOS_CATEGORY_ID);
     button.type = "button";
     button.textContent = category.name;
     if (category.id && !category.special && !category.automatic) attachCategoryDropTarget(button, category.id);
@@ -3634,14 +3637,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
-
-
-
-
-
 
 
 

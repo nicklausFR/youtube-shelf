@@ -699,6 +699,12 @@ body.videoWideColumns .video {
   border-color: var(--accent);
 }
 
+.video.is-unseen {
+  border-color: #4b86d9;
+  outline: 1px solid rgba(75, 134, 217, 0.7);
+  outline-offset: -1px;
+}
+
 .thumb {
   background: #060606;
   height: 100%;
@@ -766,8 +772,8 @@ body.videoWideColumns .video {
 
 .watchLaterButton:hover,
 .watchLaterButton.is-active {
-  border-color: var(--accent);
-  color: var(--text);
+  border-color: #4b86d9;
+  color: #b8d7ff;
 }
 
 .modalOverlay {
@@ -1746,6 +1752,7 @@ body.sidePanelVideos .videos {
   flex-direction: row;
   flex-wrap: wrap;
   gap: 6px;
+  justify-content: space-between;
 }
 
 .sidePanelPath .pathRow {
@@ -2161,13 +2168,19 @@ body.sidePanelVideos .channel.is-active .channelFallback {
 
 .category.is-auto,
 .pathButton-root.is-auto {
-  border-color: #3f7f55;
-  color: #bff0c9;
+  border-color: #4b86d9;
+  color: #b8d7ff;
 }
 
 .pathButton-auto {
-  border-color: #3f7f55;
-  color: #bff0c9;
+  border-color: #4b86d9;
+  color: #b8d7ff;
+}
+
+.category.is-new,
+.pathButton-new {
+  border-color: #6fb67a;
+  color: #e9ffe8;
 }
 
 /* Narrow video mode: keep channels and videos in separate views. */
@@ -2771,37 +2784,6 @@ body.sidePanelVideos .channels {
   z-index: 1;
 }
 
-.watchedCheck {
-  align-items: center;
-  background: #12345d;
-  border: 1px solid #4b86d9;
-  border-radius: 999px;
-  color: #b8d7ff;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 800;
-  height: 17px;
-  justify-content: center;
-  line-height: 1;
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 17px;
-  z-index: 2;
-}
-
-.video:has(.videoFreshAgeBadge) .watchedCheck {
-  right: 46px;
-}
-
-.video:has(.watchedCheck) .videoTitle {
-  padding-right: 30px;
-}
-
-.video:has(.videoFreshAgeBadge):has(.watchedCheck) .videoTitle {
-  padding-right: 58px;
-}
-
 .watchMoreCard {
   background: #151515;
   border: 1px solid #343434;
@@ -3054,6 +3036,7 @@ body.virtualVideoListView #toggleListLayout {
 .sidebar > .sidePanelPath {
   display: flex !important;
   flex: 0 0 auto;
+  justify-content: space-between;
   min-height: 26px;
 }
 
