@@ -2839,6 +2839,7 @@ body.sidePanelVideos .channels {
 }
 
 .channelFreshAgeBadge {
+  cursor: pointer;
   margin-left: 0;
   position: absolute;
   right: 6px;

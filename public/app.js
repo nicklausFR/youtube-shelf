@@ -2844,7 +2844,21 @@ function renderChannels(channels) {
       if (ageLabel) {
         const age = document.createElement("span");
         age.className = "freshAgeBadge channelFreshAgeBadge";
+        age.role = "button";
+        age.tabIndex = 0;
+        age.title = "Open This week";
         age.textContent = ageLabel;
+        age.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          showNewVideos();
+        });
+        age.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          event.stopPropagation();
+          showNewVideos();
+        });
         titleRow.append(age);
       }
 
@@ -3879,7 +3893,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
 
 
 
