@@ -2,26 +2,22 @@
 
 Browser extension for managing a personal YouTube channel shelf from the side panel.
 
-Current version: `2.0.0`.
+Current version: `2.0.1`.
 
 ## Main Features
 
 - Add YouTube channels by drag and drop or by searching YouTube from the extension.
 - Add, rename, and manage categories from the extension UI.
 - Classify channels into categories with context menus or drag and drop.
-- Keep uncategorized channels available through the fixed `Uncategorized` category.
-- Sort manual categories automatically by channel count.
 - Show recent videos from the week in `This week`.
 - Browse each channel's latest RSS videos.
 - Save videos to `Watch later`.
-- Mark videos as watched or unwatched.
 - Search channels and videos using titles, declared tags, keywords, topics, categories, and type metadata when available.
 - Switch display between icon, multi-column, and single-column views, with separate local preferences per list context.
 - Zoom the channel/video list area locally.
 - Hide YouTube comments and suggestion lists while the extension panel is active.
 - Toggle a focused YouTube player view from the side panel toolbar.
 - Open the official YouTube channel page when the RSS feed limit is reached.
-- Import and export the extension configuration.
 
 ## Local Installation
 

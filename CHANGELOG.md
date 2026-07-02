@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 - 2026-07-02
+
+- Added the ability to exclude specific channels from `New videos`.
+- Added a `New videos` exclusion manager so excluded channels can be restored later.
+
 ## 1.1.0 - 2026-06-24
 
 - Added the automatic `New videos` workflow and video list rendering.
