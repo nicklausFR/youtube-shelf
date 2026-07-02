@@ -47,6 +47,10 @@ const channelAssignPromptEl = document.querySelector("#channelAssignPrompt");
 const channelAssignListEl = document.querySelector("#channelAssignList");
 const cancelChannelAssignEl = document.querySelector("#cancelChannelAssign");
 const saveChannelAssignEl = document.querySelector("#saveChannelAssign");
+const excludedNewVideosPromptEl = document.querySelector("#excludedNewVideosPrompt");
+const excludedNewVideosListEl = document.querySelector("#excludedNewVideosList");
+const cancelExcludedNewVideosEl = document.querySelector("#cancelExcludedNewVideos");
+const saveExcludedNewVideosEl = document.querySelector("#saveExcludedNewVideos");
 const importExportPromptEl = document.querySelector("#importExportPrompt");
 const exportNativeConfigEl = document.querySelector("#exportNativeConfig");
 const importNativeConfigEl = document.querySelector("#importNativeConfig");
@@ -515,7 +519,7 @@ function requestConfirmation(message) {
 
 function videoContextActions(video) {
   const isWatched = Boolean(seenVideos[video.id]);
-  return [
+  const actions = [
     {
       label: watchLater[video.id] ? "Remove from Watch later" : "Watch later",
       action: () => toggleWatchLater(video)
@@ -530,6 +534,13 @@ function videoContextActions(video) {
       }
     }
   ];
+  if (activeView === "newVideos" && video.channelId) {
+    actions.push({
+      label: "Do not include this channel in New videos",
+      action: () => setChannelNewVideosExcluded(video.channelId, true)
+    });
+  }
+  return actions;
 }
 
 function refreshCurrentVideoList() {
@@ -1049,6 +1060,7 @@ function isNewerThanReset(publishedValue, channel) {
 }
 
 function hasNewVideos(channel) {
+  if (channel?.excludeFromNewVideos) return false;
   if (!channel?.feedLatestPublished) return false;
   return isWithinNewVideosRange({ published: channel.feedLatestPublished }) && isNewerThanReset(channel.feedLatestPublished, channel);
 }
@@ -1062,6 +1074,7 @@ function channelsWithNewVideos() {
 }
 
 function isVideoNewForChannel(video, channel) {
+  if (channel?.excludeFromNewVideos) return false;
   if (!video?.published || !channel?.id) return false;
   return isWithinNewVideosRange(video) && isNewerThanReset(video.published, channel);
 }
@@ -1086,7 +1099,8 @@ function isWithinNewVideosRange(video) {
 
 function newVideosContextActions() {
   return [
-    { label: "Reset weekly NEW", action: resetNewVideoCounters }
+    { label: "Reset weekly NEW", action: resetNewVideoCounters },
+    { label: "Excluded channels", action: openExcludedNewVideosDialog }
   ];
 }
 
@@ -1114,6 +1128,99 @@ async function resetNewVideoCounters() {
     setActiveChannelButton();
   }
   renderSidePanelPath();
+}
+
+async function setChannelNewVideosExcluded(channelId, excluded) {
+  const channel = allChannels.find((item) => item.id === channelId);
+  if (!channel) return;
+  allChannels = allChannels.map((item) => {
+    if (item.id !== channelId) return item;
+    const { excludeFromNewVideos, ...rest } = item;
+    return excluded ? { ...rest, excludeFromNewVideos: true } : rest;
+  });
+  if (activeChannel?.id === channelId) {
+    activeChannel = allChannels.find((item) => item.id === channelId) || activeChannel;
+  }
+  await saveConfig();
+  renderCategories();
+  if (activeView === "newVideos") {
+    renderNewVideos();
+  } else if (!activeChannel) {
+    renderChannels(channelsForActiveCategory());
+  } else {
+    setActiveChannelButton();
+  }
+  renderSidePanelPath();
+  showInfoPopup(
+    excluded
+      ? `"${channel.title || channel.id}" will not appear in New videos.`
+      : `"${channel.title || channel.id}" will appear in New videos again.`,
+    "ok"
+  );
+}
+
+function renderExcludedNewVideosList() {
+  if (!excludedNewVideosListEl) return;
+  const excludedChannels = allChannels.filter((channel) => channel.excludeFromNewVideos);
+  if (!excludedChannels.length) {
+    const message = document.createElement("p");
+    message.className = "meta";
+    message.textContent = "No excluded channels.";
+    excludedNewVideosListEl.replaceChildren(message);
+    return;
+  }
+
+  excludedNewVideosListEl.replaceChildren(
+    ...excludedChannels.map((channel) => {
+      const label = document.createElement("label");
+      label.className = "categoryAssignItem";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = channel.id;
+      checkbox.checked = true;
+
+      const name = document.createElement("span");
+      name.textContent = channel.title || channel.id;
+
+      label.append(checkbox, name);
+      return label;
+    })
+  );
+}
+
+function openExcludedNewVideosDialog() {
+  if (!excludedNewVideosPromptEl) return;
+  renderExcludedNewVideosList();
+  excludedNewVideosPromptEl.hidden = false;
+}
+
+function closeExcludedNewVideosDialog() {
+  if (excludedNewVideosPromptEl) excludedNewVideosPromptEl.hidden = true;
+}
+
+async function saveExcludedNewVideosDialog() {
+  if (!excludedNewVideosListEl) return;
+  const selectedIds = new Set([...excludedNewVideosListEl.querySelectorAll("input:checked")].map((checkbox) => checkbox.value));
+  allChannels = allChannels.map((channel) => {
+    if (!channel.excludeFromNewVideos) return channel;
+    const { excludeFromNewVideos, ...rest } = channel;
+    return selectedIds.has(channel.id) ? { ...rest, excludeFromNewVideos: true } : rest;
+  });
+  if (activeChannel?.id) {
+    activeChannel = allChannels.find((channel) => channel.id === activeChannel.id) || activeChannel;
+  }
+  await saveConfig();
+  renderCategories();
+  if (activeView === "newVideos") {
+    renderNewVideos();
+  } else if (!activeChannel) {
+    renderChannels(channelsForActiveCategory());
+  } else {
+    setActiveChannelButton();
+  }
+  renderSidePanelPath();
+  closeExcludedNewVideosDialog();
 }
 
 function parseLocalizedInteger(value = "") {
@@ -2212,12 +2319,16 @@ function openSubscribeOnYouTube(channel) {
 }
 
 function channelContextActions(channel) {
-  return [
+  const actions = [
     { label: "Open YouTube channel", action: () => openChannelVideosOnYouTube(channel) },
     { label: "Subscribe on YouTube", action: () => openSubscribeOnYouTube(channel) },
     { label: "Add to category", action: () => openCategoryAssignment(channel) },
     { label: "Remove channel", action: () => unsubscribeChannel(channel), danger: true }
   ];
+  if (channel.excludeFromNewVideos) {
+    actions.splice(3, 0, { label: "Include in New videos", action: () => setChannelNewVideosExcluded(channel.id, false) });
+  }
+  return actions;
 }
 
 function isManualCategoryId(categoryId) {
@@ -3277,6 +3388,10 @@ cancelChannelAssignEl.addEventListener("click", closeChannelAssignment);
 saveChannelAssignEl.addEventListener("click", () => {
   saveChannelAssignment().catch((error) => setStatus(`Save error: ${error.message}`, true));
 });
+cancelExcludedNewVideosEl?.addEventListener("click", closeExcludedNewVideosDialog);
+saveExcludedNewVideosEl?.addEventListener("click", () => {
+  saveExcludedNewVideosDialog().catch((error) => setStatus(`Save error: ${error.message}`, true));
+});
 closeImportExportEl.addEventListener("click", closeImportExportDialog);
 exportNativeConfigEl.addEventListener("click", exportNativeConfig);
 importNativeConfigEl.addEventListener("click", () => runImportFilePicker("native"));
@@ -3764,13 +3879,6 @@ loadChannels().then(() => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
-
-
-
-
 
 
 
