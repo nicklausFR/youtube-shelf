@@ -1,7 +1,7 @@
 {
     "manifest_version":  3,
     "name":  "YouTube Channel Shelf",
-    "version":  "2.0.1",
+    "version":  "2.1",
     "author":  "nicklausFR",
     "description":  "Organize YouTube channels by category and open videos in a clean interface.",
     "icons":  {
@@ -30,7 +30,8 @@
                         "tabs",
                         "scripting",
                         "sidePanel",
-                        "contextMenus"
+                        "contextMenus",
+                        "declarativeNetRequestWithHostAccess"
                     ],
     "host_permissions":  [
                              "https://www.youtube.com/*",
@@ -39,6 +40,18 @@
                              "https://yt3.ggpht.com/*",
                              "https://yt3.googleusercontent.com/*"
                          ],
+    "optional_host_permissions":  [
+                                       "https://*/*"
+                                   ],
+    "declarative_net_request":  {
+                                    "rule_resources":  [
+                                                           {
+                                                               "id":  "youtube_origin",
+                                                               "enabled":  true,
+                                                               "path":  "rules/youtube-origin.json"
+                                                           }
+                                                       ]
+                                },
     "content_scripts":  [
                             {
                                 "matches":  [

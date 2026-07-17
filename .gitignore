@@ -4,6 +4,7 @@ Thumbs.db
 Desktop.ini
 .idea/
 .vscode/
+_metadata/
 
 # Logs and temporary files
 *.log

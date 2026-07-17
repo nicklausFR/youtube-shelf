@@ -1,3 +1,5 @@
+import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-export.js";
+
 const STORAGE_KEY = "youtubeChannelShelfConfig";
 const command = new URLSearchParams(location.search).get("command") || "";
 const titleEl = document.querySelector("#title");
@@ -199,6 +201,13 @@ async function exportNative() {
   setStatus("Export complete.");
 }
 
+async function exportNewPipe() {
+  const config = await readConfig();
+  const data = newPipeSubscriptionData(config.channels, chrome.runtime?.getManifest?.().version || "");
+  downloadText(newPipeSubscriptionFilename(), JSON.stringify(data, null, 2));
+  setStatus(`${data.subscriptions.length} subscriptions exported for NewPipe.`);
+}
+
 async function importFile(kind, file) {
   const text = await file.text();
 
@@ -273,6 +282,7 @@ function addImportButton(kind, label, autoOpen = false) {
 function render() {
   const labels = {
     exportNative: "Export YouTube Channel Shelf",
+    exportNewPipe: "Export for NewPipe",
     importNative: "Import YouTube Channel Shelf",
     importFreetube: "Import FreeTube",
     cleanSlate: "Clean Slate"
@@ -281,6 +291,10 @@ function render() {
   titleEl.textContent = labels[command] || "Import / Export";
 
   if (command === "exportNative") addButton("Export", exportNative, "primary");
+  else if (command === "exportNewPipe") {
+    descriptionEl.textContent = "Export subscriptions in NewPipe JSON format. Groups are not included.";
+    addButton("Export", exportNewPipe, "primary");
+  }
   else if (command === "importNative") {
     descriptionEl.textContent = "Select the YouTube Channel Shelf export.";
     addImportButton("native", "Choose a file", true);
@@ -298,6 +312,7 @@ function render() {
     }, "primary danger");
   } else {
     addButton("Export YouTube Channel Shelf", exportNative);
+    addButton("Export for NewPipe", exportNewPipe);
     addImportButton("native", "Import YouTube Channel Shelf");
     addImportButton("freetube", "Import FreeTube");
   }

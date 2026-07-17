@@ -209,6 +209,15 @@ svg {
   width: 100%;
 }
 
+.channelShelfControls {
+  --list-zoom: 1;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
 .channelSearch input {
   background: var(--panel);
   border: 1px solid var(--soft-line);
@@ -753,6 +762,27 @@ body.videoWideColumns .video {
   display: none;
 }
 
+button.videoChannelMeta {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.videoChannelMeta:hover,
+button.videoChannelMeta:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .videoActions {
   align-self: end;
   display: flex;
@@ -841,6 +871,81 @@ body.videoWideColumns .video {
   max-width: 360px;
 }
 
+.youtubeDataOptionsModal {
+  max-width: 420px;
+}
+
+.webDavSyncModal {
+  max-width: 520px;
+}
+
+.webDavSyncFields {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.webDavSyncFields label {
+  display: grid;
+  gap: 5px;
+}
+
+.webDavSyncFields label > span,
+.webDavSyncStatusRow > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.webDavSyncFields input {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.webDavSyncFields input:focus {
+  border-color: #666;
+  outline: none;
+}
+
+.webDavSyncStatusRow {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 10px;
+}
+
+.webDavSyncStatusRow strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.webDavSyncActions {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.webDavSyncActions .modalButton {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.webDavSyncActions .modalButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.webDavSyncNote {
+  margin-bottom: 14px !important;
+}
+
 .modalCheckbox {
   align-items: center;
   border: 1px solid var(--soft-line);
@@ -860,6 +965,33 @@ body.videoWideColumns .video {
 .modalCheckbox:has(input:disabled) {
   cursor: default;
   opacity: 0.45;
+}
+
+.modalSelectField {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 8px;
+}
+
+.modalSelectField > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modalSelectField select {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  min-height: 38px;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.modalSelectField select:focus {
+  border-color: #666;
+  outline: none;
 }
 
 .modalHint {
@@ -1985,7 +2117,7 @@ body.sidePanelVideos .sidePanelVideoPath {
 }
 
 .channelCategoryChip {
-  cursor: context-menu;
+  cursor: pointer;
 }
 
 .channelCategoryChip:hover {
@@ -2876,6 +3008,11 @@ body.sidePanelVideos .channels {
   color: var(--text);
 }
 
+.watchMoreCard:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .videos .watchMoreCard {
   grid-column: 1 / -1;
 }
@@ -3158,12 +3295,12 @@ body.virtualVideoListView .sidebar > .categoryResizeHandle {
   order: 2;
 }
 
-body.virtualVideoListView .sidebar > .channelSearch {
+body.virtualVideoListView .sidebar > .channelShelfControls {
   flex: 0 0 auto;
   order: 3;
 }
 
-body.virtualVideoListView .sidebar > .categories {
+body.virtualVideoListView .sidebar > .channelShelfControls > .categories {
   display: none !important;
 }
 

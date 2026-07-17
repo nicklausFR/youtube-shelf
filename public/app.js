@@ -1,3 +1,7 @@
+import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-export.js";
+import { searchYoutubeChannelVideos } from "./youtube-channel-search.js";
+import { fetchYoutubeChannelVideosPage } from "./youtube-channel-videos.js";
+
 const toggleSidebarEl = document.querySelector("#toggleSidebar");
 const backEl = document.querySelector("#back");
 const forwardEl = document.querySelector("#forward");
@@ -15,6 +19,7 @@ const channelZoomInEl = document.querySelector("#channelZoomIn");
 const channelBackEl = document.querySelector("#channelBack");
 const channelForwardEl = document.querySelector("#channelForward");
 const channelSearchInputEl = document.querySelector("#channelSearchInput");
+const channelShelfControlsEl = document.querySelector("#channelShelfControls");
 const categoriesEl = document.querySelector("#categories");
 const channelsEl = document.querySelector("#channels");
 const activeChannelSeparatorEl = document.querySelector("#activeChannelSeparator");
@@ -53,6 +58,7 @@ const cancelExcludedNewVideosEl = document.querySelector("#cancelExcludedNewVide
 const saveExcludedNewVideosEl = document.querySelector("#saveExcludedNewVideos");
 const importExportPromptEl = document.querySelector("#importExportPrompt");
 const exportNativeConfigEl = document.querySelector("#exportNativeConfig");
+const exportNewPipeConfigEl = document.querySelector("#exportNewPipeConfig");
 const importNativeConfigEl = document.querySelector("#importNativeConfig");
 const importFreetubeConfigEl = document.querySelector("#importFreetubeConfig");
 const closeImportExportEl = document.querySelector("#closeImportExport");
@@ -61,6 +67,20 @@ const hideCommentsOptionEl = document.querySelector("#hideCommentsOption");
 const hideSuggestionsOptionEl = document.querySelector("#hideSuggestionsOption");
 const closeDisplayOptionsEl = document.querySelector("#closeDisplayOptions");
 const displayOptionsInactiveEl = document.querySelector("#displayOptionsInactive");
+const youtubeDataOptionsPromptEl = document.querySelector("#youtubeDataOptionsPrompt");
+const sniffYoutubeOptionEl = document.querySelector("#sniffYoutubeOption");
+const channelVideoSourceOptionEl = document.querySelector("#channelVideoSourceOption");
+const closeYoutubeDataOptionsEl = document.querySelector("#closeYoutubeDataOptions");
+const webDavSyncPromptEl = document.querySelector("#webDavSyncPrompt");
+const webDavUrlEl = document.querySelector("#webDavUrl");
+const webDavUsernameEl = document.querySelector("#webDavUsername");
+const webDavPasswordEl = document.querySelector("#webDavPassword");
+const webDavStatusEl = document.querySelector("#webDavStatus");
+const testWebDavEl = document.querySelector("#testWebDav");
+const enableWebDavSyncEl = document.querySelector("#enableWebDavSync");
+const syncWebDavNowEl = document.querySelector("#syncWebDavNow");
+const disconnectWebDavEl = document.querySelector("#disconnectWebDav");
+const closeWebDavSyncEl = document.querySelector("#closeWebDavSync");
 const addChannelPromptEl = document.querySelector("#addChannelPrompt");
 const addChannelSearchFormEl = document.querySelector("#addChannelSearchForm");
 const addChannelSearchInputEl = document.querySelector("#addChannelSearchInput");
@@ -87,7 +107,16 @@ let currentWatchLaterVideoId = "";
 let pendingAddChannelCategoryId = "";
 let channelSearchMetadataRefreshTimer = 0;
 let channelSearchMetadataRefreshInFlight = false;
+let channelVideoSearchTimer = 0;
+let channelVideoSearchController = null;
+let channelVideoSearchRequestId = 0;
+let channelVideoSearchQueryKey = "";
+let channelVideoSearchResults = [];
+let channelVideoSearchLoading = false;
+let channelVideoSearchError = "";
 let currentWatchLaterStartedAt = 0;
+let lastVideoChannelNavigationAt = 0;
+let lastVideoChannelNavigationId = "";
 let seenPromptResolve = null;
 let configLoaded = false;
 let sessionFeedBaseline = new Map();
@@ -124,9 +153,15 @@ const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const SNIFF_YOUTUBE_KEY = "youtubeChannelShelfSniffYoutube";
+const CHANNEL_VIDEO_SOURCE_KEY = "youtubeChannelShelfChannelVideoSource";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
 const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
 const CATEGORY_ZOOM_KEY = "youtubeChannelShelfCategoryZoom";
+const WEBDAV_SYNC_SETTINGS_KEY = "youtubeChannelShelfWebDavSyncSettings";
+const WEBDAV_DEFAULT_URL = "";
+const WEBDAV_SYNC_WRITE_DELAY_MS = 10000;
+const WEBDAV_SYNC_POLL_INTERVAL_MS = 60000;
+const WEBDAV_REQUEST_TIMEOUT_MS = 15000;
 const LIST_ZOOM_MIN = 0.7;
 const LIST_ZOOM_MAX = 1.5;
 const LIST_ZOOM_STEP = 0.1;
@@ -138,9 +173,19 @@ const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
+const storedChannelVideoSource = localStorage.getItem(CHANNEL_VIDEO_SOURCE_KEY);
+let channelVideoSource = ["hybrid", "innertube", "rss"].includes(storedChannelVideoSource) ? storedChannelVideoSource : "hybrid";
+let channelVideosContinuation = "";
+let channelVideosLoadingMore = false;
+let channelVideosInnertubeFailed = false;
+let channelVideoLoadRequestId = 0;
 let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
 let categoryPanelHeight = Number(localStorage.getItem(CATEGORY_PANEL_HEIGHT_KEY)) || 90;
 let categoryZoom = Number(localStorage.getItem(CATEGORY_ZOOM_KEY)) || 1;
+let webDavSyncSettings = null;
+let webDavSyncWriteTimer = 0;
+let webDavSyncInProgress = false;
+let webDavSyncIgnoreUpdatedAt = "";
 
 function setPanelOpenState(open, options = {}) {
   if (!globalThis.chrome?.storage?.local) return;
@@ -416,17 +461,525 @@ function closeDisplayOptionsDialog() {
   if (displayOptionsPromptEl) displayOptionsPromptEl.hidden = true;
 }
 
+function randomSyncId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function readWebDavSyncSettings() {
+  if (!globalThis.chrome?.storage?.local) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    chrome.storage.local.get(WEBDAV_SYNC_SETTINGS_KEY, (result) => resolve(result[WEBDAV_SYNC_SETTINGS_KEY] || null));
+  });
+}
+
+function writeWebDavSyncSettings(value) {
+  webDavSyncSettings = value;
+  if (!globalThis.chrome?.storage?.local) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set({ [WEBDAV_SYNC_SETTINGS_KEY]: value }, () => {
+      const error = chrome.runtime?.lastError;
+      if (error) reject(new Error(error.message));
+      else resolve();
+    });
+  });
+}
+
+async function configChecksum(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function synchronizableConfig(value = {}) {
+  const channels = Array.isArray(value.channels) ? value.channels.map((channel) => {
+    const {
+      feedVideos: _feedVideos,
+      feedVideoCount: _feedVideoCount,
+      feedLatestPublished: _feedLatestPublished,
+      feedLatestTitle: _feedLatestTitle,
+      channelVideoCount: _channelVideoCount,
+      ...content
+    } = channel || {};
+    return content;
+  }) : [];
+  const seenVideos = Object.fromEntries(Object.entries(value.seenVideos || {}).map(([videoId, item]) => {
+    if (!item || typeof item !== "object") return [videoId, Boolean(item)];
+    return [videoId, {
+      ...(item.savedAt ? { savedAt: item.savedAt } : {}),
+      ...(item.seenAt ? { seenAt: item.seenAt } : {}),
+      ...(item.channelId ? { channelId: item.channelId } : {}),
+      ...(item.title ? { title: item.title } : {})
+    }];
+  }));
+  return {
+    version: 1,
+    categories: Array.isArray(value.categories) ? value.categories : [],
+    channels,
+    seenVideos,
+    watchLater: value.watchLater && typeof value.watchLater === "object" ? value.watchLater : {},
+    updatedAt: value.updatedAt || ""
+  };
+}
+
+function setWebDavStatus(message, error = false) {
+  if (!webDavStatusEl) return;
+  webDavStatusEl.textContent = message;
+  webDavStatusEl.style.color = error ? "#ff736d" : "";
+}
+
+function webDavSettingsFromFields() {
+  const url = String(webDavUrlEl?.value || "").trim();
+  const username = String(webDavUsernameEl?.value || "").trim();
+  const password = String(webDavPasswordEl?.value || "");
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error("Enter a valid WebDAV file URL");
+  }
+  if (parsedUrl.protocol !== "https:") throw new Error("The WebDAV URL must use HTTPS");
+  if (!username) throw new Error("Enter the Nextcloud username");
+  if (!password) throw new Error("Enter an application password");
+  return { url: parsedUrl.toString(), username, password };
+}
+
+function webDavAuthorization(settings = webDavSyncSettings) {
+  const bytes = new TextEncoder().encode(`${settings.username}:${settings.password}`);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `Basic ${btoa(binary)}`;
+}
+
+function webDavOriginPermission(settings) {
+  return { origins: [`${new URL(settings.url).origin}/*`] };
+}
+
+async function ensureWebDavHostPermission(settings, requestPermission = false) {
+  if (!globalThis.chrome?.permissions) return true;
+  const permission = webDavOriginPermission(settings);
+  if (requestPermission) return chrome.permissions.request(permission);
+  return chrome.permissions.contains(permission);
+}
+
+async function webDavFetch(url, options = {}, settings = webDavSyncSettings) {
+  if (!settings?.username || !settings?.password) throw new Error("WebDAV credentials are not configured");
+  if (!await ensureWebDavHostPermission(settings)) throw new Error("Server access permission is required");
+  const method = options.method || "GET";
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), WEBDAV_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      cache: "no-store",
+      credentials: "omit",
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Authorization: webDavAuthorization(settings),
+        "Cache-Control": "no-cache",
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      const timeoutError = new Error(`The WebDAV ${method} request did not respond within 15 seconds`);
+      timeoutError.code = "WEBDAV_TIMEOUT";
+      timeoutError.method = method;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function webDavError(response, fallback = "WebDAV request failed") {
+  let detail = "";
+  try {
+    const body = await response.text();
+    if (body) {
+      const documentNode = new DOMParser().parseFromString(body, "application/xml");
+      const messageNode = [...documentNode.querySelectorAll("*")].find((node) => node.localName === "message");
+      detail = String(messageNode?.textContent || "").trim().replace(/\s+/g, " ").slice(0, 240);
+    }
+  } catch {
+    // Some proxies return an empty or non-readable error response.
+  }
+  const suffix = detail ? ` ${detail}` : "";
+  if (response.status === 401) return new Error(`Authentication failed. Check the username and application password.${suffix}`);
+  if (response.status === 403) return new Error(`Nextcloud denied access to this location.${suffix}`);
+  if (response.status === 404) return new Error(`The WebDAV folder was not found.${suffix}`);
+  return new Error(`${fallback} (HTTP ${response.status}).${suffix}`);
+}
+
+async function testWebDavConnection(settings, options = {}) {
+  if (!await ensureWebDavHostPermission(settings, options.requestPermission)) {
+    throw new Error("Server access permission was not granted");
+  }
+  const folderUrl = new URL(".", settings.url).toString();
+  const response = await webDavFetch(folderUrl, {
+    method: "PROPFIND",
+    headers: { Depth: "0" }
+  }, settings);
+  if (!response.ok && response.status !== 207) throw await webDavError(response, "Unable to access the WebDAV folder");
+  return true;
+}
+
+function refreshWebDavDialog() {
+  const enabled = Boolean(webDavSyncSettings?.enabled && webDavSyncSettings?.password);
+  testWebDavEl?.toggleAttribute("disabled", webDavSyncInProgress);
+  enableWebDavSyncEl?.toggleAttribute("disabled", webDavSyncInProgress);
+  syncWebDavNowEl?.toggleAttribute("disabled", !enabled || webDavSyncInProgress);
+  disconnectWebDavEl?.toggleAttribute("disabled", !enabled || webDavSyncInProgress);
+}
+
+function populateWebDavDialog() {
+  const settings = webDavSyncSettings || {};
+  if (webDavUrlEl) webDavUrlEl.value = settings.url || WEBDAV_DEFAULT_URL;
+  if (webDavUsernameEl) webDavUsernameEl.value = settings.username || "";
+  if (webDavPasswordEl) webDavPasswordEl.value = settings.password || "";
+  setWebDavStatus(settings.enabled ? "Enabled" : "Not configured");
+  refreshWebDavDialog();
+}
+
+function openWebDavSyncDialog() {
+  if (!webDavSyncPromptEl) return;
+  populateWebDavDialog();
+  webDavSyncPromptEl.hidden = false;
+  webDavUrlEl?.focus();
+}
+
+function closeWebDavSyncDialog() {
+  if (webDavSyncPromptEl) webDavSyncPromptEl.hidden = true;
+}
+
+async function readSynchronizationEnvelope(settings = webDavSyncSettings) {
+  const response = await webDavFetch(settings.url, { method: "GET" }, settings);
+  if (response.status === 404) return { envelope: null, etag: "", exists: false };
+  if (!response.ok) throw await webDavError(response, "Unable to read the synchronization file");
+  const parsed = await response.json();
+  if (!parsed || parsed.formatVersion !== 1 || !parsed.current?.data || !Array.isArray(parsed.current.data.channels)) {
+    throw new Error("The WebDAV synchronization file is invalid");
+  }
+  const synchronizedData = synchronizableConfig(parsed.current.data);
+  const normalizedCurrent = {
+    ...parsed.current,
+    data: synchronizedData,
+    checksum: await configChecksum(synchronizedData)
+  };
+  return {
+    envelope: { ...parsed, current: normalizedCurrent },
+    etag: response.headers.get("ETag") || "",
+    exists: true,
+    requiresCompaction: JSON.stringify(parsed.current.data) !== JSON.stringify(synchronizedData)
+  };
+}
+
+async function writeSynchronizationEnvelope(envelope, options = {}, settings = webDavSyncSettings) {
+  const { etag = "", exists = false } = options;
+  let response;
+  try {
+    response = await webDavFetch(settings.url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(etag ? { "If-Match": etag } : exists ? {} : { "If-None-Match": "*" })
+      },
+      body: JSON.stringify(envelope)
+    }, settings);
+  } catch (error) {
+    if (error?.code !== "WEBDAV_TIMEOUT" || error.method !== "PUT") throw error;
+    setWebDavStatus("Write response delayed - verifying remote file...");
+    await new Promise((resolve) => window.setTimeout(resolve, 1200));
+    try {
+      const verification = await readSynchronizationEnvelope(settings);
+      if (verification.envelope?.current?.changeId === envelope.current?.changeId) {
+        return verification.etag;
+      }
+    } catch {
+      // Preserve the original PUT timeout when verification is inconclusive.
+    }
+    throw error;
+  }
+  if (response.status === 412) {
+    const error = new Error("The remote file changed during synchronization");
+    error.code = "WEBDAV_CONFLICT";
+    throw error;
+  }
+  if (!response.ok && response.status !== 201 && response.status !== 204) {
+    throw await webDavError(response, "Unable to write the synchronization file");
+  }
+  return response.headers.get("ETag") || "";
+}
+
+function snapshotTimestamp(snapshot) {
+  return Date.parse(snapshot?.updatedAt || snapshot?.data?.updatedAt || "") || 0;
+}
+
+function compareSyncSnapshots(left, right) {
+  const timestampDifference = snapshotTimestamp(left) - snapshotTimestamp(right);
+  if (timestampDifference) return timestampDifference;
+  const revisionDifference = Number(left?.revision || 0) - Number(right?.revision || 0);
+  if (revisionDifference) return revisionDifference;
+  const deviceDifference = String(left?.updatedBy || "").localeCompare(String(right?.updatedBy || ""));
+  if (deviceDifference) return deviceDifference;
+  return String(left?.checksum || "").localeCompare(String(right?.checksum || ""));
+}
+
+async function applySynchronizedConfig(snapshot, etag = "") {
+  const synchronizedData = synchronizableConfig({
+    ...snapshot.data,
+    updatedAt: snapshot.updatedAt || snapshot.data.updatedAt
+  });
+  const localChannels = new Map((config.channels || []).map((channel) => [channel.id, channel]));
+  const channels = synchronizedData.channels.map((channel) => {
+    const local = localChannels.get(channel.id) || {};
+    return {
+      ...channel,
+      ...(local.feedVideos ? { feedVideos: local.feedVideos } : {}),
+      ...(local.feedVideoCount !== undefined ? { feedVideoCount: local.feedVideoCount } : {}),
+      ...(local.feedLatestPublished ? { feedLatestPublished: local.feedLatestPublished } : {}),
+      ...(local.feedLatestTitle ? { feedLatestTitle: local.feedLatestTitle } : {}),
+      ...(local.channelVideoCount !== undefined ? { channelVideoCount: local.channelVideoCount } : {})
+    };
+  });
+  const nextConfig = { ...config, ...synchronizedData, channels };
+  webDavSyncIgnoreUpdatedAt = nextConfig.updatedAt || "";
+  await writeWebDavSyncSettings({
+    ...webDavSyncSettings,
+    revision: Number(snapshot.revision || 0),
+    changeId: snapshot.changeId || "",
+    parentChangeId: snapshot.parentChangeId || "",
+    updatedAt: snapshot.updatedAt || nextConfig.updatedAt,
+    updatedBy: snapshot.updatedBy || "",
+    checksum: await configChecksum(synchronizedData),
+    etag
+  });
+  applyExternalConfig(nextConfig);
+  await writeStoredConfig(nextConfig);
+}
+
+async function synchronizeWebDavConfig(options = {}) {
+  if (!webDavSyncSettings?.enabled || !configLoaded || webDavSyncInProgress) return;
+  webDavSyncInProgress = true;
+  refreshWebDavDialog();
+  clearTimeout(webDavSyncWriteTimer);
+  webDavSyncWriteTimer = 0;
+  setWebDavStatus("Synchronizing...");
+
+  try {
+    if (!await ensureWebDavHostPermission(webDavSyncSettings, options.requestPermission)) {
+      setWebDavStatus("Server access permission required", true);
+      return;
+    }
+
+    setWebDavStatus("Checking remote file...");
+    const remoteState = await readSynchronizationEnvelope();
+    const remoteEnvelope = remoteState.envelope;
+    const remoteSnapshot = remoteEnvelope?.current || null;
+    const localConfig = config;
+    const localSynchronizedData = synchronizableConfig(localConfig);
+    const localChecksum = await configChecksum(localSynchronizedData);
+    if (config !== localConfig) {
+      scheduleWebDavSynchronization();
+      return;
+    }
+    const localMatchesLastSync = Boolean(webDavSyncSettings.checksum) && webDavSyncSettings.checksum === localChecksum;
+    const localSnapshot = {
+      revision: localMatchesLastSync ? Number(webDavSyncSettings.revision || 0) : Number(webDavSyncSettings.revision || 0) + 1,
+      changeId: localMatchesLastSync ? webDavSyncSettings.changeId || "" : "",
+      parentChangeId: webDavSyncSettings.changeId || "",
+      updatedAt: localSynchronizedData.updatedAt || new Date().toISOString(),
+      updatedBy: localMatchesLastSync ? webDavSyncSettings.updatedBy || webDavSyncSettings.deviceId : webDavSyncSettings.deviceId,
+      checksum: localChecksum,
+      data: localSynchronizedData
+    };
+
+    if (remoteSnapshot && compareSyncSnapshots(remoteSnapshot, localSnapshot) > 0) {
+      setWebDavStatus("Applying remote configuration...");
+      let remoteEtag = remoteState.etag;
+      if (remoteState.requiresCompaction) {
+        setWebDavStatus("Compacting remote configuration...");
+        remoteEtag = await writeSynchronizationEnvelope({
+          formatVersion: 1,
+          current: remoteSnapshot,
+          history: Array.isArray(remoteEnvelope.history) ? remoteEnvelope.history : []
+        }, remoteState);
+      }
+      await applySynchronizedConfig(remoteSnapshot, remoteEtag);
+      setWebDavStatus(`Received - revision ${Number(remoteSnapshot.revision || 0)}`);
+      return;
+    }
+
+    if (remoteSnapshot?.checksum === localChecksum) {
+      let remoteEtag = remoteState.etag;
+      if (remoteState.requiresCompaction) {
+        setWebDavStatus("Compacting remote configuration...");
+        remoteEtag = await writeSynchronizationEnvelope({
+          formatVersion: 1,
+          current: remoteSnapshot,
+          history: Array.isArray(remoteEnvelope.history) ? remoteEnvelope.history : []
+        }, remoteState);
+      }
+      await writeWebDavSyncSettings({
+        ...webDavSyncSettings,
+        revision: Number(remoteSnapshot.revision || 0),
+        changeId: remoteSnapshot.changeId || "",
+        parentChangeId: remoteSnapshot.parentChangeId || "",
+        updatedAt: remoteSnapshot.updatedAt || localConfig.updatedAt,
+        updatedBy: remoteSnapshot.updatedBy || "",
+        checksum: localChecksum,
+        etag: remoteEtag
+      });
+      setWebDavStatus(`Synchronized - revision ${Number(remoteSnapshot.revision || 0)}`);
+      return;
+    }
+
+    const revision = Math.max(Number(remoteSnapshot?.revision || 0), Number(webDavSyncSettings.revision || 0)) + 1;
+    const snapshot = {
+      revision,
+      changeId: randomSyncId(),
+      parentChangeId: remoteSnapshot?.changeId || webDavSyncSettings.changeId || "",
+      updatedAt: localSynchronizedData.updatedAt || new Date().toISOString(),
+      updatedBy: webDavSyncSettings.deviceId,
+      checksum: localChecksum,
+      data: localSynchronizedData
+    };
+    if (config !== localConfig) {
+      scheduleWebDavSynchronization();
+      return;
+    }
+    const nextEnvelope = {
+      formatVersion: 1,
+      current: snapshot,
+      history: Array.isArray(remoteEnvelope?.history) ? remoteEnvelope.history : []
+    };
+    const payloadKilobytes = Math.max(1, Math.round(new Blob([JSON.stringify(nextEnvelope)]).size / 1024));
+    setWebDavStatus(`Uploading local configuration (${payloadKilobytes} KB)...`);
+    const etag = await writeSynchronizationEnvelope(nextEnvelope, remoteState);
+    const { data: _snapshotData, ...snapshotMeta } = snapshot;
+    await writeWebDavSyncSettings({ ...webDavSyncSettings, ...snapshotMeta, etag });
+    setWebDavStatus(`Synchronized - revision ${revision}`);
+  } catch (error) {
+    if (error?.code === "WEBDAV_CONFLICT") {
+      setWebDavStatus("Remote file changed - retrying", true);
+      webDavSyncWriteTimer = window.setTimeout(() => synchronizeWebDavConfig(), 1000);
+    } else {
+      setWebDavStatus(`Synchronization error: ${error.message}`, true);
+    }
+  } finally {
+    webDavSyncInProgress = false;
+    refreshWebDavDialog();
+  }
+}
+
+function scheduleWebDavSynchronization() {
+  if (!webDavSyncSettings?.enabled || !configLoaded) return;
+  clearTimeout(webDavSyncWriteTimer);
+  webDavSyncWriteTimer = window.setTimeout(() => synchronizeWebDavConfig(), WEBDAV_SYNC_WRITE_DELAY_MS);
+  setWebDavStatus("Local changes pending");
+}
+
+async function testWebDavFromDialog() {
+  try {
+    const settings = webDavSettingsFromFields();
+    setWebDavStatus("Testing connection...");
+    await testWebDavConnection(settings, { requestPermission: true });
+    setWebDavStatus("Connection successful");
+  } catch (error) {
+    setWebDavStatus(`Connection error: ${error.message}`, true);
+  }
+}
+
+async function saveAndEnableWebDavSync() {
+  try {
+    const entered = webDavSettingsFromFields();
+    setWebDavStatus("Checking connection...");
+    await testWebDavConnection(entered, { requestPermission: true });
+    const sameEndpoint = webDavSyncSettings?.url === entered.url && webDavSyncSettings?.username === entered.username;
+    await writeWebDavSyncSettings({
+      ...(sameEndpoint ? webDavSyncSettings : {}),
+      ...entered,
+      enabled: true,
+      deviceId: sameEndpoint && webDavSyncSettings?.deviceId ? webDavSyncSettings.deviceId : randomSyncId()
+    });
+    refreshWebDavDialog();
+    await synchronizeWebDavConfig();
+  } catch (error) {
+    setWebDavStatus(`Setup error: ${error.message}`, true);
+  }
+}
+
+async function disconnectWebDavSynchronization() {
+  clearTimeout(webDavSyncWriteTimer);
+  webDavSyncWriteTimer = 0;
+  const previous = webDavSyncSettings;
+  await writeWebDavSyncSettings({
+    url: previous?.url || WEBDAV_DEFAULT_URL,
+    username: previous?.username || "",
+    password: "",
+    enabled: false,
+    deviceId: previous?.deviceId || randomSyncId()
+  });
+  if (previous?.url && globalThis.chrome?.permissions) {
+    await chrome.permissions.remove(webDavOriginPermission(previous)).catch(() => false);
+  }
+  populateWebDavDialog();
+  setWebDavStatus("Disconnected - application password forgotten");
+}
+
+async function initializeWebDavSynchronization() {
+  webDavSyncSettings = await readWebDavSyncSettings() || {
+    url: WEBDAV_DEFAULT_URL,
+    username: "",
+    password: "",
+    enabled: false,
+    deviceId: randomSyncId()
+  };
+  if (!webDavSyncSettings.deviceId) {
+    await writeWebDavSyncSettings({ ...webDavSyncSettings, deviceId: randomSyncId() });
+  }
+  chrome.storage?.local?.remove?.("youtubeChannelShelfFileSyncMeta");
+  globalThis.indexedDB?.deleteDatabase?.("youtubeChannelShelfFileSync");
+  refreshWebDavDialog();
+  if (webDavSyncSettings.enabled && await ensureWebDavHostPermission(webDavSyncSettings)) {
+    await synchronizeWebDavConfig();
+  }
+}
+
 function setSniffYoutubeEnabled(value) {
   sniffYoutubeEnabled = Boolean(value);
   localStorage.setItem(SNIFF_YOUTUBE_KEY, String(sniffYoutubeEnabled));
+  if (sniffYoutubeOptionEl) sniffYoutubeOptionEl.checked = sniffYoutubeEnabled;
   if (globalThis.chrome?.storage?.local) {
     chrome.storage.local.set({ [SNIFF_YOUTUBE_KEY]: sniffYoutubeEnabled });
   }
-  showInfoPopup(`Sniff YouTube metadata ${sniffYoutubeEnabled ? "enabled" : "disabled"}.`, "info");
 }
 
-function toggleSniffYoutube() {
-  setSniffYoutubeEnabled(!sniffYoutubeEnabled);
+function syncYoutubeDataOptionsDialog() {
+  if (sniffYoutubeOptionEl) sniffYoutubeOptionEl.checked = sniffYoutubeEnabled;
+  if (channelVideoSourceOptionEl) channelVideoSourceOptionEl.value = channelVideoSource;
+}
+
+function openYoutubeDataOptionsDialog() {
+  if (!youtubeDataOptionsPromptEl) return;
+  syncYoutubeDataOptionsDialog();
+  youtubeDataOptionsPromptEl.hidden = false;
+  sniffYoutubeOptionEl?.focus();
+}
+
+function closeYoutubeDataOptionsDialog() {
+  if (youtubeDataOptionsPromptEl) youtubeDataOptionsPromptEl.hidden = true;
+}
+
+function setChannelVideoSource(value) {
+  if (!["hybrid", "innertube", "rss"].includes(value)) return;
+  const changed = value !== channelVideoSource;
+  channelVideoSource = value;
+  localStorage.setItem(CHANNEL_VIDEO_SOURCE_KEY, channelVideoSource);
+  if (channelVideoSourceOptionEl) channelVideoSourceOptionEl.value = channelVideoSource;
+  if (!changed) return;
+  showInfoPopup(`Channel video list: ${channelVideoSource}.`, "info");
+  if (activeChannel?.id) loadFeed();
 }
 
 function settingsContextActions() {
@@ -434,8 +987,9 @@ function settingsContextActions() {
     { label: "Add channel", action: () => addChannel(activeCategoryId) },
     { label: "Add category", action: () => addCategoryEl.click() },
     { label: "Import / Export", action: openImportExportDialog },
+    { label: "WebDAV synchronization", action: openWebDavSyncDialog },
     { label: "Display options", action: openDisplayOptionsDialog },
-    { label: `Sniff YouTube metadata: ${sniffYoutubeEnabled ? "On" : "Off"}`, action: toggleSniffYoutube },
+    { label: "YouTube data options", action: openYoutubeDataOptionsDialog },
     { label: "Clean Slate", action: cleanSlate, danger: true }
   ];
 }
@@ -912,8 +1466,8 @@ function clampListZoom(value) {
 
 function applyListZoom() {
   listZoom = clampListZoom(listZoom);
-  channelsEl.style.setProperty("--list-zoom", String(listZoom));
-  channelsEl.style.zoom = String(listZoom);
+  channelShelfControlsEl?.style.setProperty("--list-zoom", String(listZoom));
+  if (channelShelfControlsEl) channelShelfControlsEl.style.zoom = String(listZoom);
   localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
   const percent = Math.round(listZoom * 100);
   channelZoomOutEl?.toggleAttribute("disabled", listZoom <= LIST_ZOOM_MIN);
@@ -1076,7 +1630,7 @@ function channelsWithNewVideos() {
 function isVideoNewForChannel(video, channel) {
   if (channel?.excludeFromNewVideos) return false;
   if (!video?.published || !channel?.id) return false;
-  return isWithinNewVideosRange(video) && isNewerThanReset(video.published, channel);
+  return isWithinNewVideosRange(video);
 }
 
 function videoWithChannel(video, channel) {
@@ -1367,16 +1921,18 @@ async function readStoredConfig() {
 async function writeStoredConfig(value) {
   if (!globalThis.chrome?.storage?.local) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    if (value?.updatedAt !== webDavSyncIgnoreUpdatedAt) scheduleWebDavSynchronization();
     return;
   }
 
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     chrome.storage.local.set({ [STORAGE_KEY]: value }, () => {
       const error = chrome.runtime?.lastError;
       if (error) reject(new Error(error.message));
       else resolve();
     });
   });
+  if (value?.updatedAt !== webDavSyncIgnoreUpdatedAt) scheduleWebDavSynchronization();
 }
 
 async function readLegacyFileConfig() {
@@ -1734,6 +2290,7 @@ function createVideoCard(video) {
       card.dataset.videoId = video.id;
       card.addEventListener("click", () => openOfficialYoutube(video));
       card.addEventListener("keydown", (event) => {
+        if (event.target !== card) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           openOfficialYoutube(video);
@@ -1773,9 +2330,17 @@ function createVideoCard(video) {
       }
       const meta = document.createElement("div");
       meta.className = "meta";
-      const channelMeta = document.createElement("div");
+      const channelTitle = videoChannelTitle(video);
+      const channelMeta = document.createElement(video.channelId && channelTitle ? "button" : "div");
       channelMeta.className = "videoChannelMeta";
-      channelMeta.textContent = videoChannelTitle(video);
+      channelMeta.textContent = channelTitle;
+      if (channelMeta instanceof HTMLButtonElement) {
+        channelMeta.type = "button";
+        channelMeta.title = `Show videos from ${channelTitle}`;
+        channelMeta.dataset.channelId = video.channelId;
+        channelMeta.dataset.channelTitle = channelTitle;
+        channelMeta.dataset.channelThumbnail = video.channelThumbnail || "";
+      }
       const dateMeta = document.createElement("div");
       dateMeta.className = "videoDateMeta";
       const dateText = videoDateText(video);
@@ -1802,18 +2367,28 @@ function createVideoCard(video) {
       return card;
 }
 
-function createWatchMoreCard(channel) {
+function createWatchMoreCard(channel, options = {}) {
   const card = document.createElement("button");
   card.className = "watchMoreCard";
   card.type = "button";
-  card.textContent = "RSS feed limit - more on YouTube";
-  card.addEventListener("click", () => openChannelVideosOnYouTube(channel));
+  if (options.loadMore) {
+    card.textContent = channelVideosLoadingMore ? "Loading more videos..." : "Load more videos";
+    card.disabled = channelVideosLoadingMore;
+    card.addEventListener("click", loadMoreChannelVideos);
+  } else {
+    card.textContent = channelVideosInnertubeFailed
+      ? "Pagination unavailable - more on YouTube"
+      : "RSS feed limit - more on YouTube";
+    card.addEventListener("click", () => openChannelVideosOnYouTube(channel));
+  }
   return card;
 }
 
 function renderVideos(videos, target = videosEl, options = {}) {
   const items = videos.map(createVideoCard);
-  if (options.watchMoreChannel?.id) items.push(createWatchMoreCard(options.watchMoreChannel));
+  if (options.watchMoreChannel?.id) {
+    items.push(createWatchMoreCard(options.watchMoreChannel, { loadMore: options.loadMore }));
+  }
   target.replaceChildren(...items);
 
   setActiveVideoButton();
@@ -1821,7 +2396,13 @@ function renderVideos(videos, target = videosEl, options = {}) {
 }
 
 function renderChannelVideos(videos = currentVideos) {
-  renderVideos(videos, videosEl, { watchMoreChannel: activeChannel });
+  const searching = Boolean(channelSearchQuery.trim()) && isSelectedChannelSearchScope();
+  const canLoadMore = channelVideoSource !== "rss" && Boolean(channelVideosContinuation || channelVideosLoadingMore);
+  const showYoutubeFallback = channelVideoSource === "rss" || channelVideosInnertubeFailed;
+  renderVideos(videos, videosEl, {
+    watchMoreChannel: !searching && (canLoadMore || showYoutubeFallback) ? activeChannel : null,
+    loadMore: canLoadMore
+  });
 }
 
 async function toggleWatchLater(video) {
@@ -1900,6 +2481,12 @@ function currentExportConfig() {
 
 function exportNativeConfig() {
   downloadText(`youtube-channel-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(currentExportConfig(), null, 2));
+}
+
+function exportNewPipeConfig() {
+  const data = newPipeSubscriptionData(allChannels, chrome.runtime?.getManifest?.().version || "");
+  downloadText(newPipeSubscriptionFilename(), JSON.stringify(data, null, 2));
+  showInfoPopup(`${data.subscriptions.length} subscriptions exported for NewPipe.`, "ok");
 }
 
 function parseCsv(text) {
@@ -2086,7 +2673,7 @@ function openImportPickerDialog(kind) {
     native: "Import YouTube Channel Shelf",
     freetube: "Import FreeTube"
   };
-  for (const button of [exportNativeConfigEl, importNativeConfigEl, importFreetubeConfigEl]) {
+  for (const button of [exportNativeConfigEl, exportNewPipeConfigEl, importNativeConfigEl, importFreetubeConfigEl]) {
     button.hidden = true;
   }
   const target = kind === "native" ? importNativeConfigEl : importFreetubeConfigEl;
@@ -2098,6 +2685,7 @@ function openFullImportExportDialog() {
   pendingImportKind = "";
   importExportPromptEl.hidden = false;
   exportNativeConfigEl.hidden = false;
+  exportNewPipeConfigEl.hidden = false;
   importNativeConfigEl.hidden = false;
   importFreetubeConfigEl.hidden = false;
   importNativeConfigEl.textContent = "Import YouTube Channel Shelf";
@@ -2121,6 +2709,7 @@ async function handleDataCommand(command) {
     return;
   }
   if (command === "exportNative") exportNativeConfig();
+  else if (command === "exportNewPipe") exportNewPipeConfig();
   else if (command === "importNative") await runImportFilePicker("native");
   else if (command === "importFreetube") await runImportFilePicker("freetube");
   else if (command === "cleanSlate") await cleanSlate();
@@ -2451,33 +3040,14 @@ function metadataTextValues(item) {
   ];
 }
 
-function savedVideoTextsForChannel(channelId) {
-  const entries = [
-    ...Object.values(seenVideos || {}),
-    ...Object.values(watchLater || {})
-  ];
-
-  return entries
-    .filter((item) => item?.channelId === channelId)
-    .flatMap((item) => [item.title || "", ...metadataTextValues(item)]);
-}
-
 function searchableTextForChannel(channel) {
   const categoryNames = categoryNamesForChannel(channel);
-  const feedVideos = Array.isArray(channel.feedVideos) ? channel.feedVideos : [];
-  const activeFeedVideos = activeChannel?.id === channel.id ? currentVideos : [];
-  const videoTitles = [...feedVideos, ...activeFeedVideos]
-    .map((video) => video?.title || "")
-    .filter(Boolean);
 
   const parts = [
     channel.id,
     channel.title,
-    channel.feedLatestTitle,
     ...metadataTextValues(channel),
-    ...categoryNames,
-    ...videoTitles,
-    ...savedVideoTextsForChannel(channel.id)
+    ...categoryNames
   ].filter(Boolean);
 
   return normalizeSearchText([
@@ -2507,9 +3077,7 @@ function updateChannelSearchPlaceholder() {
       ? "Search Watch later"
       : activeView === "newVideos"
       ? "Search this week"
-      : activeCategoryId
-      ? `Search channels in ${currentCategoryName()}`
-      : "Search all channels";
+      : "Search channel";
   channelSearchInputEl.placeholder = placeholder;
   channelSearchInputEl.setAttribute("aria-label", placeholder);
 }
@@ -2520,6 +3088,7 @@ function syncChannelSearchState() {
 }
 
 function clearChannelSearch() {
+  resetSelectedChannelVideoSearch();
   channelSearchQuery = "";
   if (channelSearchInputEl) channelSearchInputEl.value = "";
   syncChannelSearchState();
@@ -2546,6 +3115,110 @@ function searchableTextForVideo(video) {
   ].join(" "));
 }
 
+function searchableTextForChannelVideo(video) {
+  const saved = [seenVideos?.[video?.id], watchLater?.[video?.id]].filter((item) => item && typeof item === "object");
+  const parts = [
+    video?.id,
+    video?.title,
+    video?.published,
+    video?.publishedText,
+    video?.duration,
+    video?.views,
+    ...videoDeclaredMetadataValues(video),
+    ...descriptiveMetadataValues(video),
+    ...saved.flatMap((item) => [
+      item.title || "",
+      ...videoDeclaredMetadataValues(item),
+      ...descriptiveMetadataValues(item)
+    ])
+  ].filter(Boolean);
+  return normalizeSearchText([
+    ...parts,
+    ...parts.flatMap(searchAliasesFromText)
+  ].join(" "));
+}
+
+function channelVideoSearchCandidates(channel) {
+  const feedVideos = (channel?.feedVideos || []).map((video) => videoWithChannel(video, channel));
+  const savedVideos = [...Object.entries(watchLater || {}), ...Object.entries(seenVideos || {})]
+    .filter(([, item]) => item && typeof item === "object" && item.channelId === channel?.id)
+    .map(([id, item]) => videoWithChannel({
+      id,
+      title: item.title || id,
+      published: item.savedAt || item.seenAt || "",
+      description: item.description || "",
+      tags: item.tags || item.keywords || item.topics || []
+    }, channel));
+  return mergeChannelVideoLists(currentVideos, [...feedVideos, ...savedVideos]);
+}
+
+function resetSelectedChannelVideoSearch() {
+  window.clearTimeout(channelVideoSearchTimer);
+  channelVideoSearchTimer = 0;
+  channelVideoSearchController?.abort();
+  channelVideoSearchController = null;
+  channelVideoSearchRequestId += 1;
+  channelVideoSearchQueryKey = "";
+  channelVideoSearchResults = [];
+  channelVideoSearchLoading = false;
+  channelVideoSearchError = "";
+}
+
+async function runSelectedChannelVideoSearch(channel, rawQuery, requestId) {
+  const controller = new AbortController();
+  channelVideoSearchController = controller;
+  channelVideoSearchLoading = true;
+  channelVideoSearchError = "";
+  renderSearchedVideos();
+  try {
+    const result = await searchYoutubeChannelVideos({
+      channelId: channel.id,
+      query: rawQuery,
+      signal: controller.signal,
+      onPage: ({ videos }) => {
+        if (requestId !== channelVideoSearchRequestId || activeChannel?.id !== channel.id) return;
+        channelVideoSearchResults = innertubeVideosWithChannel(videos, channel);
+        renderSearchedVideos();
+      }
+    });
+    if (requestId !== channelVideoSearchRequestId || activeChannel?.id !== channel.id) return;
+    channelVideoSearchResults = innertubeVideosWithChannel(result.videos, channel);
+  } catch (error) {
+    if (error?.name === "AbortError" || requestId !== channelVideoSearchRequestId) return;
+    channelVideoSearchError = error.message || "YouTube channel search failed";
+  } finally {
+    if (requestId === channelVideoSearchRequestId && activeChannel?.id === channel.id) {
+      channelVideoSearchLoading = false;
+      channelVideoSearchController = null;
+      renderSearchedVideos();
+    }
+  }
+}
+
+function scheduleSelectedChannelVideoSearch() {
+  const channel = activeChannel;
+  const rawQuery = channelSearchQuery.trim();
+  const queryKey = normalizeSearchText(rawQuery);
+  if (!channel?.id || !queryKey) {
+    resetSelectedChannelVideoSearch();
+    return;
+  }
+  if (queryKey === channelVideoSearchQueryKey) return;
+
+  window.clearTimeout(channelVideoSearchTimer);
+  channelVideoSearchController?.abort();
+  channelVideoSearchRequestId += 1;
+  const requestId = channelVideoSearchRequestId;
+  channelVideoSearchQueryKey = queryKey;
+  channelVideoSearchResults = [];
+  channelVideoSearchLoading = false;
+  channelVideoSearchError = "";
+  channelVideoSearchTimer = window.setTimeout(() => {
+    channelVideoSearchTimer = 0;
+    runSelectedChannelVideoSearch(channel, rawQuery, requestId).catch(() => {});
+  }, 300);
+}
+
 function renderSearchedVideos() {
   syncChannelSearchState();
   const query = normalizeSearchText(channelSearchQuery.trim());
@@ -2555,9 +3228,18 @@ function renderSearchedVideos() {
     return;
   }
 
-  const filteredVideos = currentVideos.filter((video) => searchableTextForVideo(video).includes(query));
+  const localVideos = channelVideoSearchCandidates(activeChannel)
+    .filter((video) => searchableTextForChannelVideo(video).includes(query));
+  const remoteVideos = channelVideoSearchQueryKey === query ? channelVideoSearchResults : [];
+  const filteredVideos = mergeChannelVideoLists(remoteVideos, localVideos);
   renderChannelVideos(filteredVideos);
-  setStatus(filteredVideos.length ? "" : "No videos found in this channel.", !filteredVideos.length);
+  if (channelVideoSearchQueryKey === query && channelVideoSearchLoading) {
+    setStatus(`Searching all channel videos… ${filteredVideos.length} found`, true);
+  } else if (channelVideoSearchQueryKey === query && channelVideoSearchError) {
+    setStatus(`Full channel search unavailable: ${channelVideoSearchError}`, true);
+  } else {
+    setStatus(filteredVideos.length ? `${filteredVideos.length} videos found` : "No videos found in this channel.", !filteredVideos.length);
+  }
 }
 
 function renderWatchLaterVideoResults(videos) {
@@ -2623,6 +3305,7 @@ function renderSearchResults() {
   syncChannelSearchState();
   if (isSelectedChannelSearchScope()) {
     renderSearchedVideos();
+    scheduleSelectedChannelVideoSearch();
     return;
   }
   if (activeView === "watchLater" || activeView === "newVideos") {
@@ -2646,14 +3329,6 @@ function channelSearchScore(channel, query) {
   score = Math.max(score, searchPartScore(categoryNamesForChannel(channel).join(" "), query, { exact: 700, prefix: 600, wordPrefix: 500, includes: 280 }));
   score = Math.max(score, searchPartScore([channel.handle, channel.id].filter(Boolean).join(" "), query, { exact: 560, prefix: 500, wordPrefix: 380, includes: 220 }));
   score = Math.max(score, searchPartScore(descriptiveMetadataValues(channel).join(" "), query, { exact: 260, prefix: 220, wordPrefix: 180, includes: 80 }));
-
-  const feedVideos = Array.isArray(channel.feedVideos) ? channel.feedVideos : [];
-  const videoText = [
-    channel.feedLatestTitle,
-    ...feedVideos.flatMap((video) => [video?.title || "", ...videoDeclaredMetadataValues(video)]),
-    ...savedVideoTextsForChannel(channel.id)
-  ].join(" ");
-  score = Math.max(score, searchPartScore(videoText, query, { exact: 180, prefix: 150, wordPrefix: 120, includes: 50 }));
 
   if (!score && searchableTextForChannel(channel).includes(query)) score = 20;
   return score;
@@ -2916,8 +3591,10 @@ function setActiveChannelButton() {
         }
       }
     }
-    const categoryNames = categoryNamesForChannel(channel);
-    if (!categoryNames.length) {
+    const channelCategories = (channel?.categories || [])
+      .map((categoryId) => allCategories.find((category) => category.id === categoryId))
+      .filter(Boolean);
+    if (!channelCategories.length) {
       if (isActive && document.body.classList.contains("sidePanelVideos")) {
         const addButton = document.createElement("button");
         addButton.type = "button";
@@ -2934,11 +3611,24 @@ function setActiveChannelButton() {
     }
 
     categoryList.append(
-      ...categoryNames.map((name) => {
+      ...channelCategories.map((category) => {
         const item = document.createElement("span");
         item.className = "channelCategoryChip";
-        item.textContent = name;
-        item.title = "Right-click to edit classification";
+        item.role = "button";
+        item.tabIndex = 0;
+        item.textContent = category.name;
+        item.title = `Show channels in ${category.name}. Right-click to edit classification.`;
+        item.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          showCategoryChannels(category.id).catch((error) => setStatus(`Unable to open category: ${error.message}`, true));
+        });
+        item.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          event.stopPropagation();
+          showCategoryChannels(category.id).catch((error) => setStatus(`Unable to open category: ${error.message}`, true));
+        });
         item.addEventListener("contextmenu", (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -2965,13 +3655,10 @@ function syncChannelCategoryLineHeights() {
 }
 
 async function selectChannel(channel, options = {}) {
-  await maybePromptSeenForWatchLater();
-  const fullChannel = allChannels.find((item) => item.id === channel?.id) || channel;
-  if (fullChannel?.id) {
-    fullChannel.newVideosSeenAt = new Date().toISOString();
-    allChannels = allChannels.map((item) => item.id === fullChannel.id ? { ...item, newVideosSeenAt: fullChannel.newVideosSeenAt } : item);
-    if (configLoaded) await saveConfig().catch(() => {});
+  if (currentWatchLaterVideoId && watchLater[currentWatchLaterVideoId]) {
+    await maybePromptSeenForWatchLater();
   }
+  const fullChannel = allChannels.find((item) => item.id === channel?.id) || channel;
   clearChannelSearch();
   activeView = "channels";
   activeChannel = fullChannel;
@@ -2992,6 +3679,72 @@ async function selectChannel(channel, options = {}) {
   await loadFeed();
 }
 
+async function fetchRssChannelVideos(channel) {
+  const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channel.id)}`, {
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`RSS request failed: HTTP ${response.status}`);
+  return parseFeed(await response.text()).map((video) => videoWithChannel(video, channel));
+}
+
+function innertubeVideosWithChannel(videos, channel) {
+  return videos.map((video) => videoWithChannel({
+    ...video,
+    views: video.viewCountText || "",
+    description: "",
+    tags: []
+  }, channel));
+}
+
+function mergeChannelVideoLists(current, additional) {
+  const merged = new Map(current.filter((video) => video?.id).map((video) => [video.id, video]));
+  for (const video of additional) {
+    if (!video?.id) continue;
+    const existing = merged.get(video.id);
+    merged.set(video.id, existing ? {
+      ...video,
+      ...existing,
+      published: !video.publishedText && video.published ? video.published : existing.published || video.published || "",
+      description: existing.description || video.description || "",
+      tags: existing.tags?.length ? existing.tags : video.tags || [],
+      views: existing.views || video.views || "",
+      duration: existing.duration || video.duration || "",
+      publishedText: existing.publishedText || video.publishedText || ""
+    } : video);
+  }
+  return [...merged.values()];
+}
+
+async function loadMoreChannelVideos() {
+  if (!activeChannel?.id || !channelVideosContinuation || channelVideosLoadingMore) return;
+  const channel = activeChannel;
+  const continuation = channelVideosContinuation;
+  const requestId = channelVideoLoadRequestId;
+  channelVideosLoadingMore = true;
+  renderChannelVideos(currentVideos);
+  try {
+    const page = await fetchYoutubeChannelVideosPage({ channelId: channel.id, continuation });
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
+    currentVideos = mergeChannelVideoLists(currentVideos, innertubeVideosWithChannel(page.videos, channel));
+    channelVideosContinuation = page.continuation || "";
+    channelVideosInnertubeFailed = false;
+    if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
+    else {
+      renderChannelVideos(currentVideos);
+      setStatus();
+    }
+  } catch (error) {
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
+    setStatus(`Unable to load more videos: ${error.message}`, true);
+  } finally {
+    if (requestId === channelVideoLoadRequestId && activeChannel?.id === channel.id) {
+      channelVideosLoadingMore = false;
+      if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
+      else renderChannelVideos(currentVideos);
+    }
+  }
+}
+
 async function loadFeed() {
   if (!activeChannel && activeSearchQuery) {
     await searchYoutube(activeSearchQuery);
@@ -3004,44 +3757,84 @@ async function loadFeed() {
     return;
   }
 
+  const channel = activeChannel;
+  const requestId = ++channelVideoLoadRequestId;
+  channelVideosContinuation = "";
+  channelVideosLoadingMore = false;
+  channelVideosInnertubeFailed = false;
   setStatus("Loading...", true);
   refreshEl.disabled = true;
 
   try {
-    const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(activeChannel.id)}`, {
-      cache: "no-store"
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    let rssVideos = [];
+    let rssLoaded = false;
+    let innertubePage = null;
+    let partialMessage = "";
+    if (channelVideoSource === "hybrid") {
+      const [rssResult, innertubeResult] = await Promise.allSettled([
+        fetchRssChannelVideos(channel),
+        fetchYoutubeChannelVideosPage({ channelId: channel.id })
+      ]);
+      if (rssResult.status === "fulfilled") {
+        rssVideos = rssResult.value;
+        rssLoaded = true;
+      }
+      if (innertubeResult.status === "fulfilled") innertubePage = innertubeResult.value;
+      if (rssResult.status === "rejected" && innertubeResult.status === "rejected") {
+        throw rssResult.reason || innertubeResult.reason || new Error("No videos returned");
+      }
+      if (rssResult.status === "rejected") partialMessage = "RSS unavailable: dates come from Innertube.";
+      if (innertubeResult.status === "rejected") {
+        channelVideosInnertubeFailed = true;
+        const detail = innertubeResult.reason?.message || "unknown error";
+        partialMessage = `Pagination unavailable: showing the RSS feed (${detail}).`;
+      }
+    } else if (channelVideoSource === "innertube") {
+      innertubePage = await fetchYoutubeChannelVideosPage({ channelId: channel.id });
+    } else {
+      rssVideos = await fetchRssChannelVideos(channel);
+      rssLoaded = true;
+    }
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
 
-    currentVideos = parseFeed(await response.text()).map((video) => videoWithChannel(video, activeChannel));
-    let channelVideoCount = activeChannel.channelVideoCount || 0;
-    let channelMetadata = { description: activeChannel.description || "", tags: activeChannel.tags || [] };
+    const innertubeVideos = innertubePage ? innertubeVideosWithChannel(innertubePage.videos, channel) : [];
+    currentVideos = channelVideoSource === "hybrid"
+      ? mergeChannelVideoLists(rssVideos, innertubeVideos)
+      : channelVideoSource === "innertube" ? innertubeVideos : rssVideos;
+    channelVideosContinuation = innertubePage?.continuation || "";
+
+    let channelVideoCount = channel.channelVideoCount || 0;
+    let channelMetadata = { description: channel.description || "", tags: channel.tags || [] };
     try {
-      channelVideoCount = await fetchChannelVideoCount(activeChannel.id) || channelVideoCount;
+      channelVideoCount = await fetchChannelVideoCount(channel.id) || channelVideoCount;
     } catch {
-      // The RSS feed remains usable even when YouTube page parsing fails.
+      // The selected video source remains usable even when YouTube page parsing fails.
     }
     try {
-      channelMetadata = { ...channelMetadata, ...await fetchChannelMetadata(activeChannel.id) };
+      channelMetadata = { ...channelMetadata, ...await fetchChannelMetadata(channel.id) };
     } catch {
       // Metadata is optional.
     }
-    const latestPublished = currentVideos[0]?.published || "";
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
+
+    const latestPublished = rssVideos[0]?.published || "";
     activeChannel = {
-      ...activeChannel,
-      feedVideoCount: currentVideos.length,
+      ...channel,
+      ...(rssLoaded ? {
+        feedVideoCount: rssVideos.length,
+        feedLatestPublished: latestPublished,
+        feedLatestTitle: rssVideos[0]?.title || "",
+        feedVideos: rssVideos.map((video) => ({
+          id: video.id,
+          title: video.title,
+          published: video.published,
+          description: video.description || "",
+          tags: video.tags || []
+        }))
+      } : {}),
       channelVideoCount,
-      description: channelMetadata.description || activeChannel.description || "",
-      tags: channelMetadata.tags?.length ? channelMetadata.tags : activeChannel.tags || [],
-      feedLatestPublished: latestPublished,
-      feedLatestTitle: currentVideos[0]?.title || "",
-      feedVideos: currentVideos.map((video) => ({
-        id: video.id,
-        title: video.title,
-        published: video.published,
-        description: video.description || "",
-        tags: video.tags || []
-      }))
+      description: channelMetadata.description || channel.description || "",
+      tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || []
     };
     allChannels = allChannels.map((channel) => (channel.id === activeChannel.id ? { ...channel, ...activeChannel } : channel));
     setActiveChannelButton();
@@ -3049,17 +3842,18 @@ async function loadFeed() {
       renderSearchedVideos();
     } else {
       renderChannelVideos(currentVideos);
-      setStatus();
+      setStatus(partialMessage, Boolean(partialMessage));
     }
   } catch (error) {
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
     currentVideos = [];
     setStatus("Loading error", true);
     const message = document.createElement("p");
     message.className = "meta";
-    message.textContent = `Unable to load feed: ${error.message}`;
+    message.textContent = `Unable to load channel videos: ${error.message}`;
     videosEl.replaceChildren(message);
   } finally {
-    refreshEl.disabled = false;
+    if (requestId === channelVideoLoadRequestId) refreshEl.disabled = false;
   }
 }
 
@@ -3379,6 +4173,28 @@ function handleGeneralContextMenu(event) {
   showContextMenu(event, generalContextActions(target));
 }
 
+function handleVideoChannelNavigation(event) {
+  if (!(event.target instanceof Element)) return;
+  const channelButton = event.target.closest("button.videoChannelMeta[data-channel-id]");
+  if (!channelButton) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const channelId = channelButton.dataset.channelId || "";
+  const now = Date.now();
+  if (channelId === lastVideoChannelNavigationId && now - lastVideoChannelNavigationAt < 500) return;
+  lastVideoChannelNavigationId = channelId;
+  lastVideoChannelNavigationAt = now;
+  const channel = allChannels.find((item) => item.id === channelId) || {
+    id: channelId,
+    title: channelButton.dataset.channelTitle || channelButton.textContent || "YouTube channel",
+    thumbnail: channelButton.dataset.channelThumbnail || "",
+    categories: []
+  };
+  selectChannel(channel).catch((error) => setStatus(`Unable to load channel: ${error.message}`, true));
+}
+
+document.addEventListener("pointerdown", handleVideoChannelNavigation, true);
+document.addEventListener("click", handleVideoChannelNavigation, true);
 document.addEventListener("contextmenu", handleGeneralContextMenu);
 document.addEventListener("click", hideContextMenu);
 document.addEventListener("keydown", (event) => {
@@ -3408,9 +4224,18 @@ saveExcludedNewVideosEl?.addEventListener("click", () => {
 });
 closeImportExportEl.addEventListener("click", closeImportExportDialog);
 exportNativeConfigEl.addEventListener("click", exportNativeConfig);
+exportNewPipeConfigEl?.addEventListener("click", exportNewPipeConfig);
 importNativeConfigEl.addEventListener("click", () => runImportFilePicker("native"));
 importFreetubeConfigEl.addEventListener("click", () => runImportFilePicker("freetube"));
 closeDisplayOptionsEl?.addEventListener("click", closeDisplayOptionsDialog);
+closeYoutubeDataOptionsEl?.addEventListener("click", closeYoutubeDataOptionsDialog);
+testWebDavEl?.addEventListener("click", testWebDavFromDialog);
+enableWebDavSyncEl?.addEventListener("click", saveAndEnableWebDavSync);
+syncWebDavNowEl?.addEventListener("click", () => synchronizeWebDavConfig({ requestPermission: true }));
+disconnectWebDavEl?.addEventListener("click", () => {
+  disconnectWebDavSynchronization().catch((error) => setWebDavStatus(`Disconnect error: ${error.message}`, true));
+});
+closeWebDavSyncEl?.addEventListener("click", closeWebDavSyncDialog);
 closeAddChannelEl?.addEventListener("click", closeAddChannelDialog);
 closeAddCategoryEl?.addEventListener("click", closeAddCategoryDialog);
 addChannelSearchFormEl?.addEventListener("submit", (event) => {
@@ -3428,6 +4253,12 @@ hideCommentsOptionEl?.addEventListener("click", (event) => {
 hideSuggestionsOptionEl?.addEventListener("click", (event) => {
   event.preventDefault();
   toggleDisplayOption(SUGGESTIONS_MODE_KEY, true);
+});
+sniffYoutubeOptionEl?.addEventListener("change", () => {
+  setSniffYoutubeEnabled(sniffYoutubeOptionEl.checked);
+});
+channelVideoSourceOptionEl?.addEventListener("change", () => {
+  setChannelVideoSource(channelVideoSourceOptionEl.value);
 });
 
 channelIconModeEl?.addEventListener("click", () => {
@@ -3849,7 +4680,9 @@ if (globalThis.chrome?.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
     if (changes[STORAGE_KEY]?.newValue) {
-      applyExternalConfig(changes[STORAGE_KEY].newValue);
+      const nextConfig = changes[STORAGE_KEY].newValue;
+      applyExternalConfig(nextConfig);
+      if (nextConfig.updatedAt !== webDavSyncIgnoreUpdatedAt) scheduleWebDavSynchronization();
     }
     if (changes[DATA_COMMAND_KEY]?.newValue) {
       handleIncomingDataCommand(changes[DATA_COMMAND_KEY].newValue);
@@ -3876,17 +4709,24 @@ async function handlePendingDataCommand() {
     await handleIncomingDataCommand(payload);
   }
 }
-document.addEventListener("visibilitychange", () => syncPanelVisibilityState({ broadcast: true }));
+document.addEventListener("visibilitychange", () => {
+  syncPanelVisibilityState({ broadcast: true });
+  if (document.visibilityState === "visible") synchronizeWebDavConfig().catch(() => {});
+});
 window.addEventListener("resize", scheduleCategoryOverflowSync);
 window.setInterval(() => syncPanelVisibilityState({ broadcast: true }), 1000);
 window.setInterval(() => {
   checkCurrentWatchLaterVisibility().catch(() => {});
 }, 1500);
+window.setInterval(() => {
+  if (document.visibilityState === "visible") synchronizeWebDavConfig().catch(() => {});
+}, WEBDAV_SYNC_POLL_INTERVAL_MS);
 window.addEventListener("pagehide", () => setPanelOpenState(false));
 window.addEventListener("beforeunload", () => setPanelOpenState(false));
 
 
 loadChannels().then(() => {
+  initializeWebDavSynchronization().catch((error) => setWebDavStatus(`Synchronization error: ${error.message}`, true));
   handlePendingDataCommand().catch(() => {});
   const initialVideoId = videoIdFromInput(new URLSearchParams(window.location.search).get("video") || "");
   if (initialVideoId) {
