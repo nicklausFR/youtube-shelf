@@ -60,6 +60,7 @@ function createContextMenus() {
       contexts: ["action"]
     });
     chrome.contextMenus.create({ id: "exportNative", parentId: "importExportMenu", title: "Export YouTube Channel Shelf", contexts: ["action"] });
+    chrome.contextMenus.create({ id: "exportNewPipe", parentId: "importExportMenu", title: "Export for NewPipe", contexts: ["action"] });
     chrome.contextMenus.create({ id: "importNative", parentId: "importExportMenu", title: "Import YouTube Channel Shelf", contexts: ["action"] });
     chrome.contextMenus.create({ id: "importFreetube", parentId: "importExportMenu", title: "Import FreeTube", contexts: ["action"] });
   });
@@ -67,7 +68,6 @@ function createContextMenus() {
 
 chrome.runtime.onInstalled.addListener(createContextMenus);
 chrome.runtime.onStartup?.addListener?.(createContextMenus);
-
 
 async function openDataPopup(command) {
   const current = await chrome.windows.getCurrent().catch(() => null);
@@ -104,7 +104,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  if (["exportNative", "importNative", "importFreetube", "cleanSlate"].includes(info.menuItemId)) {
+  if (["exportNative", "exportNewPipe", "importNative", "importFreetube", "cleanSlate"].includes(info.menuItemId)) {
     await openDataPopup(info.menuItemId);
   }
 });
@@ -130,9 +130,3 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (!changes[COMMENTS_MODE_KEY] && !changes[SUGGESTIONS_MODE_KEY] && !changes[PANEL_OPEN_KEY] && !changes[PANEL_HEARTBEAT_KEY]) return;
   syncDisplayContextMenus();
 });
-
-
-
-
-
-

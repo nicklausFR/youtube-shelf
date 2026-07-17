@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1 - 2026-07-17
+
+- Added NewPipe-compatible JSON subscription export without groups.
+- Added an experimental NewPipe-style Innertube channel-video pagination module and live probe.
+- Added selectable hybrid, Innertube-only, and RSS-only channel video sources.
+- Added in-extension channel pagination with a `Load more videos` card and RSS fallback in hybrid mode.
+- Grouped metadata sniffing and channel video source settings in a dedicated `YouTube data options` dialog.
+- Added an MV3 header rule so YouTube accepts extension requests to YouTube endpoints.
+- Restricted shelf search to channel names, identifiers, categories, tags, and descriptions.
+- Added automatic exhaustive search in the selected channel by traversing its complete Innertube video pagination and filtering the available video metadata locally.
+- Made channel names on video cards open that channel's video list inside the extension.
+- Kept watched videos in `This week`; the view now strictly represents the last seven days instead of hiding videos after channel activity.
+- Made category chips on the selected channel navigate to that category's channel list; right-click still edits classification.
+- Added bidirectional WebDAV synchronization with Nextcloud-compatible application-password authentication.
+- Added newest-revision reconciliation, delayed writes, periodic remote checks, and conditional ETag updates.
+- Added WebDAV connection testing and local credential removal on disconnect.
+- Restricted synchronized data to channels, categories, seen videos, and Watch later; appearance preferences remain local.
+- Reserved synchronization-file history metadata for future restore points.
+
 ## 2.0.1 - 2026-07-02
 
 - Added the ability to exclude specific channels from `New videos`.

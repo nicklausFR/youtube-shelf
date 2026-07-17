@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -43,21 +43,23 @@
           <button id="addCategory" class="sidebarAction" type="button">+ Category</button>
         </div>
         <div id="sidePanelPath" class="sidePanelPath"></div>
-        <div class="channelSearch">
-          <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
-            <span></span><span></span><span></span>
-          </button>
-          <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">-</button>
-          <button id="channelZoomIn" class="channelZoomButton" type="button" title="Zoom in list" aria-label="Zoom in list">+</button>
-          <button id="channelBack" class="channelNavButton" type="button" title="Back" aria-label="Back">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-          </button>
-          <button id="channelForward" class="channelNavButton" type="button" title="Forward" aria-label="Forward">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-          </button>
-          <input id="channelSearchInput" type="search" placeholder="Search channels in current category" autocomplete="off" aria-label="Search channels in current category">
+        <div id="channelShelfControls" class="channelShelfControls">
+          <div class="channelSearch">
+            <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
+              <span></span><span></span><span></span>
+            </button>
+            <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">-</button>
+            <button id="channelZoomIn" class="channelZoomButton" type="button" title="Zoom in list" aria-label="Zoom in list">+</button>
+            <button id="channelBack" class="channelNavButton" type="button" title="Back" aria-label="Back">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button id="channelForward" class="channelNavButton" type="button" title="Forward" aria-label="Forward">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <input id="channelSearchInput" type="search" placeholder="Search channel" autocomplete="off" aria-label="Search channel">
+          </div>
+          <div id="categories" class="categories"></div>
         </div>
-        <div id="categories" class="categories"></div>
         <div id="channelListSeparator" class="channelListSeparator" aria-hidden="true"></div>
         <div id="channels" class="channels"></div>
         <div id="activeChannelSeparator" class="activeChannelSeparator" hidden></div>
@@ -161,6 +163,7 @@
         <h2 id="importExportTitle">Import / Export</h2>
         <div class="importExportGrid">
           <button id="exportNativeConfig" class="modalButton secondary" type="button">Export YouTube Channel Shelf</button>
+          <button id="exportNewPipeConfig" class="modalButton secondary" type="button">Export for NewPipe</button>
           <button id="importNativeConfig" class="modalButton secondary" type="button">Import YouTube Channel Shelf</button>
           <button id="importFreetubeConfig" class="modalButton secondary" type="button">Import FreeTube</button>
         </div>
@@ -180,9 +183,67 @@
           <input id="hideSuggestionsOption" type="checkbox" />
           <span>Hide suggestion list</span>
         </label>
-        <p id="displayOptionsInactive" class="modalHint" hidden>Options apply only while the extension panel is open.</p>
+        <p id="displayOptionsInactive" class="modalHint" hidden>Page display options apply only while the extension panel is open.</p>
         <div class="modalActions">
           <button id="closeDisplayOptions" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="youtubeDataOptionsPrompt" class="modalOverlay" hidden>
+      <div class="modal youtubeDataOptionsModal" role="dialog" aria-modal="true" aria-labelledby="youtubeDataOptionsTitle">
+        <h2 id="youtubeDataOptionsTitle">YouTube data options</h2>
+        <label class="modalCheckbox">
+          <input id="sniffYoutubeOption" type="checkbox" />
+          <span>Sniff YouTube metadata</span>
+        </label>
+        <p class="modalHint">Retrieve channel descriptions, tags, and video counts from YouTube pages.</p>
+        <label class="modalSelectField" for="channelVideoSourceOption">
+          <span>Channel video source</span>
+          <select id="channelVideoSourceOption">
+            <option value="hybrid">Hybrid — RSS + Innertube (recommended)</option>
+            <option value="innertube">Innertube — paginated list</option>
+            <option value="rss">RSS — latest videos only</option>
+          </select>
+        </label>
+        <p class="modalHint">Hybrid keeps exact RSS dates for recent videos and adds older videos through Innertube pagination.</p>
+        <div class="modalActions">
+          <button id="closeYoutubeDataOptions" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="webDavSyncPrompt" class="modalOverlay" hidden>
+      <div class="modal webDavSyncModal" role="dialog" aria-modal="true" aria-labelledby="webDavSyncTitle">
+        <h2 id="webDavSyncTitle">WebDAV synchronization</h2>
+        <p class="modalHint">Synchronize the configuration through your Nextcloud WebDAV file.</p>
+        <div class="webDavSyncFields">
+          <label>
+            <span>WebDAV file URL</span>
+            <input id="webDavUrl" type="url" autocomplete="url" spellcheck="false">
+          </label>
+          <label>
+            <span>Username</span>
+            <input id="webDavUsername" type="text" autocomplete="username" spellcheck="false">
+          </label>
+          <label>
+            <span>Application password</span>
+            <input id="webDavPassword" type="password" autocomplete="new-password">
+          </label>
+        </div>
+        <div class="webDavSyncStatusRow">
+          <span>Status</span>
+          <strong id="webDavStatus">Not configured</strong>
+        </div>
+        <div class="webDavSyncActions">
+          <button id="testWebDav" class="modalButton secondary" type="button">Test connection</button>
+          <button id="enableWebDavSync" class="modalButton primary" type="button">Save and enable</button>
+          <button id="syncWebDavNow" class="modalButton secondary" type="button" disabled>Synchronize now</button>
+          <button id="disconnectWebDav" class="modalButton secondary" type="button" disabled>Disconnect and forget credentials</button>
+        </div>
+        <p class="modalHint webDavSyncNote">Credentials stay on this device and are never included in exports or synchronized data.</p>
+        <div class="modalActions">
+          <button id="closeWebDavSync" class="modalButton secondary" type="button">Close</button>
         </div>
       </div>
     </div>
