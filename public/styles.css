@@ -1334,6 +1334,10 @@ button.videoChannelMeta:focus-visible {
   white-space: nowrap;
 }
 
+.pathButton.has-count::before {
+  content: none;
+}
+
 .pathButton:hover {
   border-color: #555;
   color: var(--text);
@@ -2385,6 +2389,42 @@ body.sidePanelVideos .channel.is-active .channelFallback {
 .pathButton-new {
   border-color: #6fb67a;
   color: #e9ffe8;
+}
+
+.newVideosLabelText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newVideosCount {
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+.pathButton-new.is-loading .newVideosCount,
+.category.is-new.is-loading .newVideosCount {
+  animation: newVideosTextFade 1.6s ease-in-out infinite;
+}
+
+@keyframes newVideosTextFade {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.48;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pathButton-new.is-loading .newVideosCount,
+  .category.is-new.is-loading .newVideosCount {
+    animation: none;
+  }
 }
 
 /* Narrow video mode: keep channels and videos in separate views. */
