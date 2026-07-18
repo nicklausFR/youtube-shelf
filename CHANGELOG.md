@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2 - 2026-07-18
+
+- Corrections uniquement.
+
 ## 2.1 - 2026-07-17
 
 - Added NewPipe-compatible JSON subscription export without groups.
