@@ -8,6 +8,9 @@ const forwardEl = document.querySelector("#forward");
 const openAppSessionEl = document.querySelector("#openAppSession");
 const searchFormEl = document.querySelector("#searchForm");
 const searchInputEl = document.querySelector("#searchInput");
+const globalSearchResultsEl = document.querySelector("#globalSearchResults");
+const topOptionsEl = document.querySelector("#topOptions");
+const primaryTabEls = [...document.querySelectorAll(".primaryTab[data-section]")];
 const contentToolbarEl = document.querySelector(".contentToolbar");
 const addChannelEl = document.querySelector("#addChannel");
 const addCategoryEl = document.querySelector("#addCategory");
@@ -94,19 +97,38 @@ const closeAddCategoryEl = document.querySelector("#closeAddCategory");
 let activeVideoId = "";
 let activeChannel = null;
 let activeSearchQuery = "";
+let youtubeSearchQuery = "";
+let youtubeSearchResultsQuery = "";
+let youtubeSearchResultsCache = [];
+let youtubeSearchPendingResults = [];
+let youtubeSearchContinuation = "";
+let youtubeSearchApiKey = "";
+let youtubeSearchClientVersion = "";
+let youtubeSearchLoadingMore = false;
+let youtubeSearchExhausted = false;
+let youtubeSearchLoadObserver = null;
+let youtubeSearchInitialQuery = "";
+let youtubeSearchInitialPromise = null;
 let channelSearchQuery = "";
-let config = { version: 1, categories: [], channels: [], seenVideos: {}, watchLater: {} };
+let config = { version: 1, categories: [], favoriteCategories: [], channels: [], favorites: {}, seenVideos: {}, watchLater: {} };
 let allChannels = [];
 let allCategories = [];
+let favoriteCategories = [];
 let activeCategoryId = "";
+let activeFavoriteCategoryId = "";
 let activeView = "home";
+let activePrimarySection = "channels";
 let currentVideos = [];
+let favorites = {};
 let seenVideos = {};
 let watchLater = {};
 let currentWatchLaterVideoId = "";
 let pendingAddChannelCategoryId = "";
 let channelSearchMetadataRefreshTimer = 0;
 let channelSearchMetadataRefreshInFlight = false;
+let globalSearchTimer = 0;
+let globalSearchController = null;
+let globalSearchRequestId = 0;
 let channelVideoSearchTimer = 0;
 let channelVideoSearchController = null;
 let channelVideoSearchRequestId = 0;
@@ -137,8 +159,10 @@ let channelListModes = Object.fromEntries(CHANNEL_LIST_MODE_SCOPES.map((scope) =
 }));
 let sidePanelCategoriesExpanded = false;
 let categoryAssignChannel = null;
+let categoryAssignFavoriteVideoId = "";
 let channelAssignCategory = null;
 let categoryBeingRenamed = null;
+let categoryDialogScope = "channels";
 let contextMenuEl = null;
 let confirmDialogResolve = null;
 let lastHandledDataCommandAt = 0;
@@ -173,7 +197,34 @@ const SPLIT_COLUMN_MIN_WIDTH = 450;
 const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
+const YOUTUBE_SEARCH_BATCH_SIZE = 20;
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
+
+function setActivePrimarySection(section) {
+  if (!["youtube", "channels", "watchLater", "favorites"].includes(section)) return;
+  activePrimarySection = section;
+  if (section !== "channels") document.body.classList.remove("isChannelDropTarget");
+  if (section !== "watchLater") document.body.classList.remove("isWatchLaterDropTarget");
+  if (section !== "favorites") document.body.classList.remove("isFavoriteDropTarget");
+  document.body.classList.toggle("primarySectionYoutube", section === "youtube");
+  document.body.classList.toggle("primarySectionChannels", section === "channels");
+  document.body.classList.toggle("primarySectionWatchLater", section === "watchLater");
+  document.body.classList.toggle("primarySectionFavorites", section === "favorites");
+  for (const tab of primaryTabEls) {
+    const active = tab.dataset.section === section;
+    tab.classList.toggle("is-active", active);
+    if (active) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
+  }
+  const placeholders = {
+    youtube: "Search YouTube",
+    channels: "Search channels",
+    watchLater: "Search Watch later",
+    favorites: "Search favorites"
+  };
+  searchInputEl.placeholder = placeholders[section];
+  searchInputEl.setAttribute("aria-label", placeholders[section]);
+}
 const storedChannelVideoSource = localStorage.getItem(CHANNEL_VIDEO_SOURCE_KEY);
 let channelVideoSource = ["hybrid", "innertube", "rss"].includes(storedChannelVideoSource) ? storedChannelVideoSource : "hybrid";
 let channelVideosContinuation = "";
@@ -217,6 +268,11 @@ function isSidePanelView() {
 function currentCategoryName() {
   if (activeView === "watchLater") return "Watch later";
   if (activeView === "newVideos") return "New";
+  if (activeView === "favorites") {
+    if (activeFavoriteCategoryId === UNCATEGORIZED_CATEGORY_ID) return "Uncategorized";
+    if (!activeFavoriteCategoryId) return "";
+    return favoriteCategories.find((category) => category.id === activeFavoriteCategoryId)?.name || "";
+  }
   if (activeCategoryId === UNCATEGORIZED_CATEGORY_ID) return "Uncategorized";
   if (!activeCategoryId) return "";
   return allCategories.find((category) => category.id === activeCategoryId)?.name || "";
@@ -260,6 +316,9 @@ function makePathButton(text, onClick, options = {}) {
   preventMouseFocus(button);
   button.addEventListener("click", onClick);
   if (options.dropCategoryId) attachCategoryDropTarget(button, options.dropCategoryId);
+  if (Object.prototype.hasOwnProperty.call(options, "dropFavoriteCategoryId")) {
+    attachFavoriteCategoryDropTarget(button, options.dropFavoriteCategoryId);
+  }
   return button;
 }
 
@@ -340,9 +399,8 @@ function makeFocusPlayerButton() {
 function appendSettingsPathItem(container) {
   const row = document.createElement("div");
   row.className = "pathRow pathSettingsRow";
-  row.append(makeSettingsButton(), makeFocusPlayerButton(), makeCategoryZoomButton(-1), makeCategoryZoomButton(1));
+  row.append(makeCategoryZoomButton(-1), makeCategoryZoomButton(1));
   container.append(row);
-  syncFocusPlayerButtonState();
   syncCategoryZoomButtons();
 }
 
@@ -417,7 +475,9 @@ function setDisplayOption(key, value) {
   const checked = Boolean(value);
   if (key === COMMENTS_MODE_KEY && hideCommentsOptionEl) hideCommentsOptionEl.checked = checked;
   if (key === SUGGESTIONS_MODE_KEY && hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = checked;
-  if (key === FOCUS_PLAYER_MODE_KEY) document.querySelector(".pathFocusButton")?.classList.toggle("is-active", checked);
+  if (key === FOCUS_PLAYER_MODE_KEY) {
+    document.querySelectorAll(".pathFocusButton").forEach((button) => button.classList.toggle("is-active", checked));
+  }
   chrome.storage.local.set({ [key]: checked });
   const overrides = {};
   if (key === COMMENTS_MODE_KEY) overrides.hideComments = checked;
@@ -435,13 +495,13 @@ function toggleDisplayOption(key, fallback = false) {
 }
 
 function syncFocusPlayerButtonState() {
-  const button = document.querySelector(".pathFocusButton");
-  if (!button) return;
+  const buttons = document.querySelectorAll(".pathFocusButton");
+  if (!buttons.length) return;
   const active = isExtensionPanelActive();
-  button.toggleAttribute("disabled", !active);
+  buttons.forEach((button) => button.toggleAttribute("disabled", !active));
   if (!globalThis.chrome?.storage?.local) return;
   chrome.storage.local.get(FOCUS_PLAYER_MODE_KEY, (result) => {
-    button.classList.toggle("is-active", Boolean(result[FOCUS_PLAYER_MODE_KEY]));
+    buttons.forEach((button) => button.classList.toggle("is-active", Boolean(result[FOCUS_PLAYER_MODE_KEY])));
   });
 }
 
@@ -526,7 +586,9 @@ function synchronizableConfig(value = {}) {
   return {
     version: 1,
     categories: Array.isArray(value.categories) ? value.categories : [],
+    favoriteCategories: Array.isArray(value.favoriteCategories) ? value.favoriteCategories : [],
     channels,
+    favorites: value.favorites && typeof value.favorites === "object" ? value.favorites : {},
     seenVideos,
     watchLater: value.watchLater && typeof value.watchLater === "object" ? value.watchLater : {},
     updatedAt: value.updatedAt || ""
@@ -1084,6 +1146,23 @@ function requestConfirmation(message) {
 }
 
 function videoContextActions(video) {
+  if (activePrimarySection === "favorites") {
+    return [
+      {
+        label: "Open in new tab",
+        action: () => openOfficialYoutube(video, { newTab: true })
+      },
+      {
+        label: "Add to categorie",
+        action: () => openFavoriteCategoryAssignment(video)
+      },
+      {
+        label: "Remove from Favorites",
+        action: () => removeFavorite(video),
+        danger: true
+      }
+    ];
+  }
   const isWatched = Boolean(seenVideos[video.id]);
   const actions = [
     {
@@ -1212,6 +1291,7 @@ async function assignChannelToCategory(channelId, categoryId) {
 function attachCategoryDropTarget(element, categoryId) {
   if (!categoryId) return;
   element.addEventListener("dragover", (event) => {
+    if (activePrimarySection !== "channels") return;
     if (!event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-channel")) return;
     event.preventDefault();
     element.classList.add("is-category-drop-target");
@@ -1220,6 +1300,7 @@ function attachCategoryDropTarget(element, categoryId) {
     element.classList.remove("is-category-drop-target");
   });
   element.addEventListener("drop", (event) => {
+    if (activePrimarySection !== "channels") return;
     const channelId = event.dataTransfer?.getData("application/x-youtube-channel-shelf-channel") || "";
     if (!channelId) return;
     event.preventDefault();
@@ -1255,17 +1336,6 @@ function appendCategoryPath(container) {
     countText: newVideosCount ? `(${newVideosCount})` : ""
   });
 
-  appendPathItem(container, "Watch later", async () => {
-    await maybePromptSeenForWatchLater();
-    activeView = "watchLater";
-    activeCategoryId = "";
-    clearChannelSearch();
-    pushHistory({ type: "watchLater", id: "watchLater" });
-    renderCategories();
-    renderChannels([]);
-    renderWatchLater();
-  }, { active: activeView === "watchLater", kind: "auto" });
-
   for (const category of sortedManualCategories()) {
     appendPathItem(container, category.name, () => {
       showCategoryChannels(category.id);
@@ -1281,6 +1351,59 @@ function appendCategoryPath(container) {
   }, {
     active: activeView === "channels" && activeCategoryId === UNCATEGORIZED_CATEGORY_ID && !activeChannel
   });
+}
+
+function appendFavoriteCategoryPath(container) {
+  container.classList.toggle("has-many-categories", favoriteCategories.length > 3);
+  appendSettingsPathItem(container);
+
+  appendPathItem(container, "All Favorite", () => showFavoritesCategory(""), {
+    active: activeView === "favorites" && !activeFavoriteCategoryId,
+    dropFavoriteCategoryId: "",
+    contextActions: [
+      { label: "Add category", action: openAddFavoriteCategoryDialog }
+    ]
+  });
+
+  for (const category of sortedFavoriteCategories()) {
+    appendPathItem(container, category.name, () => showFavoritesCategory(category.id), {
+      active: activeView === "favorites" && activeFavoriteCategoryId === category.id,
+      dropFavoriteCategoryId: category.id,
+      contextActions: favoriteCategoryContextActions(category)
+    });
+  }
+
+  appendPathItem(container, "Uncategorized", () => showFavoritesCategory(UNCATEGORIZED_CATEGORY_ID), {
+    active: activeView === "favorites" && activeFavoriteCategoryId === UNCATEGORIZED_CATEGORY_ID,
+    dropFavoriteCategoryId: UNCATEGORIZED_CATEGORY_ID
+  });
+}
+
+function attachFavoriteCategoryDropTarget(element, categoryId = "") {
+  element.addEventListener("dragover", (event) => {
+    if (activePrimarySection !== "favorites" || !hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    document.body.classList.remove("isFavoriteDropTarget");
+    element.classList.add("is-category-drop-target");
+  });
+  element.addEventListener("dragleave", () => element.classList.remove("is-category-drop-target"));
+  element.addEventListener("drop", (event) => {
+    const video = droppedVideoFromDataTransfer(event.dataTransfer);
+    if (!video) return;
+    event.preventDefault();
+    event.stopPropagation();
+    element.classList.remove("is-category-drop-target");
+    addVideoToFavorites(video, categoryId).catch((error) => showInfoPopup(`Favorite update failed: ${error.message}`, "error"));
+  });
+}
+
+function favoriteCategoryContextActions(category) {
+  return [
+    { label: "Rename category", action: () => openRenameCategoryDialog(category, "favorites") },
+    { label: "Delete category", action: () => removeFavoriteCategory(category.id), danger: true }
+  ];
 }
 
 function appendActiveChannelCategories(container) {
@@ -1422,7 +1545,8 @@ function renderSidePanelPath() {
   applyCategoryZoom();
   sidePanelPathEl.replaceChildren();
   sidePanelVideoPathEl.replaceChildren();
-  appendCategoryPath(sidePanelPathEl);
+  if (activePrimarySection === "favorites") appendFavoriteCategoryPath(sidePanelPathEl);
+  else appendCategoryPath(sidePanelPathEl);
   sidePanelPathEl.classList.remove("is-fully-expanded");
   sidePanelPathEl.parentElement?.querySelectorAll(".categoryResizeHandle").forEach((handle) => handle.remove());
   sidePanelPathEl.after(makeCategoryResizeHandle());
@@ -1434,6 +1558,7 @@ function renderSidePanelPath() {
 
 async function showSidePanelChannels() {
   await maybePromptSeenForWatchLater();
+  setActivePrimarySection("channels");
   document.body.classList.remove("sidePanelVideos");
   document.body.classList.remove("virtualVideoListView");
   activeView = "channels";
@@ -1455,6 +1580,7 @@ async function showSidePanelChannels() {
 function currentListLayoutScope() {
   if (activeView === "newVideos") return "newVideos";
   if (activeView === "watchLater") return "watchLater";
+  if (activeView === "favorites") return "channelVideos";
   if (activeChannel) return "channelVideos";
   if (activeView === "channels" && activeCategoryId) return "category";
   return "channels";
@@ -2051,6 +2177,7 @@ function newVideosHistoryEntry() {
 
 function currentShelfBaseHistoryEntry() {
   if (activeView === "watchLater") return { type: "watchLater", id: "watchLater" };
+  if (activeView === "favorites") return { type: "favorites", id: activeFavoriteCategoryId || "" };
   if (activeView === "newVideos") return newVideosHistoryEntry();
   if (activeChannel) return { type: "channel", id: activeChannel.id };
   if (activeView === "channels") return channelListHistoryEntry();
@@ -2064,7 +2191,9 @@ function channelSearchHistoryEntry() {
     type: "channelSearch",
     id: JSON.stringify({
       query,
-      categoryId: activeCategoryId || "",
+      view: activeView,
+      section: activePrimarySection,
+      categoryId: activeView === "favorites" ? activeFavoriteCategoryId || "" : activeCategoryId || "",
       channelId: activeChannel?.id || ""
     })
   };
@@ -2084,7 +2213,22 @@ function recordChannelSearchHistory() {
   pushHistory(entry);
 }
 
+function recordYoutubeSearchHistory(query) {
+  const trimmed = String(query || "").trim();
+  const entry = trimmed
+    ? { type: "search", id: trimmed }
+    : { type: "youtubeHome", id: "youtube" };
+  const current = historyStack[historyIndex];
+  if (!suppressHistory && ["search", "youtubeHome"].includes(current?.type)) {
+    historyStack[historyIndex] = entry;
+    updateHistoryButtons();
+    return;
+  }
+  pushHistory(entry);
+}
+
 function showChannelListState(categoryId = "") {
+  setActivePrimarySection("channels");
   document.body.classList.remove("sidePanelVideos");
   document.body.classList.remove("virtualVideoListView");
   activeView = "channels";
@@ -2116,6 +2260,7 @@ function renderNewVideos() {
 }
 
 function showNewVideos(options = {}) {
+  setActivePrimarySection("channels");
   clearChannelSearch();
   document.body.classList.remove("sidePanelVideos");
   document.body.classList.add("virtualVideoListView");
@@ -2316,6 +2461,29 @@ function createVideoCard(video) {
       card.tabIndex = 0;
       card.role = "button";
       card.dataset.videoId = video.id;
+      card.draggable = true;
+      card.addEventListener("dragstart", (event) => {
+        const draggedVideo = {
+          id: video.id,
+          title: video.title || "",
+          channelId: video.channelId || "",
+          channel: video.channel || videoChannelTitle(video),
+          description: video.description || "",
+          tags: video.tags || video.keywords || video.topics || []
+        };
+        event.dataTransfer?.setData("application/x-youtube-channel-shelf-video", JSON.stringify(draggedVideo));
+        event.dataTransfer?.setData("text/uri-list", `https://www.youtube.com/watch?v=${video.id}`);
+        event.dataTransfer?.setData("text/plain", `https://www.youtube.com/watch?v=${video.id}`);
+        event.dataTransfer.effectAllowed = "copy";
+        card.classList.add("is-dragging");
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("is-dragging");
+        document.body.classList.remove("isWatchLaterDropTarget");
+        document.body.classList.remove("isFavoriteDropTarget");
+        document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
+        document.querySelectorAll(".is-favorite-drop-target").forEach((item) => item.classList.remove("is-favorite-drop-target"));
+      });
       card.addEventListener("click", () => openOfficialYoutube(video));
       card.addEventListener("keydown", (event) => {
         if (event.target !== card) return;
@@ -2375,6 +2543,51 @@ function createVideoCard(video) {
       dateMeta.textContent = video.views ? [dateText, video.views].filter(Boolean).join(" - ") : dateText;
       meta.append(channelMeta, dateMeta);
 
+      const favoriteCategoryList = document.createElement("div");
+      favoriteCategoryList.className = "channelCategoryList videoCategoryList";
+      if (activePrimarySection === "favorites") {
+        const assignedCategories = (video.categories || [])
+          .map((categoryId) => favoriteCategories.find((category) => category.id === categoryId))
+          .filter(Boolean);
+        favoriteCategoryList.append(...assignedCategories.map((category) => {
+          const chip = document.createElement("span");
+          chip.className = "channelCategoryChip";
+          chip.role = "button";
+          chip.tabIndex = 0;
+          chip.textContent = category.name;
+          chip.title = `Show favorites in ${category.name}`;
+          const openCategory = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            showFavoritesCategory(category.id);
+          };
+          chip.addEventListener("click", openCategory);
+          chip.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") openCategory(event);
+          });
+          return chip;
+        }));
+        favoriteCategoryList.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openFavoriteCategoryAssignment(video);
+        });
+      }
+
+      const favoriteButton = document.createElement("button");
+      favoriteButton.className = "favoriteButton";
+      favoriteButton.dataset.videoId = video.id;
+      const isFavorite = Boolean(favorites[video.id]);
+      favoriteButton.classList.toggle("is-active", isFavorite);
+      favoriteButton.type = "button";
+      favoriteButton.textContent = isFavorite ? "\u2605" : "\u2606";
+      favoriteButton.title = isFavorite ? "Remove from Favorites" : "Add to Favorites";
+      favoriteButton.setAttribute("aria-label", favoriteButton.title);
+      favoriteButton.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await toggleFavorite(video);
+      });
+
       const watchButton = document.createElement("button");
       watchButton.className = "watchLaterButton";
       const isWatchLater = Boolean(watchLater[video.id]);
@@ -2388,7 +2601,13 @@ function createVideoCard(video) {
 
       const actions = document.createElement("div");
       actions.className = "videoActions";
-      actions.append(watchButton);
+      if (activePrimarySection === "youtube" || activePrimarySection === "favorites" || activeView === "newVideos" || activeChannel) {
+        actions.append(favoriteButton);
+      }
+      if (activePrimarySection === "favorites" && favoriteCategoryList.childElementCount) {
+        actions.append(favoriteCategoryList);
+      }
+      if (activePrimarySection !== "favorites") actions.append(watchButton);
 
       details.append(title, meta);
       card.append(thumbFrame, details, actions);
@@ -2481,7 +2700,7 @@ function slugify(value) {
     .slice(0, 48);
 }
 function emptyConfig() {
-  return { version: 1, categories: [], channels: [], seenVideos: {}, watchLater: {}, updatedAt: new Date().toISOString() };
+  return { version: 1, categories: [], favoriteCategories: [], channels: [], favorites: {}, seenVideos: {}, watchLater: {}, updatedAt: new Date().toISOString() };
 }
 
 function downloadText(filename, text, type = "application/json") {
@@ -2500,7 +2719,9 @@ function currentExportConfig() {
   return {
     version: 1,
     categories: allCategories,
+    favoriteCategories,
     channels: allChannels,
+    favorites,
     seenVideos,
     watchLater,
     updatedAt: new Date().toISOString()
@@ -2627,7 +2848,9 @@ async function importNativeConfigFromText(text) {
   if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Channel Shelf file");
   config = { ...emptyConfig(), ...parsed, updatedAt: new Date().toISOString() };
   allCategories = config.categories || [];
+  favoriteCategories = config.favoriteCategories || [];
   allChannels = config.channels || [];
+  favorites = config.favorites || {};
   seenVideos = config.seenVideos || {};
   watchLater = config.watchLater || {};
   await writeStoredConfig(config);
@@ -2764,15 +2987,18 @@ function createCategory(name) {
 
 function renderCategoryAssignmentList() {
   if (!categoryAssignListEl) return;
+  const favoriteItem = categoryAssignFavoriteVideoId ? favorites[categoryAssignFavoriteVideoId] : null;
+  const sourceCategories = favoriteItem ? favoriteCategories : allCategories;
+  const selectedCategoryIds = favoriteItem?.categories || categoryAssignChannel?.categories || [];
   categoryAssignListEl.replaceChildren(
-    ...allCategories.map((category) => {
+    ...sourceCategories.map((category) => {
       const label = document.createElement("label");
       label.className = "categoryAssignItem";
 
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.value = category.id;
-      checkbox.checked = Boolean(categoryAssignChannel?.categories?.includes(category.id));
+      checkbox.checked = selectedCategoryIds.includes(category.id);
 
       const name = document.createElement("span");
       name.textContent = category.name;
@@ -2836,7 +3062,22 @@ async function saveChannelAssignment() {
 }
 function openCategoryAssignment(channel = activeChannel) {
   if (!channel || !categoryAssignPromptEl) return;
+  categoryAssignFavoriteVideoId = "";
   categoryAssignChannel = channel;
+  const title = categoryAssignPromptEl.querySelector("#categoryAssignTitle");
+  if (title) title.textContent = "Channel categories";
+  newCategoryNameEl.value = "";
+  renderCategoryAssignmentList();
+  categoryAssignPromptEl.hidden = false;
+  newCategoryNameEl.focus();
+}
+
+function openFavoriteCategoryAssignment(video) {
+  if (!video?.id || !favorites[video.id] || !categoryAssignPromptEl) return;
+  categoryAssignChannel = null;
+  categoryAssignFavoriteVideoId = video.id;
+  const title = categoryAssignPromptEl.querySelector("#categoryAssignTitle");
+  if (title) title.textContent = "Favorite categories";
   newCategoryNameEl.value = "";
   renderCategoryAssignmentList();
   categoryAssignPromptEl.hidden = false;
@@ -2846,13 +3087,20 @@ function openCategoryAssignment(channel = activeChannel) {
 function closeCategoryAssignment() {
   categoryAssignPromptEl.hidden = true;
   categoryAssignChannel = null;
+  categoryAssignFavoriteVideoId = "";
   newCategoryNameEl.value = "";
 }
 
 async function addCategoryFromAssignment() {
-  const category = createCategory(newCategoryNameEl.value);
+  const category = categoryAssignFavoriteVideoId
+    ? createFavoriteCategory(newCategoryNameEl.value)
+    : createCategory(newCategoryNameEl.value);
   if (!category) return;
-  if (categoryAssignChannel) {
+  if (categoryAssignFavoriteVideoId && favorites[categoryAssignFavoriteVideoId]) {
+    favorites[categoryAssignFavoriteVideoId].categories = [
+      ...new Set([...(favorites[categoryAssignFavoriteVideoId].categories || []), category.id])
+    ];
+  } else if (categoryAssignChannel) {
     categoryAssignChannel.categories = [...new Set([...(categoryAssignChannel.categories || []), category.id])];
   }
   newCategoryNameEl.value = "";
@@ -2862,11 +3110,21 @@ async function addCategoryFromAssignment() {
 }
 
 async function saveCategoryAssignment() {
-  if (!categoryAssignChannel) return;
+  if (!categoryAssignChannel && !categoryAssignFavoriteVideoId) return;
   if (newCategoryNameEl.value.trim()) {
     await addCategoryFromAssignment();
   }
   const categoryIds = [...categoryAssignListEl.querySelectorAll("input:checked")].map((checkbox) => checkbox.value);
+  if (categoryAssignFavoriteVideoId) {
+    const videoId = categoryAssignFavoriteVideoId;
+    if (favorites[videoId]) {
+      favorites[videoId] = { ...favorites[videoId], categories: [...new Set(categoryIds)] };
+    }
+    await saveConfig();
+    renderFavoritesHome();
+    closeCategoryAssignment();
+    return;
+  }
   categoryAssignChannel.categories = [...new Set(categoryIds)];
   allChannels = allChannels.map((channel) => (channel.id === categoryAssignChannel.id ? categoryAssignChannel : channel));
   activeChannel = activeChannel?.id === categoryAssignChannel.id ? categoryAssignChannel : activeChannel;
@@ -2892,6 +3150,20 @@ async function removeCategory(categoryId) {
   renderCategories();
   renderChannels(channelsForActiveCategory());
   renderSidePanelPath();
+}
+
+async function removeFavoriteCategory(categoryId) {
+  const category = favoriteCategories.find((item) => item.id === categoryId);
+  if (!category) return;
+  if (!await requestConfirmation(`Delete category "${category.name}"?`)) return;
+  favoriteCategories = favoriteCategories.filter((item) => item.id !== categoryId);
+  favorites = Object.fromEntries(Object.entries(favorites).map(([videoId, item]) => [videoId, {
+    ...item,
+    categories: (item.categories || []).filter((id) => id !== categoryId)
+  }]));
+  if (activeFavoriteCategoryId === categoryId) activeFavoriteCategoryId = "";
+  await saveConfig();
+  renderFavoritesHome();
 }
 
 async function unsubscribeActiveChannel() {
@@ -3273,8 +3545,17 @@ function renderSearchedVideos() {
 function renderWatchLaterVideoResults(videos) {
   const watchLaterList = document.createElement("div");
   watchLaterList.className = "videos watchLaterVideos";
+  channelsEl.classList.add("videoListHost");
   channelsEl.replaceChildren(watchLaterList);
   renderVideos(videos, watchLaterList);
+}
+
+function renderFavoriteVideoResults(videos) {
+  const favoriteList = document.createElement("div");
+  favoriteList.className = "videos favoriteVideos";
+  channelsEl.classList.add("videoListHost");
+  channelsEl.replaceChildren(favoriteList);
+  renderVideos(videos, favoriteList);
 }
 
 function channelNeedsMetadata(channel) {
@@ -3331,6 +3612,10 @@ function scheduleSearchMetadataRefresh(channels) {
 
 function renderSearchResults() {
   syncChannelSearchState();
+  if (activeView === "favorites") {
+    renderFavoritesHome();
+    return;
+  }
   if (isSelectedChannelSearchScope()) {
     renderSearchedVideos();
     scheduleSelectedChannelVideoSearch();
@@ -3380,7 +3665,9 @@ async function saveConfig() {
   config = {
     version: 1,
     categories: allCategories,
+    favoriteCategories,
     channels: allChannels,
+    favorites,
     seenVideos,
     watchLater,
     updatedAt: new Date().toISOString()
@@ -3388,7 +3675,9 @@ async function saveConfig() {
 
   await writeStoredConfig(config);
   allCategories = config.categories || [];
+  favoriteCategories = config.favoriteCategories || [];
   allChannels = config.channels || [];
+  favorites = config.favorites || {};
   seenVideos = config.seenVideos || {};
   watchLater = config.watchLater || {};
 }
@@ -3398,7 +3687,6 @@ function renderCategories() {
   const buttons = [
     { id: "", name: "All channels" },
     { id: NEW_VIDEOS_CATEGORY_ID, name: `This week${newVideosCount ? ` (${newVideosCount})` : ""}`, automatic: true },
-    { id: "__watch_later", name: "Watch later", automatic: true },
     ...sortedManualCategories(),
     { id: UNCATEGORIZED_CATEGORY_ID, name: "Uncategorized" }
   ].map((category) => {
@@ -3433,23 +3721,12 @@ function renderCategories() {
     }
     button.classList.toggle(
       "is-active",
-      category.id === "__watch_later" ? activeView === "watchLater" : category.id === NEW_VIDEOS_CATEGORY_ID ? activeView === "newVideos" : activeView === "channels" && category.id === activeCategoryId
+      category.id === NEW_VIDEOS_CATEGORY_ID ? activeView === "newVideos" : activeView === "channels" && category.id === activeCategoryId
     );
     button.addEventListener("click", async () => {
       await maybePromptSeenForWatchLater();
       if (category.id === NEW_VIDEOS_CATEGORY_ID) {
         showNewVideos();
-        return;
-      }
-
-      if (category.id === "__watch_later") {
-        activeView = "watchLater";
-        activeCategoryId = "";
-        clearChannelSearch();
-        pushHistory({ type: "watchLater", id: "watchLater" });
-        renderCategories();
-        renderChannels([]);
-        renderWatchLater();
         return;
       }
 
@@ -3495,6 +3772,195 @@ function renderWatchLater() {
   renderVideos(currentVideos, watchLaterList);
   syncStackedChannelViewState();
   syncVideoLayoutAvailability();
+}
+
+function createFavoriteCategory(name) {
+  const trimmed = name.trim();
+  const idBase = slugify(trimmed);
+  if (!idBase) return null;
+  const existing = favoriteCategories.find((category) => category.name.toLocaleLowerCase("fr") === trimmed.toLocaleLowerCase("fr"));
+  if (existing) return existing;
+  let id = idBase;
+  let suffix = 2;
+  while (favoriteCategories.some((category) => category.id === id)) {
+    id = `${idBase}-${suffix}`;
+    suffix += 1;
+  }
+  const category = { id, name: trimmed };
+  favoriteCategories.push(category);
+  return category;
+}
+
+function sortedFavoriteCategories() {
+  return [...favoriteCategories].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+}
+
+function syncFavoriteButtons(videoId = "") {
+  const selector = videoId
+    ? `.favoriteButton[data-video-id="${CSS.escape(videoId)}"]`
+    : ".favoriteButton[data-video-id]";
+  document.querySelectorAll(selector).forEach((button) => {
+    const isFavorite = Boolean(favorites[button.dataset.videoId]);
+    button.classList.toggle("is-active", isFavorite);
+    button.textContent = isFavorite ? "\u2605" : "\u2606";
+    button.title = isFavorite ? "Remove from Favorites" : "Add to Favorites";
+    button.setAttribute("aria-label", button.title);
+  });
+}
+
+async function toggleFavorite(video) {
+  if (!video?.id) return;
+  if (favorites[video.id]) {
+    delete favorites[video.id];
+    await saveConfig();
+    syncFavoriteButtons(video.id);
+    showInfoPopup(`"${video.title || video.id}" removed from Favorites.`, "info");
+    return;
+  }
+  await addVideoToFavorites(video);
+  syncFavoriteButtons(video.id);
+}
+
+async function removeFavorite(video) {
+  if (!video?.id || !favorites[video.id]) return;
+  if (!await requestConfirmation(`Remove "${video.title || video.id}" from Favorites?`)) return;
+  delete favorites[video.id];
+  await saveConfig();
+  renderFavoritesHome();
+  syncFavoriteButtons(video.id);
+}
+
+async function addVideoToWatchLater(video) {
+  if (!video?.id) return false;
+  if (watchLater[video.id]) {
+    showInfoPopup("This video is already in Watch later.", "info");
+    return false;
+  }
+  watchLater[video.id] = {
+    savedAt: new Date().toISOString(),
+    seenAt: "",
+    channelId: video.channelId || "",
+    title: video.title || video.id,
+    description: video.description || "",
+    tags: video.tags || video.keywords || video.topics || [],
+    channel: video.channel || ""
+  };
+  await saveConfig();
+  if (activeView === "watchLater") renderWatchLater();
+  showInfoPopup(`"${video.title || video.id}" added to Watch later.`, "ok");
+  return true;
+}
+
+async function addVideoToFavorites(video, categoryId = "") {
+  if (!video?.id) return false;
+  if (!video.title || video.title === video.id) {
+    try {
+      const match = (await fetchYoutubeGlobalSearchResults(video.id, { limit: 8 }))
+        .find((item) => item.type === "video" && item.id === video.id);
+      if (match) video = { ...video, ...match };
+    } catch {
+      // Keep the dropped identifier when YouTube metadata is temporarily unavailable.
+    }
+  }
+  const targetCategoryId = favoriteCategories.some((category) => category.id === categoryId) ? categoryId : "";
+  const current = favorites[video.id];
+  if (current) {
+    if (targetCategoryId && !(current.categories || []).includes(targetCategoryId)) {
+      favorites[video.id] = {
+        ...current,
+        categories: [...new Set([...(current.categories || []), targetCategoryId])]
+      };
+      await saveConfig();
+      if (activeView === "favorites") renderFavoritesHome();
+      syncFavoriteButtons(video.id);
+      showInfoPopup(`"${current.title || video.title || video.id}" added to this favorite category.`, "ok");
+      return true;
+    }
+    showInfoPopup("This video is already in Favorites.", "info");
+    return false;
+  }
+  favorites[video.id] = {
+    savedAt: new Date().toISOString(),
+    channelId: video.channelId || "",
+    title: video.title || video.id,
+    description: video.description || "",
+    tags: video.tags || video.keywords || video.topics || [],
+    channel: video.channel || "",
+    categories: targetCategoryId ? [targetCategoryId] : []
+  };
+  await saveConfig();
+  if (activeView === "favorites") renderFavoritesHome();
+  syncFavoriteButtons(video.id);
+  showInfoPopup(`"${video.title || video.id}" added to Favorites.`, "ok");
+  return true;
+}
+
+function droppedVideoFromDataTransfer(dataTransfer) {
+  const payload = dataTransfer?.getData("application/x-youtube-channel-shelf-video") || "";
+  if (payload) {
+    try {
+      const video = JSON.parse(payload);
+      if (videoIdFromInput(video.id || "")) return video;
+    } catch {
+      // Fall back to the URL payload.
+    }
+  }
+  const value = dataTransfer?.getData("text/uri-list") || dataTransfer?.getData("text/plain") || "";
+  const id = videoIdFromInput(value.split(/\r?\n/).find((line) => line && !line.startsWith("#")) || value);
+  return id ? { id, title: id } : null;
+}
+
+function renderFavoritesHome() {
+  activeView = "favorites";
+  activeChannel = null;
+  activeVideoId = "";
+  currentVideos = Object.entries(favorites)
+    .map(([id, item]) => ({
+      id,
+      title: item.title || id,
+      published: item.savedAt || "",
+      channelId: item.channelId || "",
+      channel: item.channel || allChannels.find((channel) => channel.id === item.channelId)?.title || "",
+      description: item.description || "",
+      tags: item.tags || item.keywords || item.topics || [],
+      thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+      categories: item.categories || []
+    }))
+    .filter((video) => {
+      if (activeFavoriteCategoryId === UNCATEGORIZED_CATEGORY_ID) return !video.categories.length;
+      if (!activeFavoriteCategoryId) return true;
+      return video.categories.includes(activeFavoriteCategoryId);
+    })
+    .filter((video) => !channelSearchQuery.trim() || searchableTextForVideo(video).includes(normalizeSearchText(channelSearchQuery.trim())))
+    .sort((a, b) => String(b.published).localeCompare(String(a.published)));
+  document.body.classList.remove("sidePanelVideos");
+  document.body.classList.add("virtualVideoListView");
+  listViewEl.hidden = false;
+  playerViewEl.hidden = true;
+  videosEl.replaceChildren();
+  if (currentVideos.length) {
+    renderFavoriteVideoResults(currentVideos);
+  } else {
+    channelsEl.classList.add("videoListHost");
+    const message = document.createElement("p");
+    message.className = "meta channelSearchEmpty";
+    message.textContent = activeFavoriteCategoryId ? "No favorites in this category yet." : "No favorites yet.";
+    channelsEl.replaceChildren(message);
+  }
+  renderCategories();
+  setActiveChannelButton();
+  setHeader("", false);
+  syncStackedChannelViewState();
+  syncVideoLayoutAvailability();
+  setStatus();
+}
+
+function showFavoritesCategory(categoryId = "", options = {}) {
+  setActivePrimarySection("favorites");
+  activeFavoriteCategoryId = categoryId || "";
+  clearChannelSearch();
+  renderFavoritesHome();
+  if (!options.skipHistory) pushHistory({ type: "favorites", id: activeFavoriteCategoryId });
 }
 
 function renderChannels(channels) {
@@ -4003,22 +4469,172 @@ async function refreshActiveView() {
   }
 }
 
+function appendYoutubeSearchBatch() {
+  const knownIds = new Set(youtubeSearchResultsCache.map((video) => video.id));
+  const batch = [];
+  while (youtubeSearchPendingResults.length && batch.length < YOUTUBE_SEARCH_BATCH_SIZE) {
+    const video = youtubeSearchPendingResults.shift();
+    if (!video?.id || knownIds.has(video.id)) continue;
+    knownIds.add(video.id);
+    batch.push(video);
+  }
+  youtubeSearchResultsCache = [...youtubeSearchResultsCache, ...batch];
+  currentVideos = [...youtubeSearchResultsCache];
+  return batch.length;
+}
+
+function renderYoutubeSearchResults() {
+  youtubeSearchLoadObserver?.disconnect();
+  youtubeSearchLoadObserver = null;
+  renderWatchLaterVideoResults(currentVideos);
+  if (youtubeSearchExhausted || (!youtubeSearchContinuation && !youtubeSearchPendingResults.length)) return;
+
+  const list = channelsEl.querySelector(".videos");
+  if (!list) return;
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "watchMoreCard";
+  more.textContent = youtubeSearchLoadingMore ? "Loading more…" : `Load ${YOUTUBE_SEARCH_BATCH_SIZE} more`;
+  more.disabled = youtubeSearchLoadingMore;
+  more.addEventListener("click", () => loadMoreYoutubeSearchResults());
+  list.append(more);
+
+  if (!youtubeSearchLoadingMore && "IntersectionObserver" in window) {
+    youtubeSearchLoadObserver = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMoreYoutubeSearchResults();
+    }, {
+      root: document.querySelector(".sidebar"),
+      rootMargin: "300px 0px"
+    });
+    youtubeSearchLoadObserver.observe(more);
+  }
+}
+
+async function loadMoreYoutubeSearchResults() {
+  if (youtubeSearchLoadingMore || youtubeSearchExhausted || activeView !== "search") return;
+  const query = youtubeSearchResultsQuery;
+  youtubeSearchLoadingMore = true;
+  renderYoutubeSearchResults();
+  try {
+    if (!youtubeSearchPendingResults.length && youtubeSearchContinuation) {
+      const previousContinuation = youtubeSearchContinuation;
+      const page = await fetchYoutubeGlobalSearchPage(query, {
+        continuation: youtubeSearchContinuation,
+        apiKey: youtubeSearchApiKey,
+        clientVersion: youtubeSearchClientVersion
+      });
+      if (activeView !== "search" || youtubeSearchResultsQuery !== query) return;
+      const knownIds = new Set([
+        ...youtubeSearchResultsCache.map((video) => video.id),
+        ...youtubeSearchPendingResults.map((video) => video.id)
+      ]);
+      const nextVideos = page.results
+        .filter((result) => result.type === "video" && !knownIds.has(result.id))
+        .map(({ type, ...video }) => video);
+      youtubeSearchPendingResults.push(...nextVideos);
+      youtubeSearchContinuation = page.continuation || "";
+      youtubeSearchApiKey = page.apiKey || youtubeSearchApiKey;
+      youtubeSearchClientVersion = page.clientVersion || youtubeSearchClientVersion;
+      if (!nextVideos.length && youtubeSearchContinuation === previousContinuation) youtubeSearchContinuation = "";
+    }
+    appendYoutubeSearchBatch();
+    youtubeSearchExhausted = !youtubeSearchPendingResults.length && !youtubeSearchContinuation;
+  } catch (error) {
+    youtubeSearchExhausted = true;
+    setStatus(`Unable to load more YouTube results: ${error.message}`, true);
+  } finally {
+    youtubeSearchLoadingMore = false;
+    if (activeView === "search" && youtubeSearchResultsQuery === query) {
+      currentVideos = [...youtubeSearchResultsCache];
+      renderYoutubeSearchResults();
+      syncVideoLayoutAvailability();
+    }
+  }
+}
+
 async function searchYoutube(query, options = {}) {
   const trimmed = query.trim();
   if (!trimmed) return;
+  setActivePrimarySection("youtube");
+  youtubeSearchQuery = trimmed;
   await maybePromptSeenForWatchLater();
+  hideGlobalSearchSuggestions();
+  globalSearchController?.abort();
   activeView = "search";
   activeSearchQuery = trimmed;
   activeChannel = null;
-  showListView();
+  document.body.classList.remove("sidePanelVideos");
+  document.body.classList.add("virtualVideoListView");
+  syncStackedChannelViewState();
   setActiveChannelButton();
-  setHeader("YouTube search", false);
+  setHeader(`YouTube search: ${trimmed}`, false);
   currentVideos = [];
   videosEl.replaceChildren();
-  setStatus("General search is not wired in this test extension. Paste a YouTube URL to play it embedded.", true);
-  if (!options.skipHistory) {
-    pushHistory({ type: "search", id: trimmed });
+  channelsEl.classList.add("videoListHost");
+  channelsEl.replaceChildren();
+  setStatus("Searching YouTube…", true);
+
+  if (!options.skipHistory) pushHistory({ type: "search", id: trimmed });
+
+  if (youtubeSearchResultsQuery === trimmed && (youtubeSearchResultsCache.length || youtubeSearchExhausted)) {
+    currentVideos = [...youtubeSearchResultsCache];
+    renderYoutubeSearchResults();
+    syncVideoLayoutAvailability();
+    setStatus(currentVideos.length ? "" : "No YouTube video found.", !currentVideos.length);
+    return;
   }
+
+  try {
+    if (youtubeSearchInitialQuery !== trimmed || !youtubeSearchInitialPromise) {
+      youtubeSearchInitialQuery = trimmed;
+      youtubeSearchInitialPromise = fetchYoutubeGlobalSearchPage(trimmed);
+    }
+    const page = await youtubeSearchInitialPromise;
+    if (youtubeSearchQuery !== trimmed) return;
+    youtubeSearchLoadObserver?.disconnect();
+    youtubeSearchResultsQuery = trimmed;
+    youtubeSearchResultsCache = [];
+    youtubeSearchPendingResults = page.results
+      .filter((result) => result.type === "video")
+      .map(({ type, ...video }) => video);
+    youtubeSearchContinuation = page.continuation || "";
+    youtubeSearchApiKey = page.apiKey || "";
+    youtubeSearchClientVersion = page.clientVersion || "";
+    youtubeSearchLoadingMore = false;
+    appendYoutubeSearchBatch();
+    youtubeSearchExhausted = !youtubeSearchPendingResults.length && !youtubeSearchContinuation;
+    if (activeView !== "search" || activeSearchQuery !== trimmed) return;
+    renderYoutubeSearchResults();
+    syncVideoLayoutAvailability();
+    setStatus(currentVideos.length ? "" : "No YouTube video found.", !currentVideos.length);
+  } catch (error) {
+    if (youtubeSearchInitialQuery === trimmed) youtubeSearchInitialPromise = null;
+    if (activeView !== "search" || activeSearchQuery !== trimmed) return;
+    setStatus(`YouTube search failed: ${error.message}`, true);
+  }
+}
+
+async function showYoutubeSearchHome() {
+  await maybePromptSeenForWatchLater();
+  setActivePrimarySection("youtube");
+  activeView = "search";
+  activeSearchQuery = "";
+  activeChannel = null;
+  activeVideoId = "";
+  currentVideos = [];
+  document.body.classList.remove("sidePanelVideos");
+  document.body.classList.add("virtualVideoListView");
+  videosEl.replaceChildren();
+  channelsEl.classList.add("videoListHost");
+  const message = document.createElement("p");
+  message.className = "meta channelSearchEmpty";
+  message.textContent = "Search YouTube to see results.";
+  channelsEl.replaceChildren(message);
+  setActiveChannelButton();
+  setHeader("", false);
+  syncStackedChannelViewState();
+  syncVideoLayoutAvailability();
+  setStatus();
 }
 
 async function loadChannels() {
@@ -4034,9 +4650,11 @@ async function loadChannels() {
     }
     config = await loadInitialConfig();
     allCategories = config.categories || [];
+    favoriteCategories = config.favoriteCategories || [];
     allChannels = (config.channels || [])
       .filter((channel) => channel.id)
       .sort((a, b) => a.title.localeCompare(b.title, "fr"));
+    favorites = config.favorites || {};
     sessionFeedBaseline = new Map(allChannels.map((channel) => [channel.id, channel.feedLatestPublished || ""]));
     seenVideos = config.seenVideos || {};
     watchLater = config.watchLater || {};
@@ -4066,21 +4684,28 @@ function applyExternalConfig(nextConfig) {
   config = {
     version: 1,
     categories: [],
+    favoriteCategories: [],
     channels: [],
+    favorites: {},
     seenVideos: {},
     watchLater: {},
     ...nextConfig
   };
   allCategories = Array.isArray(config.categories) ? config.categories : [];
+  favoriteCategories = Array.isArray(config.favoriteCategories) ? config.favoriteCategories : [];
   allChannels = (Array.isArray(config.channels) ? config.channels : [])
     .filter((channel) => channel.id)
     .sort((a, b) => (a.title || a.id).localeCompare(b.title || b.id, "fr"));
+  favorites = config.favorites && typeof config.favorites === "object" ? config.favorites : {};
   seenVideos = config.seenVideos || {};
   watchLater = config.watchLater || {};
   configLoaded = true;
 
   if (activeCategoryId && !allCategories.some((category) => category.id === activeCategoryId)) {
     activeCategoryId = "";
+  }
+  if (activeFavoriteCategoryId && activeFavoriteCategoryId !== UNCATEGORIZED_CATEGORY_ID && !favoriteCategories.some((category) => category.id === activeFavoriteCategoryId)) {
+    activeFavoriteCategoryId = "";
   }
 
   activeChannel = activeChannelId ? allChannels.find((channel) => channel.id === activeChannelId) || null : null;
@@ -4095,6 +4720,22 @@ function applyExternalConfig(nextConfig) {
   if (activeView === "newVideos") {
     renderChannels([]);
     renderNewVideos();
+    return;
+  }
+
+  if (activeView === "search") {
+    setActivePrimarySection("youtube");
+    document.body.classList.remove("sidePanelVideos");
+    document.body.classList.add("virtualVideoListView");
+    renderYoutubeSearchResults();
+    setActiveChannelButton();
+    syncStackedChannelViewState();
+    syncVideoLayoutAvailability();
+    return;
+  }
+
+  if (activeView === "favorites") {
+    renderFavoritesHome();
     return;
   }
 
@@ -4128,19 +4769,22 @@ async function navigateHistory(delta) {
     if (entry.type === "channelList") {
       clearChannelSearch();
       showChannelListState(entry.id || "");
+      searchInputEl.value = "";
       return;
     }
 
     if (entry.type === "newVideos") {
       showNewVideos({ skipHistory: true });
+      searchInputEl.value = "";
       return;
     }
 
     if (entry.type === "channel") {
       const channel = allChannels.find((item) => item.id === entry.id);
-      if (channel) {
-        await selectChannel(channel, { skipHistory: true });
-        return;
+        if (channel) {
+          await selectChannel(channel, { skipHistory: true });
+          searchInputEl.value = "";
+          return;
       }
     }
 
@@ -4152,12 +4796,38 @@ async function navigateHistory(delta) {
         state = { query: entry.id || "" };
       }
 
+      if (state.view === "watchLater") {
+        setActivePrimarySection("watchLater");
+        activeView = "watchLater";
+        activeCategoryId = "";
+        activeChannel = null;
+        renderCategories();
+        renderChannels([]);
+        renderWatchLater();
+        channelSearchQuery = state.query || "";
+        if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+        searchInputEl.value = channelSearchQuery;
+        renderSearchResults();
+        return;
+      }
+
+      if (state.view === "favorites") {
+        setActivePrimarySection("favorites");
+        activeFavoriteCategoryId = state.categoryId || "";
+        channelSearchQuery = state.query || "";
+        if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+        searchInputEl.value = channelSearchQuery;
+        renderFavoritesHome();
+        return;
+      }
+
       if (state.channelId) {
         const channel = allChannels.find((item) => item.id === state.channelId);
         if (channel) {
           await selectChannel(channel, { skipHistory: true });
           channelSearchQuery = state.query || "";
           if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+          searchInputEl.value = channelSearchQuery;
           renderSearchResults();
           return;
         }
@@ -4165,6 +4835,7 @@ async function navigateHistory(delta) {
         showChannelListState(state.categoryId || "");
         channelSearchQuery = state.query || "";
         if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+        searchInputEl.value = channelSearchQuery;
         renderSearchResults();
         return;
       }
@@ -4176,17 +4847,35 @@ async function navigateHistory(delta) {
     }
 
     if (entry.type === "search") {
+      searchInputEl.value = entry.id || "";
       await searchYoutube(entry.id, { skipHistory: true });
       return;
     }
 
+    if (entry.type === "youtubeHome") {
+      searchInputEl.value = "";
+      await showYoutubeSearchHome();
+      return;
+    }
+
     if (entry.type === "watchLater") {
+      setActivePrimarySection("watchLater");
       activeView = "watchLater";
       activeCategoryId = "";
       clearChannelSearch();
+      searchInputEl.value = "";
       renderCategories();
       renderChannels([]);
       renderWatchLater();
+      return;
+    }
+
+    if (entry.type === "favorites") {
+      setActivePrimarySection("favorites");
+      activeFavoriteCategoryId = entry.id || "";
+      clearChannelSearch();
+      searchInputEl.value = "";
+      renderFavoritesHome();
     }
   } finally {
     suppressHistory = false;
@@ -4236,13 +4925,18 @@ playerWatchLaterEl.addEventListener("click", async () => {
 
 function generalContextActions(target) {
   if (target?.closest(".sidePanelPath")) {
-    return [
-      { label: "Add category", action: () => addCategoryEl.click() }
-    ];
+    if (activePrimarySection === "favorites") {
+      return [{ label: "Add category", action: openAddFavoriteCategoryDialog }];
+    }
+    if (activePrimarySection === "channels") {
+      return [{ label: "Add category", action: () => addCategoryEl.click() }];
+    }
+    return [];
   }
-  return [
-    { label: "Add channel", action: () => addChannel(activeView === "channels" ? activeCategoryId : "") }
-  ];
+  if (activePrimarySection === "channels") {
+    return [{ label: "Add channel", action: () => addChannel(activeView === "channels" ? activeCategoryId : "") }];
+  }
+  return [];
 }
 
 function handleGeneralContextMenu(event) {
@@ -4250,8 +4944,10 @@ function handleGeneralContextMenu(event) {
   if (!(target instanceof Element)) return;
   if (!target.closest(".sidebar, .sidePanelPath, .videos")) return;
   if (target.closest(".channel, .category, .pathButton, .pathIconButton, .video, .watchMoreCard, button, input, a")) return;
+  const actions = generalContextActions(target);
+  if (!actions.length) return;
   event.preventDefault();
-  showContextMenu(event, generalContextActions(target));
+  showContextMenu(event, actions);
 }
 
 function handleVideoChannelNavigation(event) {
@@ -4309,6 +5005,11 @@ exportNewPipeConfigEl?.addEventListener("click", exportNewPipeConfig);
 importNativeConfigEl.addEventListener("click", () => runImportFilePicker("native"));
 importFreetubeConfigEl.addEventListener("click", () => runImportFilePicker("freetube"));
 closeDisplayOptionsEl?.addEventListener("click", closeDisplayOptionsDialog);
+topOptionsEl?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  showContextMenu(event, settingsContextActions());
+});
 closeYoutubeDataOptionsEl?.addEventListener("click", closeYoutubeDataOptionsDialog);
 testWebDavEl?.addEventListener("click", testWebDavFromDialog);
 enableWebDavSyncEl?.addEventListener("click", saveAndEnableWebDavSync);
@@ -4368,15 +5069,157 @@ channelSearchInputEl?.addEventListener("search", () => {
 window.addEventListener("resize", syncHeaderToPlayerWidth);
 
 openAppSessionEl.addEventListener("click", () => {
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.hash = "";
-  window.open(url.toString(), "_blank", "noopener");
+  toggleDisplayOption(FOCUS_PLAYER_MODE_KEY, false);
+});
+
+for (const tab of primaryTabEls) {
+  tab.addEventListener("click", async () => {
+    const section = tab.dataset.section;
+    hideGlobalSearchSuggestions();
+
+    if (section === "youtube") {
+      clearChannelSearch();
+      setActivePrimarySection("youtube");
+      searchInputEl.value = youtubeSearchQuery;
+      if (youtubeSearchQuery) {
+        pushHistory({ type: "search", id: youtubeSearchQuery });
+        await searchYoutube(youtubeSearchQuery, { skipHistory: true });
+      } else {
+        pushHistory({ type: "youtubeHome", id: "youtube" });
+        await showYoutubeSearchHome();
+      }
+      searchInputEl.focus();
+      return;
+    }
+
+    if (section === "watchLater") {
+      await maybePromptSeenForWatchLater();
+      clearChannelSearch();
+      setActivePrimarySection("watchLater");
+      activeView = "watchLater";
+      activeCategoryId = "";
+      pushHistory({ type: "watchLater", id: "watchLater" });
+      renderCategories();
+      renderChannels([]);
+      renderWatchLater();
+      searchInputEl.value = "";
+      searchInputEl.focus();
+      return;
+    }
+
+    if (section === "favorites") {
+      await maybePromptSeenForWatchLater();
+      clearChannelSearch();
+      setActivePrimarySection("favorites");
+      activeFavoriteCategoryId = "";
+      pushHistory({ type: "favorites", id: "" });
+      renderFavoritesHome();
+      searchInputEl.value = "";
+      searchInputEl.focus();
+      return;
+    }
+
+    await showRootChannels();
+    searchInputEl.value = "";
+    searchInputEl.focus();
+  });
+}
+
+const watchLaterTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "watchLater");
+watchLaterTabEl?.addEventListener("dragover", (event) => {
+  if (!hasVideoDropType(event.dataTransfer)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.remove("isChannelDropTarget");
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  watchLaterTabEl.classList.add("is-watch-later-drop-target");
+});
+watchLaterTabEl?.addEventListener("dragleave", () => {
+  watchLaterTabEl.classList.remove("is-watch-later-drop-target");
+});
+watchLaterTabEl?.addEventListener("drop", async (event) => {
+  const video = droppedVideoFromDataTransfer(event.dataTransfer);
+  if (!video) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.remove("isChannelDropTarget");
+  watchLaterTabEl.classList.remove("is-watch-later-drop-target");
+  await addVideoToWatchLater(video);
+});
+
+const favoritesTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "favorites");
+favoritesTabEl?.addEventListener("dragover", (event) => {
+  if (!hasVideoDropType(event.dataTransfer)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget");
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  favoritesTabEl.classList.add("is-favorite-drop-target");
+});
+favoritesTabEl?.addEventListener("dragleave", () => favoritesTabEl.classList.remove("is-favorite-drop-target"));
+favoritesTabEl?.addEventListener("drop", async (event) => {
+  const video = droppedVideoFromDataTransfer(event.dataTransfer);
+  if (!video) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget");
+  favoritesTabEl.classList.remove("is-favorite-drop-target");
+  await addVideoToFavorites(video);
+});
+
+searchInputEl.addEventListener("input", () => {
+  hideGlobalSearchSuggestions();
+  if (activePrimarySection === "youtube") {
+    window.clearTimeout(globalSearchTimer);
+    const query = searchInputEl.value.trim();
+    if (query.length >= 2) {
+      globalSearchTimer = window.setTimeout(() => {
+        searchYoutube(query, { skipHistory: true })
+          .then(() => recordYoutubeSearchHistory(query))
+          .catch((error) => setStatus(`YouTube search failed: ${error.message}`, true));
+      }, 300);
+    } else if (!query) {
+      youtubeSearchQuery = "";
+      showYoutubeSearchHome()
+        .then(() => recordYoutubeSearchHistory(""))
+        .catch(() => {});
+    }
+    return;
+  }
+  if (activePrimarySection === "channels" && (activeView !== "channels" || activeChannel)) {
+    showChannelListState("");
+  }
+  channelSearchQuery = searchInputEl.value;
+  if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+  renderSearchResults();
+});
+searchInputEl.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideGlobalSearchSuggestions();
+    searchInputEl.blur();
+  }
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (!(event.target instanceof Element) || !event.target.closest(".globalYoutubeSearch")) {
+    hideGlobalSearchSuggestions();
+  }
 });
 
 searchFormEl.addEventListener("submit", async (event) => {
   event.preventDefault();
+  window.clearTimeout(globalSearchTimer);
   const value = searchInputEl.value;
+  hideGlobalSearchSuggestions();
+
+  if (activePrimarySection !== "youtube") {
+    channelSearchQuery = value;
+    if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+    recordChannelSearchHistory();
+    renderSearchResults();
+    return;
+  }
+
   const videoId = videoIdFromInput(value);
 
   if (videoId) {
@@ -4398,6 +5241,20 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("dragover", (event) => {
+  if (activePrimarySection === "favorites") {
+    if (!hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
+    document.body.classList.add("isFavoriteDropTarget");
+    return;
+  }
+  if (activePrimarySection === "watchLater") {
+    if (!hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
+    document.body.classList.add("isWatchLaterDropTarget");
+    return;
+  }
+  if (activePrimarySection !== "channels") return;
+  if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-video")) return;
   if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-channel")) return;
   if (![...event.dataTransfer?.types || []].some((type) => ["text/uri-list", "text/plain"].includes(type))) return;
   event.preventDefault();
@@ -4407,9 +5264,31 @@ document.addEventListener("dragover", (event) => {
 document.addEventListener("dragleave", (event) => {
   if (event.relatedTarget) return;
   document.body.classList.remove("isChannelDropTarget");
+  document.body.classList.remove("isWatchLaterDropTarget");
+  document.body.classList.remove("isFavoriteDropTarget");
+  document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
+  document.querySelectorAll(".is-favorite-drop-target").forEach((item) => item.classList.remove("is-favorite-drop-target"));
 });
 
 document.addEventListener("drop", async (event) => {
+  if (activePrimarySection === "favorites") {
+    const video = droppedVideoFromDataTransfer(event.dataTransfer);
+    if (!video) return;
+    event.preventDefault();
+    document.body.classList.remove("isFavoriteDropTarget");
+    await addVideoToFavorites(video, activeFavoriteCategoryId);
+    return;
+  }
+  if (activePrimarySection === "watchLater") {
+    const video = droppedVideoFromDataTransfer(event.dataTransfer);
+    if (!video) return;
+    event.preventDefault();
+    document.body.classList.remove("isWatchLaterDropTarget");
+    await addVideoToWatchLater(video);
+    return;
+  }
+  if (activePrimarySection !== "channels") return;
+  if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-video")) return;
   if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-channel")) return;
   const data = event.dataTransfer?.getData("text/uri-list") || event.dataTransfer?.getData("text/plain") || "";
   if (!data) return;
@@ -4597,6 +5476,222 @@ function channelResultFromRenderer(renderer) {
   return { id, title, handle, description, thumbnail };
 }
 
+function hasVideoDropType(dataTransfer) {
+  const types = [...dataTransfer?.types || []];
+  if (types.includes("application/x-youtube-channel-shelf-channel")) return false;
+  return types.some((type) => ["application/x-youtube-channel-shelf-video", "text/uri-list", "text/plain"].includes(type));
+}
+
+function collectGlobalSearchRenderers(node, results = []) {
+  if (!node || typeof node !== "object") return results;
+  if (node.videoRenderer) results.push({ type: "video", renderer: node.videoRenderer });
+  else if (node.channelRenderer) results.push({ type: "channel", renderer: node.channelRenderer });
+  for (const value of Object.values(node)) {
+    if (value && typeof value === "object") collectGlobalSearchRenderers(value, results);
+  }
+  return results;
+}
+
+function globalVideoResultFromRenderer(renderer) {
+  const id = String(renderer?.videoId || "").trim();
+  if (!id) return null;
+  const thumbnails = renderer.thumbnail?.thumbnails || [];
+  const ownerRun = renderer.ownerText?.runs?.find((run) => run.navigationEndpoint?.browseEndpoint?.browseId) || renderer.ownerText?.runs?.[0];
+  return {
+    id,
+    title: textFromRuns(renderer.title).trim() || "Untitled video",
+    channel: textFromRuns(renderer.ownerText).trim(),
+    channelId: ownerRun?.navigationEndpoint?.browseEndpoint?.browseId || "",
+    published: textFromRuns(renderer.publishedTimeText).trim(),
+    duration: textFromRuns(renderer.lengthText).trim(),
+    views: textFromRuns(renderer.viewCountText).trim(),
+    thumbnail: thumbnails.at(-1)?.url || thumbnails[0]?.url || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+  };
+}
+
+function youtubeConfigValue(html, key) {
+  const match = String(html || "").match(new RegExp(`"${key}":"((?:\\\\.|[^"\\\\])*)"`));
+  if (!match) return "";
+  try {
+    return JSON.parse(`"${match[1]}"`);
+  } catch {
+    return match[1];
+  }
+}
+
+function youtubeSearchContinuationToken(node) {
+  if (!node || typeof node !== "object") return "";
+  const rendererToken = node.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+  if (rendererToken) return rendererToken;
+  for (const value of Object.values(node)) {
+    const token = youtubeSearchContinuationToken(value);
+    if (token) return token;
+  }
+  return "";
+}
+
+function youtubeSearchResultsFromData(data) {
+  const seen = new Set();
+  const results = [];
+  for (const item of collectGlobalSearchRenderers(data)) {
+    const result = item.type === "video"
+      ? globalVideoResultFromRenderer(item.renderer)
+      : channelResultFromRenderer(item.renderer);
+    if (!result) continue;
+    const key = `${item.type}:${result.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    results.push({ type: item.type, ...result });
+  }
+  return results;
+}
+
+async function fetchYoutubeGlobalSearchPage(query, options = {}) {
+  const trimmed = query.trim();
+  if (!trimmed) return { results: [], continuation: "", apiKey: "", clientVersion: "" };
+
+  if (options.continuation) {
+    if (!options.apiKey || !options.clientVersion) {
+      return { results: [], continuation: "", apiKey: options.apiKey || "", clientVersion: options.clientVersion || "" };
+    }
+    const response = await fetch(`https://www.youtube.com/youtubei/v1/search?key=${encodeURIComponent(options.apiKey)}&prettyPrint=false`, {
+      method: "POST",
+      cache: "no-store",
+      signal: options.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-YouTube-Client-Name": "1",
+        "X-YouTube-Client-Version": options.clientVersion
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: "WEB",
+            clientVersion: options.clientVersion,
+            hl: "en",
+            gl: "US"
+          }
+        },
+        continuation: options.continuation
+      })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return {
+      results: youtubeSearchResultsFromData(data),
+      continuation: youtubeSearchContinuationToken(data),
+      apiKey: options.apiKey,
+      clientVersion: options.clientVersion
+    };
+  }
+
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmed)}`;
+  const response = await fetch(url, { cache: "no-store", signal: options.signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  const initialData = extractJsonObjectAfter(html, "ytInitialData") || extractJsonObjectAfter(html, "var ytInitialData =");
+  if (!initialData) return { results: [], continuation: "", apiKey: "", clientVersion: "" };
+  const data = JSON.parse(initialData);
+  return {
+    results: youtubeSearchResultsFromData(data),
+    continuation: youtubeSearchContinuationToken(data),
+    apiKey: youtubeConfigValue(html, "INNERTUBE_API_KEY"),
+    clientVersion: youtubeConfigValue(html, "INNERTUBE_CLIENT_VERSION") || youtubeConfigValue(html, "INNERTUBE_CONTEXT_CLIENT_VERSION")
+  };
+}
+
+async function fetchYoutubeGlobalSearchResults(query, { limit = 24, signal } = {}) {
+  const page = await fetchYoutubeGlobalSearchPage(query, { signal });
+  return page.results.slice(0, limit);
+}
+
+function hideGlobalSearchSuggestions() {
+  window.clearTimeout(globalSearchTimer);
+  globalSearchController?.abort();
+  globalSearchController = null;
+  globalSearchRequestId += 1;
+  if (globalSearchResultsEl) globalSearchResultsEl.hidden = true;
+  searchInputEl.setAttribute("aria-expanded", "false");
+}
+
+function renderGlobalSearchSuggestions(results, message = "") {
+  if (!globalSearchResultsEl) return;
+  if (message || !results.length) {
+    const status = document.createElement("div");
+    status.className = "globalSearchMessage";
+    status.textContent = message || "No YouTube result found.";
+    globalSearchResultsEl.replaceChildren(status);
+    globalSearchResultsEl.hidden = false;
+    searchInputEl.setAttribute("aria-expanded", "true");
+    return;
+  }
+
+  globalSearchResultsEl.replaceChildren(...results.map((result) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.role = "option";
+    button.className = `globalSearchResult is-${result.type}`;
+
+    const thumbnail = document.createElement(result.thumbnail ? "img" : "span");
+    thumbnail.className = "globalSearchResultThumb";
+    if (thumbnail instanceof HTMLImageElement) {
+      thumbnail.alt = "";
+      thumbnail.loading = "lazy";
+      thumbnail.src = result.thumbnail;
+    } else {
+      thumbnail.textContent = result.title.slice(0, 1).toUpperCase();
+    }
+
+    const text = document.createElement("span");
+    text.className = "globalSearchResultText";
+    const title = document.createElement("span");
+    title.className = "globalSearchResultTitle";
+    title.textContent = result.title;
+    const meta = document.createElement("span");
+    meta.className = "globalSearchResultMeta";
+    meta.textContent = result.type === "channel"
+      ? ["Channel", result.handle].filter(Boolean).join(" · ")
+      : [result.channel, result.duration, result.views].filter(Boolean).join(" · ");
+    text.append(title, meta);
+    button.append(thumbnail, text);
+    button.addEventListener("click", () => {
+      hideGlobalSearchSuggestions();
+      if (result.type === "channel") {
+        selectChannel({ ...result, categories: [] }).catch((error) => setStatus(`Unable to load channel: ${error.message}`, true));
+      } else {
+        openOfficialYoutube(result);
+      }
+    });
+    return button;
+  }));
+  globalSearchResultsEl.hidden = false;
+  searchInputEl.setAttribute("aria-expanded", "true");
+}
+
+function scheduleGlobalSearchSuggestions() {
+  window.clearTimeout(globalSearchTimer);
+  globalSearchController?.abort();
+  const query = searchInputEl.value.trim();
+  if (query.length < 2 || videoIdFromInput(query)) {
+    hideGlobalSearchSuggestions();
+    return;
+  }
+
+  const requestId = ++globalSearchRequestId;
+  globalSearchTimer = window.setTimeout(async () => {
+    globalSearchController = new AbortController();
+    renderGlobalSearchSuggestions([], "Searching YouTube…");
+    try {
+      const results = await fetchYoutubeGlobalSearchResults(query, { limit: 8, signal: globalSearchController.signal });
+      if (requestId !== globalSearchRequestId || searchInputEl.value.trim() !== query) return;
+      renderGlobalSearchSuggestions(results);
+    } catch (error) {
+      if (error?.name === "AbortError" || requestId !== globalSearchRequestId) return;
+      renderGlobalSearchSuggestions([], `Search failed: ${error.message}`);
+    }
+  }, 300);
+}
+
 async function searchYoutubeChannels(query) {
   const trimmed = query.trim();
   if (!trimmed) return [];
@@ -4685,7 +5780,8 @@ async function addChannel(categoryId = activeCategoryId) {
   openAddChannelDialog(categoryId);
 }
 
-function openAddCategoryDialog() {
+function openAddCategoryDialog(scope = "channels") {
+  categoryDialogScope = scope === "favorites" ? "favorites" : "channels";
   categoryBeingRenamed = null;
   if (!addCategoryPromptEl) return;
   const title = addCategoryPromptEl.querySelector("#addCategoryTitle");
@@ -4697,8 +5793,13 @@ function openAddCategoryDialog() {
   addCategoryNameEl?.focus();
 }
 
-function openRenameCategoryDialog(category) {
+function openAddFavoriteCategoryDialog() {
+  openAddCategoryDialog("favorites");
+}
+
+function openRenameCategoryDialog(category, scope = "channels") {
   if (!category?.id || !addCategoryPromptEl) return;
+  categoryDialogScope = scope === "favorites" ? "favorites" : "channels";
   categoryBeingRenamed = category;
   const title = addCategoryPromptEl.querySelector("#addCategoryTitle");
   const submit = addCategoryFormEl?.querySelector("button[type='submit']");
@@ -4713,14 +5814,17 @@ function openRenameCategoryDialog(category) {
 function closeAddCategoryDialog() {
   if (addCategoryPromptEl) addCategoryPromptEl.hidden = true;
   categoryBeingRenamed = null;
+  categoryDialogScope = "channels";
 }
 
 async function saveNewCategoryFromDialog() {
   const name = addCategoryNameEl?.value || "";
   if (!name.trim()) return;
+  const isFavoriteCategory = categoryDialogScope === "favorites";
   if (categoryBeingRenamed) {
     const trimmed = name.trim();
-    const duplicate = allCategories.find((category) => (
+    const sourceCategories = isFavoriteCategory ? favoriteCategories : allCategories;
+    const duplicate = sourceCategories.find((category) => (
       category.id !== categoryBeingRenamed.id
       && category.name.toLocaleLowerCase("fr") === trimmed.toLocaleLowerCase("fr")
     ));
@@ -4729,19 +5833,35 @@ async function saveNewCategoryFromDialog() {
       return;
     }
     categoryBeingRenamed.name = trimmed;
-    allCategories = allCategories.map((category) => (
-      category.id === categoryBeingRenamed.id ? categoryBeingRenamed : category
-    ));
+    if (isFavoriteCategory) {
+      favoriteCategories = favoriteCategories.map((category) => (
+        category.id === categoryBeingRenamed.id ? categoryBeingRenamed : category
+      ));
+    } else {
+      allCategories = allCategories.map((category) => (
+        category.id === categoryBeingRenamed.id ? categoryBeingRenamed : category
+      ));
+    }
     await saveConfig();
+    if (isFavoriteCategory) {
+      renderFavoritesHome();
+      closeAddCategoryDialog();
+      return;
+    }
     renderCategories();
     renderChannels(channelsForActiveCategory());
     renderSidePanelPath();
     closeAddCategoryDialog();
     return;
   }
-  const category = createCategory(name);
+  const category = isFavoriteCategory ? createFavoriteCategory(name) : createCategory(name);
   if (!category) return;
   await saveConfig();
+  if (isFavoriteCategory) {
+    renderFavoritesHome();
+    closeAddCategoryDialog();
+    return;
+  }
   renderCategories();
   renderChannels(channelsForActiveCategory());
   renderSidePanelPath();
@@ -4806,7 +5926,26 @@ window.addEventListener("pagehide", () => setPanelOpenState(false));
 window.addEventListener("beforeunload", () => setPanelOpenState(false));
 
 
-loadChannels().then(() => {
+loadChannels().then(async () => {
+  if (activePrimarySection === "youtube") {
+    searchInputEl.value = youtubeSearchQuery;
+    if (youtubeSearchQuery) await searchYoutube(youtubeSearchQuery, { skipHistory: true });
+    else await showYoutubeSearchHome();
+  } else if (activePrimarySection === "watchLater") {
+    setActivePrimarySection("watchLater");
+    activeView = "watchLater";
+    activeCategoryId = "";
+    clearChannelSearch();
+    renderCategories();
+    renderChannels([]);
+    renderWatchLater();
+  } else if (activePrimarySection === "favorites") {
+    setActivePrimarySection("favorites");
+    clearChannelSearch();
+    renderFavoritesHome();
+  } else {
+    setActivePrimarySection("channels");
+  }
   initializeWebDavSynchronization().catch((error) => setWebDavStatus(`Synchronization error: ${error.message}`, true));
   handlePendingDataCommand().catch(() => {});
   const initialVideoId = videoIdFromInput(new URLSearchParams(window.location.search).get("video") || "");
