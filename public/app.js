@@ -1087,6 +1087,10 @@ function videoContextActions(video) {
   const isWatched = Boolean(seenVideos[video.id]);
   const actions = [
     {
+      label: "Open in new tab",
+      action: () => openOfficialYoutube(video, { newTab: true })
+    },
+    {
       label: watchLater[video.id] ? "Remove from Watch later" : "Watch later",
       action: () => toggleWatchLater(video)
     },
@@ -1887,7 +1891,7 @@ function youtubeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-async function openOfficialYoutube(video) {
+async function openOfficialYoutube(video, options = {}) {
   const videoId = typeof video === "string" ? video : video.id;
   if (!videoId) return;
 
@@ -1910,6 +1914,15 @@ async function openOfficialYoutube(video) {
       channel: video.channel || activeChannel?.title || ""
     };
     await saveConfig().catch(() => {});
+  }
+
+  if (options.newTab) {
+    if (globalThis.chrome?.tabs) {
+      chrome.tabs.create({ url: youtubeUrl(videoId) });
+    } else {
+      window.open(youtubeUrl(videoId), "_blank", "noopener");
+    }
+    return;
   }
 
   if (globalThis.chrome?.tabs) {
