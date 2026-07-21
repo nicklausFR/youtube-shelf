@@ -16,7 +16,7 @@ export function newPipeSubscriptionData(channels = [], appVersion = "") {
   subscriptions.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
 
   return {
-    app_version: appVersion ? `YouTube Channel Shelf ${appVersion}` : "YouTube Channel Shelf",
+    app_version: appVersion ? `YouTube Shelf ${appVersion}` : "YouTube Shelf",
     app_version_int: 1,
     subscriptions
   };
