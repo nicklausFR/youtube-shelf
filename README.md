@@ -1,23 +1,16 @@
-# YouTube Channel Shelf
+# YouTube Shelf
 
-Browser extension for managing a personal YouTube channel shelf from the side panel.
+Browser extension for managing YouTube channels and favorite videos from the side panel.
 
-Current version: `2.2`.
+Current version: `3.0.1`.
 
 ## Main Features
 
-- Add YouTube channels by drag and drop or by searching YouTube from the extension.
-- Add, rename, and manage categories from the extension UI.
-- Classify channels into categories with context menus or drag and drop.
-- Show recent videos from the week in `This week`.
-- Browse each channel's latest RSS videos.
-- Save videos to `Watch later`.
-- Search channels and videos using titles, declared tags, keywords, topics, categories, and type metadata when available.
-- Switch display between icon, multi-column, and single-column views, with separate local preferences per list context.
-- Zoom the channel/video list area locally.
-- Hide YouTube comments and suggestion lists while the extension panel is active.
-- Toggle a focused YouTube player view from the side panel toolbar.
-- Synchronize configuration data bidirectionally with a WebDAV server such as Nextcloud.
+- Navigate channels, recent videos, favorites, and other views through tabs.
+- Search YouTube directly from the extension and add channels from the results.
+- Save favorite videos and organize them into categories.
+- Organize channels into categories and browse their latest videos.
+- Synchronize content between browsers through a WebDAV server such as Nextcloud.
 
 ## Local Installation
 
@@ -41,7 +34,7 @@ Use the extension import/export actions to back up or transfer your configuratio
 
 Open `Settings > WebDAV synchronization`, then enter the full URL of the synchronization file, your Nextcloud username, and a dedicated application password. The default file name is:
 
-`youtube-channel-shelf-synchronized-data.json`
+`youtube-shelf-synchronized-data.json`
 
 Use `Test connection` before enabling synchronization. The browser asks for access only to the WebDAV server origin. Credentials remain in the extension's local browser storage and are never included in the synchronized file or exports. `Disconnect` forgets the application password.
 

@@ -59,9 +59,9 @@ function createContextMenus() {
       title: "Import / Export",
       contexts: ["action"]
     });
-    chrome.contextMenus.create({ id: "exportNative", parentId: "importExportMenu", title: "Export YouTube Channel Shelf", contexts: ["action"] });
+    chrome.contextMenus.create({ id: "exportNative", parentId: "importExportMenu", title: "Export YouTube Shelf", contexts: ["action"] });
     chrome.contextMenus.create({ id: "exportNewPipe", parentId: "importExportMenu", title: "Export for NewPipe", contexts: ["action"] });
-    chrome.contextMenus.create({ id: "importNative", parentId: "importExportMenu", title: "Import YouTube Channel Shelf", contexts: ["action"] });
+    chrome.contextMenus.create({ id: "importNative", parentId: "importExportMenu", title: "Import YouTube Shelf", contexts: ["action"] });
     chrome.contextMenus.create({ id: "importFreetube", parentId: "importExportMenu", title: "Import FreeTube", contexts: ["action"] });
   });
 }

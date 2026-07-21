@@ -16,6 +16,7 @@ exports/
 *.local.json
 *.private.json
 youtube-channel-shelf-*.json
+youtube-shelf-*.json
 youtube-subscriptions-*.csv
 data/config.json
 public/subscriptions.json
