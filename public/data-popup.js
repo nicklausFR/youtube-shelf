@@ -15,7 +15,9 @@ function emptyConfig() {
   return {
     version: 1,
     categories: [],
+    favoriteCategories: [],
     channels: [],
+    favorites: {},
     seenVideos: {},
     watchLater: {},
     updatedAt: new Date().toISOString()
