@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Démo — Recherche YouTube globale</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #101010;
+        --surface: #181818;
+        --surface-hover: #242424;
+        --line: #3f3f3f;
+        --soft-line: #343434;
+        --text: #f1f1f1;
+        --muted: #aaa;
+        --accent: #ff0033;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        overflow: hidden;
+        background: var(--background);
+        color: var(--text);
+        font: 14px Arial, sans-serif;
+      }
+
+      button, input { font: inherit; }
+
+      .globalSearchArea {
+        padding: 14px 16px 16px;
+        background: var(--surface);
+        border-bottom: 2px solid var(--line);
+      }
+
+      .globalSearchLabel {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 9px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+      }
+
+      .youtubeMark {
+        display: grid;
+        width: 22px;
+        height: 15px;
+        place-items: center;
+        border-radius: 4px;
+        background: var(--accent);
+        color: white;
+        font-size: 9px;
+      }
+
+      .globalSearchForm {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 44px;
+        max-width: 760px;
+        margin: 0 auto;
+        overflow: hidden;
+        border: 1px solid #555;
+        border-radius: 999px;
+        background: #0f0f0f;
+      }
+
+      .globalSearchForm:focus-within {
+        border-color: #3f8cff;
+        box-shadow: 0 0 0 1px #3f8cff;
+      }
+
+      .globalSearchForm input {
+        min-width: 0;
+        padding: 11px 16px;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+      }
+
+      .globalSearchForm button {
+        border: 0;
+        border-left: 1px solid #555;
+        background: var(--surface-hover);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 18px;
+      }
+
+      .globalSearchForm button:hover { background: #303030; }
+
+      .appToolbar {
+        display: flex;
+        min-height: 52px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 2px solid var(--line);
+      }
+
+      .iconButton, .actionButton {
+        min-width: 34px;
+        min-height: 34px;
+        border: 1px solid var(--soft-line);
+        border-radius: 6px;
+        background: #202020;
+        color: var(--text);
+      }
+
+      .toolbarTitle {
+        flex: 1;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: minmax(220px, 34%) 1fr;
+        height: calc(100vh - 157px);
+      }
+
+      .sidebar {
+        padding: 14px;
+        border-right: 2px solid var(--line);
+      }
+
+      .sectionTitle {
+        margin: 0 0 12px;
+        font-size: 15px;
+      }
+
+      .channelSearch {
+        width: 100%;
+        padding: 9px 11px;
+        border: 1px solid var(--soft-line);
+        border-radius: 6px;
+        background: #181818;
+        color: var(--text);
+      }
+
+      .separator {
+        height: 2px;
+        margin: 14px -14px;
+        background: var(--line);
+      }
+
+      .placeholder {
+        padding: 16px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 560px) {
+        .globalSearchArea { padding: 10px 12px 12px; }
+        .globalSearchLabel { margin-bottom: 7px; }
+        .content { grid-template-columns: 1fr; }
+        .placeholder { display: none; }
+        .sidebar { border-right: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="globalSearchArea" aria-label="Recherche YouTube globale">
+      <div class="globalSearchLabel">
+        <span class="youtubeMark">▶</span>
+        Recherche YouTube globale
+      </div>
+      <form class="globalSearchForm" id="youtubeSearch">
+        <input id="youtubeQuery" type="search" placeholder="Rechercher une vidéo, une chaîne ou un sujet…" autocomplete="off" autofocus>
+        <button type="submit" title="Rechercher sur YouTube" aria-label="Rechercher sur YouTube">⌕</button>
+      </form>
+    </section>
+
+    <header class="appToolbar">
+      <button class="iconButton" type="button" aria-label="Menu">☰</button>
+      <button class="iconButton" type="button" aria-label="Retour">←</button>
+      <button class="iconButton" type="button" aria-label="Suivant">→</button>
+      <span class="toolbarTitle">YouTube Channel Shelf</span>
+      <button class="actionButton" type="button">Options</button>
+    </header>
+
+    <main class="content">
+      <aside class="sidebar">
+        <h2 class="sectionTitle">Abonnements</h2>
+        <input class="channelSearch" type="search" placeholder="Rechercher dans mes chaînes">
+        <div class="separator"></div>
+        <p>Cette semaine</p>
+        <p>Toutes les chaînes</p>
+        <p>À regarder plus tard</p>
+      </aside>
+      <section class="placeholder">
+        <h1>Contenu de l’extension</h1>
+        <p>La recherche YouTube globale reste distincte de la recherche locale des chaînes.</p>
+      </section>
+    </main>
+
+    <script>
+      document.querySelector("#youtubeSearch").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const query = document.querySelector("#youtubeQuery").value.trim();
+        if (query) window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank", "noopener");
+      });
+    </script>
+  </body>
+</html>
