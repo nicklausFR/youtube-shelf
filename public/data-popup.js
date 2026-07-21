@@ -199,7 +199,7 @@ function mergeChannels(config, imported) {
 
 async function exportNative() {
   const config = await readConfig();
-  downloadText(`youtube-channel-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(config, null, 2));
+  downloadText(`youtube-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(config, null, 2));
   setStatus("Export complete.");
 }
 
@@ -215,7 +215,7 @@ async function importFile(kind, file) {
 
   if (kind === "native") {
     const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Channel Shelf file");
+    if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Shelf file");
     const nextConfig = { ...emptyConfig(), ...parsed, updatedAt: new Date().toISOString() };
     await writeConfig(nextConfig);
     return nextConfig.channels.length;
@@ -283,9 +283,9 @@ function addImportButton(kind, label, autoOpen = false) {
 
 function render() {
   const labels = {
-    exportNative: "Export YouTube Channel Shelf",
+    exportNative: "Export YouTube Shelf",
     exportNewPipe: "Export for NewPipe",
-    importNative: "Import YouTube Channel Shelf",
+    importNative: "Import YouTube Shelf",
     importFreetube: "Import FreeTube",
     cleanSlate: "Clean Slate"
   };
@@ -298,7 +298,7 @@ function render() {
     addButton("Export", exportNewPipe, "primary");
   }
   else if (command === "importNative") {
-    descriptionEl.textContent = "Select the YouTube Channel Shelf export.";
+    descriptionEl.textContent = "Select the YouTube Shelf export.";
     addImportButton("native", "Choose a file", true);
   }
   else if (command === "importFreetube") {
@@ -313,9 +313,9 @@ function render() {
       window.setTimeout(() => window.close(), 1200);
     }, "primary danger");
   } else {
-    addButton("Export YouTube Channel Shelf", exportNative);
+    addButton("Export YouTube Shelf", exportNative);
     addButton("Export for NewPipe", exportNewPipe);
-    addImportButton("native", "Import YouTube Channel Shelf");
+    addImportButton("native", "Import YouTube Shelf");
     addImportButton("freetube", "Import FreeTube");
   }
 }

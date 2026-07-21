@@ -2729,7 +2729,7 @@ function currentExportConfig() {
 }
 
 function exportNativeConfig() {
-  downloadText(`youtube-channel-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(currentExportConfig(), null, 2));
+  downloadText(`youtube-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(currentExportConfig(), null, 2));
 }
 
 function exportNewPipeConfig() {
@@ -2845,7 +2845,7 @@ function mergeChannels(imported) {
 
 async function importNativeConfigFromText(text) {
   const parsed = JSON.parse(text);
-  if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Channel Shelf file");
+  if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Shelf file");
   config = { ...emptyConfig(), ...parsed, updatedAt: new Date().toISOString() };
   allCategories = config.categories || [];
   favoriteCategories = config.favoriteCategories || [];
@@ -2921,7 +2921,7 @@ function openImportPickerDialog(kind) {
   pendingImportKind = kind;
   importExportPromptEl.hidden = false;
   const labels = {
-    native: "Import YouTube Channel Shelf",
+    native: "Import YouTube Shelf",
     freetube: "Import FreeTube"
   };
   for (const button of [exportNativeConfigEl, exportNewPipeConfigEl, importNativeConfigEl, importFreetubeConfigEl]) {
@@ -2939,7 +2939,7 @@ function openFullImportExportDialog() {
   exportNewPipeConfigEl.hidden = false;
   importNativeConfigEl.hidden = false;
   importFreetubeConfigEl.hidden = false;
-  importNativeConfigEl.textContent = "Import YouTube Channel Shelf";
+  importNativeConfigEl.textContent = "Import YouTube Shelf";
   importFreetubeConfigEl.textContent = "Import FreeTube";
 }
 function openImportExportDialog() {
