@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.1 - 2026-07-21
+
+- Reorganized the interface around tabs.
+- Added YouTube search management.
+- Added categorized video favorites.
+- Renamed the extension to YouTube Shelf.
+
 ## 2.2 - 2026-07-18
 
 - Corrections uniquement.
@@ -41,7 +48,7 @@
 ## 1.0.0 - 2026-06-21
 
 - Released the first functional version of the extension.
-- Prepared the public Git repository as `nicklausFR/youtube-channel-shelf`.
+- Prepared the public Git repository, now named `nicklausFR/youtube-shelf`.
 - Added README, GPL notice, changelog, and ignore rules.
 - Removed personal subscriptions and local watch history from distributed data.
 - Split public default data from ignored local personal data.

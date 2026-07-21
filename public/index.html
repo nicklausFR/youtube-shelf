@@ -8,28 +8,38 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <header class="globalYoutubeSearch channelSearch" aria-label="Main toolbar">
+      <button id="topOptions" class="pathSettingsButton" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06A2 2 0 0 1 20.11 7l-.06.06A1.7 1.7 0 0 0 19.4 9c.3.37.63.6 1 .6h.6a2 2 0 0 1 0 4h-.6a1.7 1.7 0 0 0-1 .6Z"/></svg>
+      </button>
+      <button id="openAppSession" class="pathSettingsButton pathFocusButton" type="button" title="Focus video player" aria-label="Focus video player">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a3 3 0 0 1 3-3h2v2H7a1 1 0 0 0-1 1v2H4V7Zm11-3h2a3 3 0 0 1 3 3v2h-2V7a1 1 0 0 0-1-1h-2V4ZM4 15h2v2a1 1 0 0 0 1 1h2v2H7a3 3 0 0 1-3-3v-2Zm14 0h2v2a3 3 0 0 1-3 3h-2v-2h2a1 1 0 0 0 1-1v-2ZM9 9h6v6H9V9Z"/></svg>
+      </button>
+      <button id="back" class="channelNavButton" type="button" title="Back" aria-label="Back" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <button id="forward" class="channelNavButton" type="button" title="Forward" aria-label="Forward" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <form id="searchForm" class="topSearchForm" role="search">
+        <input id="searchInput" type="search" placeholder="Search YouTube" autocomplete="off" aria-label="Search YouTube" aria-autocomplete="list" aria-controls="globalSearchResults" aria-expanded="false">
+      </form>
+      <div id="globalSearchResults" class="globalSearchResults" role="listbox" aria-label="YouTube search suggestions" hidden></div>
+    </header>
+
+    <nav class="primaryTabs" aria-label="Main sections">
+      <button class="primaryTab" type="button" data-section="youtube">YouTube</button>
+      <button class="primaryTab is-active" type="button" data-section="channels" aria-current="page">Channels</button>
+      <button class="primaryTab" type="button" data-section="watchLater">Watch later</button>
+      <button class="primaryTab" type="button" data-section="favorites">Favorites</button>
+    </nav>
+
     <header class="mainbar" aria-label="Navigation">
       <div class="leftTools">
         <button id="toggleSidebar" class="iconButton" type="button" title="Collapse subscriptions" aria-label="Collapse subscriptions">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <button id="back" class="iconButton" type="button" title="Back" aria-label="Back" disabled>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <button id="forward" class="iconButton" type="button" title="Forward" aria-label="Forward" disabled>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-        <button id="openAppSession" class="iconButton" type="button" title="New app session" aria-label="New app session">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h10v10H8z"/><path d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
       </div>
-
-      <form id="searchForm" class="searchBox" role="search">
-        <input id="searchInput" type="search" placeholder="Search / open URL" autocomplete="off">
-        <button class="searchButton" type="submit" title="Search or open" aria-label="Search or open">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        </button>
-      </form>
 
       <div class="rightTools">
         <a class="signinButton" href="https://www.youtube.com/signin" target="_blank">YouTube sign in</a>
@@ -45,11 +55,6 @@
         <div id="sidePanelPath" class="sidePanelPath"></div>
         <div id="channelShelfControls" class="channelShelfControls">
           <div class="channelSearch">
-            <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
-              <span></span><span></span><span></span>
-            </button>
-            <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">-</button>
-            <button id="channelZoomIn" class="channelZoomButton" type="button" title="Zoom in list" aria-label="Zoom in list">+</button>
             <button id="channelBack" class="channelNavButton" type="button" title="Back" aria-label="Back">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
             </button>
@@ -59,6 +64,17 @@
             <input id="channelSearchInput" type="search" placeholder="Search channel" autocomplete="off" aria-label="Search channel">
           </div>
           <div id="categories" class="categories"></div>
+        </div>
+        <div class="resultsToolbar" aria-label="Result display controls">
+          <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
+            <span></span><span></span><span></span>
+          </button>
+          <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6"/></svg>
+          </button>
+          <button id="channelZoomIn" class="channelZoomButton" type="button" title="Zoom in list" aria-label="Zoom in list">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6M10 7v6"/></svg>
+          </button>
         </div>
         <div id="channelListSeparator" class="channelListSeparator" aria-hidden="true"></div>
         <div id="channels" class="channels"></div>
@@ -162,9 +178,9 @@
       <div class="modal importExportModal" role="dialog" aria-modal="true" aria-labelledby="importExportTitle">
         <h2 id="importExportTitle">Import / Export</h2>
         <div class="importExportGrid">
-          <button id="exportNativeConfig" class="modalButton secondary" type="button">Export YouTube Channel Shelf</button>
+          <button id="exportNativeConfig" class="modalButton secondary" type="button">Export YouTube Shelf</button>
           <button id="exportNewPipeConfig" class="modalButton secondary" type="button">Export for NewPipe</button>
-          <button id="importNativeConfig" class="modalButton secondary" type="button">Import YouTube Channel Shelf</button>
+          <button id="importNativeConfig" class="modalButton secondary" type="button">Import YouTube Shelf</button>
           <button id="importFreetubeConfig" class="modalButton secondary" type="button">Import FreeTube</button>
         </div>
         <div class="modalActions">
