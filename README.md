@@ -2,7 +2,7 @@
 
 Browser extension for managing YouTube channels and favorite videos from the side panel.
 
-Current version: `3.0.3`.
+Current version: `3.0.4`.
 
 ## Main Features
 
@@ -12,6 +12,7 @@ Current version: `3.0.3`.
 - Add personal comments to favorite and `Watch later` videos.
 - Organize channels into categories and browse their latest videos.
 - Sort channels and videos alphabetically, by date, views, or subscriber count.
+- Automatically resume YouTube videos from their last locally saved position for up to seven days.
 - Synchronize content between browsers through a WebDAV server such as Nextcloud.
 
 ## Local Installation
@@ -28,7 +29,7 @@ Firefox compatibility is planned for a later version.
 
 ## Local Data
 
-The extension stores channels, categories, watched state, and `Watch later` in browser local storage.
+The extension stores channels, categories, watched state, `Watch later`, and video playback positions in browser local storage.
 
 Use the extension import/export actions to back up or transfer your configuration.
 

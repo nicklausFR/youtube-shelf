@@ -31,6 +31,23 @@ body {
   font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Keep channel and channel-video views scrollable without a visible scrollbar. */
+html,
+body,
+.sidebar,
+.channels,
+body.sidePanelVideos .content {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar,
+.channels::-webkit-scrollbar,
+body.sidePanelVideos .content::-webkit-scrollbar {
+  display: none;
+}
+
 button,
 input {
   font: inherit;
