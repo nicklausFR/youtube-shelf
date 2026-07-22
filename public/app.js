@@ -11,6 +11,7 @@ const searchInputEl = document.querySelector("#searchInput");
 const globalSearchResultsEl = document.querySelector("#globalSearchResults");
 const topOptionsEl = document.querySelector("#topOptions");
 const primaryTabEls = [...document.querySelectorAll(".primaryTab[data-section]")];
+const sortResultsEl = document.querySelector("#sortResults");
 const contentToolbarEl = document.querySelector(".contentToolbar");
 const addChannelEl = document.querySelector("#addChannel");
 const addCategoryEl = document.querySelector("#addCategory");
@@ -133,6 +134,7 @@ let currentWatchLaterVideoId = "";
 let pendingAddChannelCategoryId = "";
 let channelSearchMetadataRefreshTimer = 0;
 let channelSearchMetadataRefreshInFlight = false;
+let subscriberSortRefreshInFlight = false;
 let globalSearchTimer = 0;
 let globalSearchController = null;
 let globalSearchRequestId = 0;
@@ -173,6 +175,7 @@ let categoryBeingRenamed = null;
 let categoryDialogScope = "channels";
 let categoryDialogParentId = "";
 let contextMenuEl = null;
+let contextSubmenuEl = null;
 let confirmDialogResolve = null;
 let lastHandledDataCommandAt = 0;
 let categoryResizeStartY = 0;
@@ -191,6 +194,7 @@ const CHANNEL_VIDEO_SOURCE_KEY = "youtubeChannelShelfChannelVideoSource";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
 const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
 const CATEGORY_ZOOM_KEY = "youtubeChannelShelfCategoryZoom";
+const SORT_MODES_KEY = "youtubeChannelShelfSortModes";
 const WEBDAV_SYNC_SETTINGS_KEY = "youtubeChannelShelfWebDavSyncSettings";
 const WEBDAV_DEFAULT_URL = "";
 const WEBDAV_SYNC_WRITE_DELAY_MS = 10000;
@@ -214,6 +218,20 @@ const YOUTUBE_REGION_BY_LANGUAGE = {
 };
 const youtubeOriginalTitleCache = new Map();
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
+let sortModes = (() => {
+  try {
+    return {
+      youtube: "default",
+      channels: "default",
+      channelVideos: "date-desc",
+      watchLater: "date-desc",
+      favorites: "date-desc",
+      ...JSON.parse(localStorage.getItem(SORT_MODES_KEY) || "{}")
+    };
+  } catch {
+    return { youtube: "default", channels: "default", channelVideos: "date-desc", watchLater: "date-desc", favorites: "date-desc" };
+  }
+})();
 
 function setActivePrimarySection(section) {
   if (!["youtube", "channels", "watchLater", "favorites"].includes(section)) return;
@@ -239,6 +257,203 @@ function setActivePrimarySection(section) {
   };
   searchInputEl.placeholder = placeholders[section];
   searchInputEl.setAttribute("aria-label", placeholders[section]);
+  syncSortButton();
+}
+
+function currentSortScope() {
+  if (activePrimarySection === "channels" && (activeChannel || activeView === "newVideos")) return "channelVideos";
+  return activePrimarySection;
+}
+
+function sortModeLabel(mode, scope = currentSortScope()) {
+  const labels = {
+    default: scope === "youtube" ? "Relevance" : "Default order",
+    "title-asc": "Title A–Z",
+    "title-desc": "Title Z–A",
+    "date-desc": scope === "channels" ? "Latest video first" : "Newest first",
+    "date-asc": scope === "channels" ? "Oldest latest video first" : "Oldest first",
+    "views-desc": "Most viewed",
+    "views-asc": "Least viewed",
+    "subscribers-desc": "Most subscribers",
+    "subscribers-asc": "Least subscribers"
+  };
+  return labels[mode] || labels.default;
+}
+
+function sortOptionsForCurrentScope() {
+  const scope = currentSortScope();
+  const modes = scope === "channels"
+    ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "subscribers-desc", "subscribers-asc"]
+    : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
+  return modes.map((mode) => ({
+    label: sortModeLabel(mode, scope),
+    checked: sortModes[scope] === mode,
+    action: () => setSortMode(scope, mode)
+  }));
+}
+
+function syncSortButton() {
+  if (!sortResultsEl) return;
+  const scope = currentSortScope();
+  const mode = sortModes[scope] || "default";
+  const label = `Sort: ${sortModeLabel(mode, scope)}`;
+  sortResultsEl.title = label;
+  sortResultsEl.setAttribute("aria-label", label);
+  sortResultsEl.classList.toggle("is-active", mode !== "default");
+}
+
+function setSortMode(scope, mode) {
+  sortModes = { ...sortModes, [scope]: mode };
+  localStorage.setItem(SORT_MODES_KEY, JSON.stringify(sortModes));
+  syncSortButton();
+  refreshSortedView();
+  if (scope === "channels" && mode.startsWith("subscribers-")) {
+    refreshMissingSubscriberCounts().catch(() => {});
+  }
+}
+
+function relativeDateValue(value = "") {
+  const text = String(value || "").trim().toLocaleLowerCase();
+  if (!text) return null;
+  const absolute = Date.parse(text);
+  if (Number.isFinite(absolute)) return absolute;
+  const match = text.match(/(\d+(?:[.,]\d+)?)\s+(second|minute|hour|day|week|month|year|seconde|heure|jour|semaine|mois|an|année)s?/u);
+  if (!match) return null;
+  const amount = Number(match[1].replace(",", "."));
+  const unit = match[2];
+  const day = 24 * 60 * 60 * 1000;
+  const multipliers = {
+    second: 1000, seconde: 1000,
+    minute: 60 * 1000,
+    hour: 60 * 60 * 1000, heure: 60 * 60 * 1000,
+    day, jour: day,
+    week: 7 * day, semaine: 7 * day,
+    month: 30 * day, mois: 30 * day,
+    year: 365 * day, an: 365 * day, année: 365 * day
+  };
+  return Date.now() - amount * multipliers[unit];
+}
+
+function compareOptionalNumbers(left, right, direction = "desc") {
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+  return direction === "asc" ? left - right : right - left;
+}
+
+function compareTitles(left, right, direction = "asc") {
+  const comparison = String(left?.title || left?.name || "").localeCompare(String(right?.title || right?.name || ""), undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+  return direction === "desc" ? -comparison : comparison;
+}
+
+function sortVideosForDisplay(videos) {
+  const mode = sortModes[currentSortScope()] || "default";
+  const sorted = [...videos];
+  if (mode === "default") return sorted;
+  if (mode.startsWith("title-")) return sorted.sort((left, right) => compareTitles(left, right, mode.endsWith("desc") ? "desc" : "asc"));
+  if (mode.startsWith("date-")) {
+    return sorted.sort((left, right) => compareOptionalNumbers(
+      relativeDateValue(left.published || left.publishedText),
+      relativeDateValue(right.published || right.publishedText),
+      mode.endsWith("asc") ? "asc" : "desc"
+    ) || compareTitles(left, right));
+  }
+  if (mode.startsWith("views-")) {
+    return sorted.sort((left, right) => compareOptionalNumbers(
+      metricCountValue(left.views || left.viewCountText),
+      metricCountValue(right.views || right.viewCountText),
+      mode.endsWith("asc") ? "asc" : "desc"
+    ) || compareTitles(left, right));
+  }
+  return sorted;
+}
+
+function sortChannelsForDisplay(channels) {
+  const mode = sortModes.channels || "default";
+  const sorted = [...channels];
+  if (mode === "default") return sorted;
+  if (mode.startsWith("title-")) return sorted.sort((left, right) => compareTitles(left, right, mode.endsWith("desc") ? "desc" : "asc"));
+  if (mode.startsWith("date-")) {
+    return sorted.sort((left, right) => compareOptionalNumbers(
+      relativeDateValue(left.feedLatestPublished),
+      relativeDateValue(right.feedLatestPublished),
+      mode.endsWith("asc") ? "asc" : "desc"
+    ) || compareTitles(left, right));
+  }
+  if (mode.startsWith("subscribers-")) {
+    return sorted.sort((left, right) => compareOptionalNumbers(
+      Number.isFinite(left.subscriberCount) ? left.subscriberCount : metricCountValue(left.subscriberCountText),
+      Number.isFinite(right.subscriberCount) ? right.subscriberCount : metricCountValue(right.subscriberCountText),
+      mode.endsWith("asc") ? "asc" : "desc"
+    ) || compareTitles(left, right));
+  }
+  return sorted;
+}
+
+function refreshSortedView() {
+  if (activePrimarySection === "youtube") {
+    if (activeView === "search" && youtubeSearchResultsQuery) renderYoutubeSearchResults();
+    return;
+  }
+  if (activePrimarySection === "favorites") {
+    renderFavoritesHome();
+    return;
+  }
+  if (activePrimarySection === "watchLater") {
+    renderWatchLater();
+    return;
+  }
+  if (activeView === "newVideos") renderNewVideos();
+  else if (activeChannel) {
+    if (channelSearchQuery.trim()) renderSearchedVideos();
+    else renderChannelVideos(currentVideos);
+  } else renderChannels(channelsForActiveCategory());
+}
+
+async function refreshMissingSubscriberCounts() {
+  if (subscriberSortRefreshInFlight) return;
+  const candidates = allChannels.filter((channel) => (
+    channel?.id
+    && !Number.isFinite(channel.subscriberCount)
+    && metricCountValue(channel.subscriberCountText) === null
+  ));
+  if (!candidates.length) return;
+
+  subscriberSortRefreshInFlight = true;
+  setStatus(`Loading subscriber counts for ${candidates.length} channel${candidates.length === 1 ? "" : "s"}…`);
+  let updatedCount = 0;
+  let nextIndex = 0;
+  const workerCount = Math.min(6, candidates.length);
+
+  async function updateNextChannel() {
+    while (nextIndex < candidates.length) {
+      const channel = candidates[nextIndex++];
+      try {
+        const subscriber = await fetchChannelSubscriberCount(channel.id);
+        if (!Number.isFinite(subscriber.subscriberCount)) continue;
+        allChannels = allChannels.map((item) => item.id === channel.id ? { ...item, ...subscriber } : item);
+        updatedCount += 1;
+      } catch {
+        // Keep channels without a public subscriber count at the end of the list.
+      }
+    }
+  }
+
+  try {
+    await Promise.all(Array.from({ length: workerCount }, updateNextChannel));
+    if (updatedCount) await saveConfig();
+    if (activePrimarySection === "channels" && !activeChannel) {
+      renderChannels(channelsForActiveCategory());
+    }
+    setStatus(updatedCount
+      ? `Subscriber counts updated for ${updatedCount} channel${updatedCount === 1 ? "" : "s"}.`
+      : "No public subscriber counts found.", !updatedCount);
+  } finally {
+    subscriberSortRefreshInFlight = false;
+  }
 }
 const storedChannelVideoSource = localStorage.getItem(CHANNEL_VIDEO_SOURCE_KEY);
 let channelVideoSource = ["hybrid", "innertube", "rss"].includes(storedChannelVideoSource) ? storedChannelVideoSource : "hybrid";
@@ -1072,15 +1287,22 @@ function setChannelVideoSource(value) {
   if (activeChannel?.id) loadFeed();
 }
 
+function dataContextActions() {
+  return [
+    { label: "Import/export/save", action: openImportExportDialog },
+    { label: "Synchronization", action: openWebDavSyncDialog },
+    { label: "Clean slate", action: cleanSlate, danger: true }
+  ];
+}
+
 function settingsContextActions() {
   return [
-    { label: "Add channel", action: () => addChannel(activeCategoryId) },
-    { label: "Add category", action: () => addCategoryEl.click() },
-    { label: "Import / Export", action: openImportExportDialog },
-    { label: "WebDAV synchronization", action: openWebDavSyncDialog },
-    { label: "Display options", action: openDisplayOptionsDialog },
-    { label: "YouTube data options", action: openYoutubeDataOptionsDialog },
-    { label: "Clean Slate", action: cleanSlate, danger: true }
+    {
+      label: "Data",
+      submenu: dataContextActions()
+    },
+    { label: "YouTube options", action: openYoutubeDataOptionsDialog },
+    { label: "Display options", action: openDisplayOptionsDialog }
   ];
 }
 
@@ -1095,6 +1317,7 @@ function ensureContextMenu() {
 
 function hideContextMenu() {
   if (contextMenuEl) contextMenuEl.hidden = true;
+  if (contextSubmenuEl) contextSubmenuEl.hidden = true;
 }
 
 function closeConfirmDialog(value) {
@@ -1265,22 +1488,54 @@ function refreshCurrentVideoList() {
   else renderVideos(currentVideos);
 }
 
+function contextMenuButtons(actions) {
+  return actions.map((item) => {
+    const button = document.createElement("button");
+    const hasSubmenu = Array.isArray(item.submenu);
+    button.type = "button";
+    button.textContent = item.checked ? "[x] " + item.label : item.label;
+    if (item.danger) button.classList.add("is-danger");
+    button.addEventListener("click", async (clickEvent) => {
+      clickEvent.preventDefault();
+      clickEvent.stopPropagation();
+      if (hasSubmenu) {
+        showContextSubmenu(button, item.submenu);
+        return;
+      }
+      hideContextMenu();
+      await maybePromptSeenForWatchLater();
+      await Promise.resolve(item.action(clickEvent));
+    });
+    return button;
+  });
+}
+
+function showContextSubmenu(anchor, actions) {
+  if (!contextSubmenuEl) {
+    contextSubmenuEl = document.createElement("div");
+    contextSubmenuEl.className = "contextMenu contextSubmenu";
+    contextSubmenuEl.hidden = true;
+    document.body.append(contextSubmenuEl);
+  }
+  contextSubmenuEl.replaceChildren(...contextMenuButtons(actions));
+  contextSubmenuEl.hidden = false;
+
+  const anchorRect = anchor.getBoundingClientRect();
+  const width = contextSubmenuEl.offsetWidth;
+  const height = contextSubmenuEl.offsetHeight;
+  const rightPosition = anchorRect.right + 4;
+  const left = rightPosition + width <= window.innerWidth - 8
+    ? rightPosition
+    : Math.max(8, anchorRect.left - width - 4);
+  contextSubmenuEl.style.left = `${left}px`;
+  contextSubmenuEl.style.top = `${Math.max(8, Math.min(anchorRect.top, window.innerHeight - height - 8))}px`;
+}
+
 function showContextMenu(event, actions) {
   const menu = ensureContextMenu();
+  if (contextSubmenuEl) contextSubmenuEl.hidden = true;
   menu.replaceChildren(
-    ...actions.map((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = item.checked ? "[x] " + item.label : item.submenu ? item.label + " >" : item.label;
-      if (item.danger) button.classList.add("is-danger");
-      if (item.submenu) button.classList.add("has-submenu");
-      button.addEventListener("click", async (clickEvent) => {
-        if (!item.submenu) hideContextMenu();
-        await maybePromptSeenForWatchLater();
-        await Promise.resolve(item.action(clickEvent));
-      });
-      return button;
-    })
+    ...contextMenuButtons(actions)
   );
 
   menu.hidden = false;
@@ -1800,6 +2055,7 @@ function syncStackedChannelViewState() {
   const stacked = document.body.classList.contains("sidePanelVideos") && !document.body.classList.contains("useSplitColumns");
   document.body.classList.toggle("stackedChannelView", stacked);
   document.body.classList.toggle("hasActiveChannel", Boolean(activeChannel));
+  syncSortButton();
   if (activeChannelSeparatorEl) {
     activeChannelSeparatorEl.hidden = !document.body.classList.contains("sidePanelVideos") || !activeChannel;
   }
@@ -2032,6 +2288,47 @@ function parseLocalizedInteger(value = "") {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function metricCountValue(value = "") {
+  const text = String(value || "").trim().toLocaleLowerCase().replace(/[\u00a0\u202f]/g, " ");
+  if (!text) return null;
+  if (/\bno (?:views?|subscribers?)\b|\baucun(?:e)?s? (?:vues?|abonnés?)\b/u.test(text)) return 0;
+  const match = text.match(/(\d[\d\s.,]*)(?:\s*)(k|m|b|thousand|million|billion|millier|milliard)?/i);
+  if (!match) return null;
+  const suffix = String(match[2] || "").toLocaleLowerCase();
+  let amount;
+  if (suffix) {
+    amount = Number.parseFloat(match[1].replace(/\s/g, "").replace(",", "."));
+  } else {
+    amount = Number.parseInt(match[1].replace(/[^\d]/g, ""), 10);
+  }
+  if (!Number.isFinite(amount)) return null;
+  const multiplier = ["k", "thousand", "millier"].includes(suffix)
+    ? 1_000
+    : ["m", "million"].includes(suffix)
+      ? 1_000_000
+      : ["b", "billion", "milliard"].includes(suffix) ? 1_000_000_000 : 1;
+  return Math.round(amount * multiplier);
+}
+
+function parseChannelSubscriberCount(html = "") {
+  const patterns = [
+    /"subscriberCountText"\s*:\s*"((?:\\.|[^"\\])*)"/i,
+    /"subscriberCountText"\s*:\s*\{[\s\S]{0,800}?"(?:simpleText|content|text)"\s*:\s*"((?:\\.|[^"\\])*)"/i
+  ];
+  for (const pattern of patterns) {
+    const encodedText = String(html || "").match(pattern)?.[1] || "";
+    let text = encodedText;
+    try {
+      text = JSON.parse(`"${encodedText}"`);
+    } catch {
+      // The unescaped value is still usable for simple numeric formats.
+    }
+    const count = metricCountValue(text);
+    if (count !== null) return { subscriberCount: count, subscriberCountText: text };
+  }
+  return { subscriberCount: null, subscriberCountText: "" };
+}
+
 function parseChannelVideoCount(html = "") {
   const decoded = html.replace(/\\"/g, '"');
   const patterns = [
@@ -2096,7 +2393,8 @@ function parseChannelMetadata(html = "") {
     ...collectJsonArrayValues(html, ["keywords", "tags", "topicDetails", "channelTags"]),
     ...collectJsonStringValues(html, ["category", "title"])
   ]);
-  return { description, tags };
+  const subscriber = parseChannelSubscriberCount(html);
+  return { description, tags, ...subscriber };
 }
 
 async function fetchChannelMetadata(channelId) {
@@ -2106,6 +2404,14 @@ async function fetchChannelMetadata(channelId) {
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return parseChannelMetadata(await response.text());
+}
+
+async function fetchChannelSubscriberCount(channelId) {
+  const response = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channelId)}/about`, {
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return parseChannelSubscriberCount(await response.text());
 }
 
 async function fetchChannelVideoCount(channelId) {
@@ -2606,7 +2912,8 @@ function createVideoCard(video) {
           channelId: video.channelId || "",
           channel: video.channel || videoChannelTitle(video),
           description: video.description || "",
-          tags: video.tags || video.keywords || video.topics || []
+          tags: video.tags || video.keywords || video.topics || [],
+          views: video.views || video.viewCountText || ""
         };
         event.dataTransfer?.setData("application/x-youtube-channel-shelf-video", JSON.stringify(draggedVideo));
         event.dataTransfer?.setData("text/uri-list", `https://www.youtube.com/watch?v=${video.id}`);
@@ -2791,7 +3098,7 @@ function createWatchMoreCard(channel, options = {}) {
 }
 
 function renderVideos(videos, target = videosEl, options = {}) {
-  const items = videos.map(createVideoCard);
+  const items = sortVideosForDisplay(videos).map(createVideoCard);
   if (options.watchMoreChannel?.id) {
     items.push(createWatchMoreCard(options.watchMoreChannel, { loadMore: options.loadMore }));
   }
@@ -2822,6 +3129,7 @@ async function toggleWatchLater(video) {
       title: video.title || "",
       description: video.description || "",
       tags: video.tags || video.keywords || video.topics || [],
+      views: video.views || video.viewCountText || "",
       channel: video.channel || activeChannel?.title || ""
     };
   }
@@ -3753,7 +4061,11 @@ function renderFavoriteVideoResults(videos) {
 }
 
 function channelNeedsMetadata(channel) {
-  return sniffYoutubeEnabled && channel?.id && !channel.description && !(Array.isArray(channel.tags) && channel.tags.length);
+  return sniffYoutubeEnabled && channel?.id && (
+    !channel.description
+    || !(Array.isArray(channel.tags) && channel.tags.length)
+    || !Number.isFinite(channel.subscriberCount)
+  );
 }
 
 async function enrichChannelsForSearch(channels) {
@@ -3772,11 +4084,13 @@ async function enrichChannelsForSearch(channels) {
       const channel = candidates[nextIndex++];
       try {
         const metadata = await fetchChannelMetadata(channel.id);
-        if (!metadata.description && !metadata.tags?.length) continue;
+        if (!metadata.description && !metadata.tags?.length && !Number.isFinite(metadata.subscriberCount)) continue;
         allChannels = allChannels.map((item) => item.id === channel.id ? {
           ...item,
           description: metadata.description || item.description || "",
-          tags: metadata.tags?.length ? metadata.tags : item.tags || []
+          tags: metadata.tags?.length ? metadata.tags : item.tags || [],
+          subscriberCount: Number.isFinite(metadata.subscriberCount) ? metadata.subscriberCount : item.subscriberCount,
+          subscriberCountText: metadata.subscriberCountText || item.subscriberCountText || ""
         } : item);
         changed = true;
         if (activeChannel?.id) activeChannel = allChannels.find((item) => item.id === activeChannel.id) || activeChannel;
@@ -3963,6 +4277,7 @@ function renderWatchLater() {
     channelId: item.channelId || "",
     channel: item.channel || allChannels.find((channel) => channel.id === item.channelId)?.title || "",
     note: item.note || "",
+    views: item.views || "",
     description: item.description || "",
     tags: item.tags || item.keywords || item.topics || [],
     thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
@@ -4057,9 +4372,10 @@ async function addVideoToWatchLater(video) {
       ...existing,
       channelId: existing.channelId || video.channelId || "",
       channel: existing.channel || video.channel || "",
-      title: !existing.title || existing.title === video.id ? video.title || video.id : existing.title
+      title: !existing.title || existing.title === video.id ? video.title || video.id : existing.title,
+      views: existing.views || video.views || video.viewCountText || ""
     };
-    if (repaired.channelId !== existing.channelId || repaired.channel !== existing.channel || repaired.title !== existing.title) {
+    if (repaired.channelId !== existing.channelId || repaired.channel !== existing.channel || repaired.title !== existing.title || repaired.views !== existing.views) {
       watchLater[video.id] = repaired;
       await saveConfig();
       if (activeView === "watchLater") renderWatchLater();
@@ -4076,6 +4392,7 @@ async function addVideoToWatchLater(video) {
     title: video.title || video.id,
     description: video.description || "",
     tags: video.tags || video.keywords || video.topics || [],
+    views: video.views || video.viewCountText || "",
     channel: video.channel || ""
   };
   await saveConfig();
@@ -4110,6 +4427,7 @@ async function addVideoToFavorites(video, categoryId = "") {
     title: video.title || video.id,
     description: video.description || "",
     tags: video.tags || video.keywords || video.topics || [],
+    views: video.views || video.viewCountText || "",
     channel: video.channel || "",
     categories: targetCategoryId ? [targetCategoryId] : []
   };
@@ -4147,6 +4465,7 @@ function renderFavoritesHome() {
       channelId: item.channelId || "",
       channel: item.channel || allChannels.find((channel) => channel.id === item.channelId)?.title || "",
       note: item.note || "",
+      views: item.views || "",
       description: item.description || "",
       tags: item.tags || item.keywords || item.topics || [],
       thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
@@ -4192,7 +4511,7 @@ function showFavoritesCategory(categoryId = "", options = {}) {
 
 function renderChannels(channels) {
   channelsEl.classList.remove("videoListHost");
-  const visibleChannels = filterChannelsForSearch(channels);
+  const visibleChannels = sortChannelsForDisplay(filterChannelsForSearch(channels));
   if (!visibleChannels.length) {
     if (!channelSearchQuery.trim()) {
       channelsEl.replaceChildren();
@@ -4312,6 +4631,11 @@ function setActiveChannelButton() {
     const channel = allChannels.find((item) => item.id === button.dataset.channelId);
     if (meta) {
       meta.replaceChildren();
+      if (channel?.subscriberCountText) {
+        const subscriberLine = document.createElement("div");
+        subscriberLine.textContent = channel.subscriberCountText;
+        meta.append(subscriberLine);
+      }
       if (isActive && document.body.classList.contains("sidePanelVideos")) {
         const count = channel?.channelVideoCount || 0;
         const date = channel?.feedLatestPublished ? formatDate(channel.feedLatestPublished) : "";
@@ -4540,7 +4864,12 @@ async function loadFeed() {
     channelVideosContinuation = innertubePage?.continuation || "";
 
     let channelVideoCount = channel.channelVideoCount || 0;
-    let channelMetadata = { description: channel.description || "", tags: channel.tags || [] };
+    let channelMetadata = {
+      description: channel.description || "",
+      tags: channel.tags || [],
+      subscriberCount: channel.subscriberCount,
+      subscriberCountText: channel.subscriberCountText || ""
+    };
     try {
       channelVideoCount = await fetchChannelVideoCount(channel.id) || channelVideoCount;
     } catch {
@@ -4570,7 +4899,9 @@ async function loadFeed() {
       } : {}),
       channelVideoCount,
       description: channelMetadata.description || channel.description || "",
-      tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || []
+      tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
+      subscriberCount: Number.isFinite(channelMetadata.subscriberCount) ? channelMetadata.subscriberCount : channel.subscriberCount,
+      subscriberCountText: channelMetadata.subscriberCountText || channel.subscriberCountText || ""
     };
     allChannels = allChannels.map((channel) => (channel.id === activeChannel.id ? { ...channel, ...activeChannel } : channel));
     setActiveChannelButton();
@@ -4610,7 +4941,12 @@ async function refreshChannelSummaries() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const videos = parseFeed(await response.text()).map((video) => videoWithChannel(video, channel));
         let channelVideoCount = channel.channelVideoCount || 0;
-        let channelMetadata = { description: channel.description || "", tags: channel.tags || [] };
+        let channelMetadata = {
+          description: channel.description || "",
+          tags: channel.tags || [],
+          subscriberCount: channel.subscriberCount,
+          subscriberCountText: channel.subscriberCountText || ""
+        };
         try {
           channelVideoCount = await fetchChannelVideoCount(channel.id) || channelVideoCount;
         } catch {
@@ -4628,6 +4964,8 @@ async function refreshChannelSummaries() {
           channelVideoCount,
           description: channelMetadata.description || channel.description || "",
           tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
+          subscriberCount: Number.isFinite(channelMetadata.subscriberCount) ? channelMetadata.subscriberCount : channel.subscriberCount,
+          subscriberCountText: channelMetadata.subscriberCountText || channel.subscriberCountText || "",
           feedLatestPublished: latestPublished,
           feedLatestTitle: videos[0]?.title || "",
           feedVideos: videos.map((video) => ({
@@ -4644,6 +4982,8 @@ async function refreshChannelSummaries() {
           next.feedVideoCount !== channel.feedVideoCount ||
           next.channelVideoCount !== channel.channelVideoCount ||
           next.description !== channel.description ||
+          next.subscriberCount !== channel.subscriberCount ||
+          next.subscriberCountText !== channel.subscriberCountText ||
           JSON.stringify(next.tags || []) !== JSON.stringify(channel.tags || [])
         ) {
           changed = true;
@@ -5250,6 +5590,12 @@ topOptionsEl?.addEventListener("click", (event) => {
   event.stopPropagation();
   showContextMenu(event, settingsContextActions());
 });
+sortResultsEl?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  syncSortButton();
+  showContextMenu(event, sortOptionsForCurrentScope());
+});
 closeYoutubeDataOptionsEl?.addEventListener("click", closeYoutubeDataOptionsDialog);
 testWebDavEl?.addEventListener("click", testWebDavFromDialog);
 enableWebDavSyncEl?.addEventListener("click", saveAndEnableWebDavSync);
@@ -5616,7 +5962,7 @@ async function addChannelById(channelId, categoryId = activeCategoryId) {
     const doc = new DOMParser().parseFromString(await response.text(), "application/xml");
     const title = doc.querySelector("feed > title")?.textContent?.trim() || "Untitled channel";
     let channelVideoCount = 0;
-    let channelMetadata = { description: "", tags: [] };
+    let channelMetadata = { description: "", tags: [], subscriberCount: null, subscriberCountText: "" };
     try {
       channelVideoCount = await fetchChannelVideoCount(cleanId);
     } catch {
@@ -5634,6 +5980,8 @@ async function addChannelById(channelId, categoryId = activeCategoryId) {
       channelVideoCount,
       description: channelMetadata.description || "",
       tags: channelMetadata.tags || [],
+      subscriberCount: channelMetadata.subscriberCount,
+      subscriberCountText: channelMetadata.subscriberCountText || "",
       newVideosSeenAt: new Date().toISOString(),
       categories: targetCategoryId ? [targetCategoryId] : []
     });
@@ -5709,11 +6057,12 @@ function channelResultFromRenderer(renderer) {
   const id = renderer.channelId || renderer.navigationEndpoint?.browseEndpoint?.browseId || "";
   if (!/^UC[-_a-zA-Z0-9]+$/.test(id)) return null;
   const title = textFromRuns(renderer.title).trim() || "Untitled channel";
-  const handle = textFromRuns(renderer.subscriberCountText).trim() || textFromRuns(renderer.videoCountText).trim();
+  const subscriberCountText = textFromRuns(renderer.subscriberCountText).trim();
+  const handle = subscriberCountText || textFromRuns(renderer.videoCountText).trim();
   const description = textFromRuns(renderer.descriptionSnippet).trim();
   const thumbnails = renderer.thumbnail?.thumbnails || [];
   const thumbnail = thumbnails.at(-1)?.url || thumbnails[0]?.url || "";
-  return { id, title, handle, description, thumbnail };
+  return { id, title, handle, description, thumbnail, subscriberCountText, subscriberCount: metricCountValue(subscriberCountText) };
 }
 
 function hasVideoDropType(dataTransfer) {
@@ -6240,6 +6589,9 @@ loadChannels().then(async () => {
     renderFavoritesHome();
   } else {
     setActivePrimarySection("channels");
+  }
+  if ((sortModes.channels || "").startsWith("subscribers-")) {
+    refreshMissingSubscriberCounts().catch(() => {});
   }
   initializeWebDavSynchronization().catch((error) => setWebDavStatus(`Synchronization error: ${error.message}`, true));
   handlePendingDataCommand().catch(() => {});

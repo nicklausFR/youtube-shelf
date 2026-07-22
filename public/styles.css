@@ -1141,7 +1141,7 @@ body.sidePanelVideos .favoriteButton {
   inset: 0;
   justify-content: center;
   position: fixed;
-  z-index: 20;
+  z-index: 200;
 }
 
 .modal {
@@ -1905,10 +1905,6 @@ body.sidePanelVideos .favoriteButton {
 
 .contextMenu button:hover {
   background: #252525;
-}
-
-.contextMenu button.has-submenu {
-  padding-right: 24px;
 }
 
 .contextMenu button.is-danger {
