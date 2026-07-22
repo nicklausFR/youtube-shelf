@@ -2,13 +2,14 @@
 
 Browser extension for managing YouTube channels and favorite videos from the side panel.
 
-Current version: `3.0.1`.
+Current version: `3.0.2`.
 
 ## Main Features
 
 - Navigate channels, recent videos, favorites, and other views through tabs.
-- Search YouTube directly from the extension and add channels from the results.
+- Search YouTube in the detected query language while keeping original video titles, and add channels from the results.
 - Save favorite videos and organize them into categories.
+- Add personal comments to favorite and `Watch later` videos.
 - Organize channels into categories and browse their latest videos.
 - Synchronize content between browsers through a WebDAV server such as Nextcloud.
 
