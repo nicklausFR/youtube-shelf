@@ -546,6 +546,39 @@ svg {
   color: var(--text);
 }
 
+.category.is-ancestor-active,
+.pathButton.is-ancestor-active {
+  background: rgba(239, 79, 69, 0.07);
+  border-color: #8a4a46;
+  color: var(--text);
+}
+
+.category.has-children::after,
+.pathButton-parent::after {
+  content: "›";
+  font-size: 1.1em;
+  margin-left: 6px;
+  opacity: 0.7;
+}
+
+.category.is-subcategory,
+.pathButton-subcategory {
+  background: #151515;
+  border-color: #383838;
+  font-size: 0.9em;
+}
+
+.category.is-subcategory::before,
+.pathButton-subcategory::before {
+  content: "↳ " attr(data-label);
+  opacity: 0.92;
+}
+
+.category.is-subcategory::before {
+  content: "↳";
+  margin-right: 5px;
+}
+
 .category.is-special {
   border-color: #4b4b4b;
 }
@@ -982,6 +1015,26 @@ body.videoWideColumns .video {
   display: none;
 }
 
+.videoNote {
+  background: rgba(255, 215, 106, 0.08);
+  border-left: 2px solid #d2a94a;
+  color: #e8d9ae;
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 7px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  padding: 5px 7px;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.videoNote[hidden] {
+  display: none;
+}
+
 button.videoChannelMeta {
   background: transparent;
   border: 0;
@@ -1059,6 +1112,28 @@ body.sidePanelVideos .favoriteButton {
   color: #b8d7ff;
 }
 
+.videoNoteButton {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 18px;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 28px;
+}
+
+.videoNoteButton:hover,
+.videoNoteButton.is-active {
+  border-color: #d2a94a;
+  color: #ffe19a;
+}
+
 .modalOverlay {
   align-items: center;
   background: rgba(0, 0, 0, 0.62);
@@ -1111,6 +1186,35 @@ body.sidePanelVideos .favoriteButton {
   background: var(--accent);
   border: 1px solid var(--accent);
   color: var(--text);
+}
+
+.videoNoteModal {
+  max-width: 520px;
+}
+
+.videoNoteModal .modalHint {
+  margin-bottom: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.videoNoteModal textarea {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  margin-bottom: 14px;
+  min-height: 130px;
+  padding: 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.videoNoteModal textarea:focus {
+  border-color: #666;
+  outline: none;
 }
 
 .displayOptionsModal {
@@ -1730,6 +1834,18 @@ body.sidePanelVideos .favoriteButton {
   grid-template-columns: auto minmax(0, 1fr);
   min-height: 34px;
   padding: 0 10px;
+}
+
+.categoryAssignItem.is-subcategory {
+  margin-left: 22px;
+  position: relative;
+}
+
+.categoryAssignItem.is-subcategory::before {
+  color: var(--muted);
+  content: "↳";
+  left: -18px;
+  position: absolute;
 }
 
 .categoryAssignItem:hover {
@@ -3366,6 +3482,18 @@ body.virtualVideoListView .sidebar {
 
 .channels > .videos.favoriteVideos .watchLaterButton {
   display: none;
+}
+
+.channels > .videos.favoriteVideos .videoActions {
+  flex-wrap: wrap;
+  justify-self: stretch;
+  width: 100%;
+}
+
+.channels > .videos.favoriteVideos .videoCategoryList {
+  flex-basis: 100%;
+  margin-bottom: 2px;
+  order: -1;
 }
 
 body.primarySectionYoutube.virtualVideoListView .sidebar > .sidePanelPath,

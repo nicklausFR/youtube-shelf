@@ -1,7 +1,7 @@
 {
     "manifest_version":  3,
     "name":  "YouTube Shelf",
-    "version":  "3.0.1",
+    "version":  "3.0.2",
     "author":  "nicklausFR",
     "description":  "Organize YouTube channels by category and open videos in a clean interface.",
     "icons":  {
