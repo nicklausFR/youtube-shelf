@@ -135,6 +135,7 @@ let pendingAddChannelCategoryId = "";
 let channelSearchMetadataRefreshTimer = 0;
 let channelSearchMetadataRefreshInFlight = false;
 let subscriberSortRefreshInFlight = false;
+let savedVideoMetadataRefreshInFlight = false;
 let globalSearchTimer = 0;
 let globalSearchController = null;
 let globalSearchRequestId = 0;
@@ -4290,6 +4291,7 @@ function renderWatchLater() {
   renderVideos(currentVideos, watchLaterList);
   syncStackedChannelViewState();
   syncVideoLayoutAvailability();
+  repairMissingSavedVideoMetadata().catch(() => {});
 }
 
 function createFavoriteCategory(name, parentId = "") {
@@ -4352,15 +4354,94 @@ async function removeFavorite(video) {
 async function completeDroppedVideoMetadata(video) {
   if (!video?.id) return video;
   const hasTitle = video.title && video.title !== video.id;
-  if (hasTitle && video.channel) return video;
+  if (hasTitle && video.channel && video.channelId) return video;
+  let completed = { ...video };
+  try {
+    const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`;
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`, {
+      cache: "force-cache",
+      credentials: "omit"
+    });
+    if (response.ok) {
+      const metadata = await response.json();
+      completed = {
+        ...completed,
+        title: hasTitle ? completed.title : String(metadata?.title || completed.title || video.id).trim(),
+        channel: completed.channel || String(metadata?.author_name || "").trim()
+      };
+      const authorUrl = String(metadata?.author_url || "").trim();
+      if (!completed.channelId && authorUrl) {
+        completed.channelId = await resolveDroppedChannelId(authorUrl, { silent: true }).catch(() => "");
+      }
+    }
+  } catch {
+    // Fall back to YouTube search metadata below.
+  }
+  if (completed.title && completed.title !== completed.id && completed.channel && completed.channelId) return completed;
   try {
     const match = (await fetchYoutubeGlobalSearchResults(video.id, { limit: 8 }))
       .find((item) => item.type === "video" && item.id === video.id);
-    if (match) return { ...video, ...match };
+    if (match) return {
+      ...completed,
+      title: completed.title && completed.title !== completed.id ? completed.title : match.title || completed.id,
+      channelId: completed.channelId || match.channelId || "",
+      channel: completed.channel || match.channel || "",
+      views: completed.views || match.views || match.viewCountText || ""
+    };
   } catch {
     // Keep the metadata carried by the drag operation when YouTube is unavailable.
   }
-  return video;
+  return completed;
+}
+
+async function repairMissingSavedVideoMetadata() {
+  if (savedVideoMetadataRefreshInFlight || !configLoaded) return;
+  const candidates = [...new Set([
+    ...Object.keys(favorites),
+    ...Object.keys(watchLater)
+  ])].filter((videoId) => {
+    const items = [favorites[videoId], watchLater[videoId]].filter(Boolean);
+    return items.some((item) => !item.channel || !item.channelId || !item.title || item.title === videoId);
+  });
+  if (!candidates.length) return;
+
+  savedVideoMetadataRefreshInFlight = true;
+  let changed = false;
+  let nextIndex = 0;
+  const workerCount = Math.min(4, candidates.length);
+
+  async function repairNextVideo() {
+    while (nextIndex < candidates.length) {
+      const videoId = candidates[nextIndex++];
+      const source = favorites[videoId] || watchLater[videoId] || {};
+      const completed = await completeDroppedVideoMetadata({ id: videoId, ...source });
+      for (const collection of [favorites, watchLater]) {
+        const item = collection[videoId];
+        if (!item) continue;
+        const repaired = {
+          ...item,
+          title: !item.title || item.title === videoId ? completed.title || videoId : item.title,
+          channelId: item.channelId || completed.channelId || "",
+          channel: item.channel || completed.channel || "",
+          views: item.views || completed.views || completed.viewCountText || ""
+        };
+        if (repaired.title !== item.title || repaired.channelId !== item.channelId || repaired.channel !== item.channel || repaired.views !== item.views) {
+          collection[videoId] = repaired;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  try {
+    await Promise.all(Array.from({ length: workerCount }, repairNextVideo));
+    if (!changed) return;
+    await saveConfig();
+    if (activePrimarySection === "favorites") renderFavoritesHome();
+    else if (activePrimarySection === "watchLater") renderWatchLater();
+  } finally {
+    savedVideoMetadataRefreshInFlight = false;
+  }
 }
 
 async function addVideoToWatchLater(video) {
@@ -4499,6 +4580,7 @@ function renderFavoritesHome() {
   syncStackedChannelViewState();
   syncVideoLayoutAvailability();
   setStatus();
+  repairMissingSavedVideoMetadata().catch(() => {});
 }
 
 function showFavoritesCategory(categoryId = "", options = {}) {
@@ -5925,7 +6007,7 @@ function channelIdFromYoutubeHtml(html = "") {
   );
 }
 
-async function resolveDroppedChannelId(value = "") {
+async function resolveDroppedChannelId(value = "", options = {}) {
   const directId = channelIdFromDroppedText(value);
   if (directId) return directId;
 
@@ -5933,7 +6015,7 @@ async function resolveDroppedChannelId(value = "") {
   const youtubeUrl = handleUrl || youtubeUrlFromDroppedText(value);
   if (!youtubeUrl) return "";
 
-  showInfoPopup(handleUrl ? "Resolving YouTube handle..." : "Resolving video channel...", "info");
+  if (!options.silent) showInfoPopup(handleUrl ? "Resolving YouTube handle..." : "Resolving video channel...", "info");
   const response = await fetch(youtubeUrl, { cache: "no-store" });
   if (!response.ok) throw new Error(`YouTube lookup failed: HTTP ${response.status}`);
   return channelIdFromYoutubeHtml(await response.text());
