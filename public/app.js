@@ -4719,6 +4719,7 @@ async function selectChannel(channel, options = {}) {
     await maybePromptSeenForWatchLater();
   }
   const fullChannel = allChannels.find((item) => item.id === channel?.id) || channel;
+  setActivePrimarySection("channels");
   clearChannelSearch();
   activeView = "channels";
   activeChannel = fullChannel;
@@ -4730,7 +4731,10 @@ async function selectChannel(channel, options = {}) {
   videosEl.replaceChildren();
   setHeader("", true);
   renderSidePanelPath();
-  setActiveChannelButton();
+  const channelIsRendered = [...channelsEl.querySelectorAll(".channel")]
+    .some((button) => button.dataset.channelId === fullChannel.id);
+  if (channelIsRendered) setActiveChannelButton();
+  else renderChannels([fullChannel]);
 
   if (!options.skipHistory) {
     pushHistory({ type: "channel", id: channel.id });
