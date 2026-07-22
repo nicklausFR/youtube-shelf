@@ -3364,6 +3364,18 @@ body.sidePanelVideos:not(.hasActiveChannel) .channels,
   }
 }
 
+/* Let channel thumbnails follow cards that grow when metadata gains another line. */
+body:not(.channelIconMode):not(.sidePanelVideos) .channel {
+  align-items: stretch;
+}
+
+body:not(.channelIconMode):not(.sidePanelVideos) .channel img,
+body:not(.channelIconMode):not(.sidePanelVideos) .channelFallback {
+  align-self: stretch;
+  border-radius: 4px;
+  height: auto;
+}
+
 .channels,
 body.sidePanelVideos .channels {
   border-top: 0 !important;
