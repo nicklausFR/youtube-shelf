@@ -1,7 +1,7 @@
 {
     "manifest_version":  3,
     "name":  "YouTube Shelf",
-    "version":  "3.0.3",
+    "version":  "3.0.4",
     "author":  "nicklausFR",
     "description":  "Search YouTube, organize channels, favorites and Watch later videos, add notes, and browse from a clean side panel.",
     "icons":  {
