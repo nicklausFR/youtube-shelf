@@ -3739,9 +3739,68 @@ body.virtualVideoListView .sidebar {
   border-left-color: #a65e68;
 }
 
+.channels > .videos.favoriteVideos .video.is-multi-selected {
+  border-color: #77a9ef !important;
+  box-shadow: 0 0 0 2px rgba(75, 134, 217, 0.55);
+}
+
+.favoriteSelectionMarquee {
+  background: rgba(75, 134, 217, 0.16);
+  border: 1px solid #77a9ef;
+  pointer-events: none;
+  position: fixed;
+  z-index: 10000;
+}
+
+.favoriteVideoGroup {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.favoriteVideoGroupMembers {
+  border-left: 2px solid #5b3037;
+  display: grid;
+  gap: 6px;
+  margin-left: 12px;
+  padding-left: 8px;
+}
+
+.favoriteVideoGroupMembers .video {
+  pointer-events: auto;
+}
+
+.favoriteGroupToggle {
+  background: #5b3037;
+  border: 1px solid #a65e68;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  left: 10px;
+  line-height: 1.15;
+  padding: 2px 6px;
+  position: absolute;
+  top: 10px;
+  z-index: 3;
+}
+
+.favoriteGroupToggle:hover {
+  background: #75404a;
+}
+
 .channels > .videos.favoriteVideos .video.is-favorite-group-drop-target {
   border-color: #6fa878 !important;
   box-shadow: 0 0 0 2px rgba(111, 168, 120, 0.35);
+}
+
+.channels > .videos.favoriteVideos .video.is-favorite-group-drop-target[data-favorite-drop-placement="before"] {
+  box-shadow: inset 0 3px 0 #6fa878;
+}
+
+.channels > .videos.favoriteVideos .video.is-favorite-group-drop-target[data-favorite-drop-placement="after"] {
+  box-shadow: inset 0 -3px 0 #6fa878;
 }
 
 .favoriteGroupBadge {
@@ -3761,6 +3820,13 @@ body.virtualVideoListView .sidebar {
 }
 
 body.videoTitleOnlyMode .channels.videoListHost .favoriteGroupBadge {
+  left: auto;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+body.videoTitleOnlyMode .channels.videoListHost .favoriteGroupToggle {
   left: auto;
   right: 8px;
   top: 50%;
