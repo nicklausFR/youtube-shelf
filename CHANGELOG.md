@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.1 - 2026-07-23
+
+- Added additive Nextcloud bookmark imports for categorized YouTube favorites.
+- Separated favorite subcategories into a dedicated section and added persistent drag-and-drop ordering.
+- Added title-only and compact thumbnail-and-title video display modes.
+- Added an animated indicator in the YouTube results area while searching.
+- Improved category zoom icons and favorite/Watch later presentation.
+
 ## 3.0.1 - 2026-07-21
 
 - Reorganized the interface around tabs.
