@@ -1,4 +1,8 @@
 import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-export.js";
+import { createI18n } from "./i18n.js";
+
+const popupI18n = await createI18n(localStorage.getItem("youtubeChannelShelfInterfaceLanguage") || "auto");
+const uiText = (value) => popupI18n.translateText(value);
 
 const STORAGE_KEY = "youtubeChannelShelfConfig";
 const command = new URLSearchParams(location.search).get("command") || "";
@@ -8,7 +12,7 @@ const actionsEl = document.querySelector("#actions");
 const statusEl = document.querySelector("#status");
 
 function setStatus(text) {
-  statusEl.textContent = text || "";
+  statusEl.textContent = uiText(text || "");
 }
 
 function emptyConfig() {
@@ -323,7 +327,7 @@ function addButton(label, action, extraClass = "") {
   const button = document.createElement("button");
   button.type = "button";
   button.className = extraClass;
-  button.textContent = label;
+  button.textContent = uiText(label);
   button.addEventListener("click", () => action().catch((error) => setStatus(error.message)));
   actionsEl.append(button);
   return button;
@@ -350,7 +354,7 @@ function addImportButton(kind, label, autoOpen = false) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "primary";
-  button.textContent = label;
+  button.textContent = uiText(label);
   button.addEventListener("click", () => input.click());
   actionsEl.append(button, input);
 
@@ -369,23 +373,23 @@ function render() {
     cleanSlate: "Clean Slate"
   };
 
-  titleEl.textContent = labels[command] || "Import/export/save";
+  titleEl.textContent = uiText(labels[command] || "Import/export/save");
 
   if (command === "exportNative") addButton("Export", exportNative, "primary");
   else if (command === "exportNewPipe") {
-    descriptionEl.textContent = "Export subscriptions in NewPipe JSON format. Groups are not included.";
+    descriptionEl.textContent = uiText("Export subscriptions in NewPipe JSON format. Groups are not included.");
     addButton("Export", exportNewPipe, "primary");
   }
   else if (command === "importNative") {
-    descriptionEl.textContent = "Select the YouTube Shelf export.";
+    descriptionEl.textContent = uiText("Select the YouTube Shelf export.");
     addImportButton("native", "Choose a file", true);
   }
   else if (command === "importFreetube") {
-    descriptionEl.textContent = "Select the FreeTube export.";
+    descriptionEl.textContent = uiText("Select the FreeTube export.");
     addImportButton("freetube", "Choose a file", true);
   }
   else if (command === "cleanSlate") {
-    descriptionEl.textContent = "Delete all subscriptions and local data?";
+    descriptionEl.textContent = uiText("Delete all subscriptions and local data?");
     addButton("Clean Slate", async () => {
       await writeConfig(emptyConfig());
       setStatus("Clean Slate complete.");
@@ -399,6 +403,7 @@ function render() {
   }
 }
 
+popupI18n.localizeTree(document);
 render();
 
 

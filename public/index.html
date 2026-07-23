@@ -205,7 +205,7 @@
     </div>
     <div id="displayOptionsPrompt" class="modalOverlay" hidden>
       <div class="modal displayOptionsModal" role="dialog" aria-modal="true" aria-labelledby="displayOptionsTitle">
-        <h2 id="displayOptionsTitle">Display options</h2>
+        <h2 id="displayOptionsTitle">YouTube Display</h2>
         <label class="modalCheckbox">
           <input id="hideCommentsOption" type="checkbox" />
           <span>Hide comments</span>
@@ -221,9 +221,73 @@
       </div>
     </div>
 
+    <div id="languageOptionsPrompt" class="modalOverlay" hidden>
+      <div class="modal languageOptionsModal" role="dialog" aria-modal="true" aria-labelledby="languageOptionsTitle">
+        <h2 id="languageOptionsTitle">Language</h2>
+        <label class="modalSelectField" for="youtubeTitleLanguageOption">
+          <span>YouTube video titles</span>
+          <select id="youtubeTitleLanguageOption">
+            <option value="auto">Automatic translation</option>
+            <option value="original">Keep original language</option>
+          </select>
+        </label>
+        <p class="modalHint">Original language keeps the title published by the video creator whenever YouTube provides it.</p>
+        <label class="modalSelectField" for="interfaceLanguageOption">
+          <span>YouTube Shelf interface</span>
+          <select id="interfaceLanguageOption">
+            <option value="auto">Automatic (browser language)</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+          </select>
+        </label>
+        <button id="openTranslationEditor" class="modalButton secondary languageTranslationButton" type="button">Edit interface translations</button>
+        <div class="modalActions">
+          <button id="closeLanguageOptions" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="translationEditorPrompt" class="modalOverlay" hidden>
+      <div class="modal translationEditorModal" role="dialog" aria-modal="true" aria-labelledby="translationEditorTitle">
+        <h2 id="translationEditorTitle">Interface translation editor</h2>
+        <label class="modalSelectField" for="translationEditorLocale">
+          <span>Translation language</span>
+          <select id="translationEditorLocale">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+          </select>
+        </label>
+        <p class="modalHint">Changes are saved locally and do not modify the packaged extension files.</p>
+        <textarea id="translationEditorText" aria-label="Translation file" spellcheck="false"></textarea>
+        <p id="translationEditorStatus" class="translationEditorStatus" aria-live="polite"></p>
+        <div class="modalActions translationEditorActions">
+          <button id="resetTranslationEditor" class="modalButton secondary" type="button">Restore original</button>
+          <button id="closeTranslationEditor" class="modalButton secondary" type="button">Cancel</button>
+          <button id="saveTranslationEditor" class="modalButton primary" type="button">Save and apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="aboutPrompt" class="modalOverlay" hidden>
+      <div class="modal aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+        <h2 id="aboutTitle">About YouTube Shelf</h2>
+        <div class="aboutDetails">
+          <p><span>Current version</span><strong id="aboutVersion"></strong></p>
+          <p id="aboutLatestVersionRow"><span>Latest version</span><strong id="aboutLatestVersion">Checking…</strong></p>
+          <p><span>Created by</span><strong>nicklausFR</strong></p>
+          <p><span>License</span><strong>GPL-3.0-or-later</strong></p>
+        </div>
+        <a id="aboutDownloadLatest" class="modalButton primary aboutDownloadLink" href="https://github.com/nicklausFR/youtube-shelf/archive/refs/heads/main.zip" target="_blank" rel="noopener noreferrer" hidden>Download latest version</a>
+        <a class="modalButton secondary aboutGithubLink" href="https://github.com/nicklausFR/youtube-shelf" target="_blank" rel="noopener noreferrer">Open GitHub repository</a>
+        <div class="modalActions">
+          <button id="closeAbout" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
     <div id="youtubeDataOptionsPrompt" class="modalOverlay" hidden>
       <div class="modal youtubeDataOptionsModal" role="dialog" aria-modal="true" aria-labelledby="youtubeDataOptionsTitle">
-        <h2 id="youtubeDataOptionsTitle">YouTube options</h2>
+        <h2 id="youtubeDataOptionsTitle">YouTube Sniff</h2>
         <label class="modalCheckbox">
           <input id="sniffYoutubeOption" type="checkbox" />
           <span>Sniff YouTube metadata</span>
@@ -297,6 +361,10 @@
       <div class="modal addCategoryModal" role="dialog" aria-modal="true" aria-labelledby="addCategoryTitle">
         <h2 id="addCategoryTitle">Add category</h2>
         <form id="addCategoryForm" class="modalSearch">
+          <label id="addCategoryParentField" class="modalSelectField addCategoryParentField" for="addCategoryParent">
+            <span>Parent category</span>
+            <select id="addCategoryParent"></select>
+          </label>
           <input id="addCategoryName" type="text" placeholder="Category name" autocomplete="off">
           <button class="modalButton primary" type="submit">Add</button>
         </form>
