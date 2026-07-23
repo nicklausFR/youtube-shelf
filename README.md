@@ -2,7 +2,7 @@
 
 Browser extension for managing YouTube channels and favorite videos from the side panel.
 
-Current version: `3.3`.
+Current version: `3.3.4`.
 
 ## Main Features
 
@@ -12,7 +12,7 @@ Current version: `3.3`.
 - Translate the interface automatically into English or French, with locally editable translation catalogs.
 - Add personal comments to favorite and `Watch later` videos.
 - Organize channels into categories and browse their latest videos.
-- Sort channels and videos alphabetically, by date, views, or subscriber count.
+- Sort channels alphabetically, by latest-video date or subscriber count, and sort videos alphabetically, by publication date, view count, or date added.
 - Automatically resume YouTube videos from their last locally saved position for up to seven days.
 - Synchronize content between browsers through a WebDAV server such as Nextcloud.
 
