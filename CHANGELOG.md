@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.1 - 2026-07-23
+
+- Kept favorite subcategories visible independently from the main category overflow.
+- Localized the subcategory section title and matched its justification to category rows.
+
 ## 3.3 - 2026-07-23
 
 - Added collapsible favorite video groups with visible sequence positions and drag-and-drop reordering.

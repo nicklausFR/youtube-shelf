@@ -142,6 +142,7 @@
   "youtubeSearchSuggestions": { "message": "Suggestions de recherche YouTube" },
   "addChannelHere": { "message": "Ajouter une chaîne ici" },
   "addSubcategory": { "message": "Ajouter une sous-catégorie" },
+  "subcategories": { "message": "Sous-catégories" },
   "renameCategory": { "message": "Renommer la catégorie" },
   "deleteCategory": { "message": "Supprimer la catégorie" },
   "rename": { "message": "Renommer" },
