@@ -1332,6 +1332,90 @@ body.sidePanelVideos .favoriteButton {
   max-width: 360px;
 }
 
+.languageOptionsModal,
+.aboutModal {
+  max-width: 420px;
+}
+
+.languageTranslationButton {
+  margin: 16px 0 14px;
+  width: 100%;
+}
+
+.translationEditorModal {
+  max-width: 720px;
+}
+
+.translationEditorModal textarea {
+  background: #101010;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  min-height: min(52vh, 460px);
+  padding: 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.translationEditorModal textarea:focus {
+  border-color: #666;
+  outline: none;
+}
+
+.translationEditorStatus {
+  color: var(--muted);
+  min-height: 18px;
+  margin: 8px 0;
+}
+
+.translationEditorStatus.is-error {
+  color: var(--accent);
+}
+
+.translationEditorActions {
+  flex-wrap: wrap;
+}
+
+.aboutDetails {
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  display: grid;
+  margin: 12px 0;
+}
+
+.aboutDetails p {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0;
+  padding: 9px 10px;
+}
+
+.aboutDetails p + p {
+  border-top: 1px solid var(--soft-line);
+}
+
+.aboutDetails span {
+  color: var(--muted);
+}
+
+.aboutDownloadLink,
+.aboutGithubLink {
+  display: flex;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.aboutDownloadLink {
+  margin-bottom: 8px;
+}
+
+.aboutGithubLink {
+  margin-bottom: 14px;
+}
+
 .youtubeDataOptionsModal {
   max-width: 420px;
 }
@@ -1467,6 +1551,11 @@ body.sidePanelVideos .favoriteButton {
 
 .addCategoryModal {
   max-width: 420px;
+}
+
+.addCategoryParentField {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
 }
 
 .modalSearch {
@@ -2427,9 +2516,13 @@ body.sidePanelVideos .videos {
 }
 
 .sidePanelPath .pathRow {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   display: inline-flex;
   width: auto;
+}
+
+.sidePanelPath .pathRow.is-justified {
+  flex-grow: 1;
 }
 
 .sidePanelPath .pathSettingsRow {
@@ -2460,7 +2553,7 @@ body.sidePanelVideos .videos {
 }
 
 .sidePanelPath .pathSubcategorySection .pathRow {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
 }
 
 .sidePanelPath .pathButton {
@@ -2475,6 +2568,13 @@ body.sidePanelVideos .videos {
 .sidePanelPath .pathCategoryZoomButton {
   font-size: 15px;
   font-weight: 700;
+  line-height: 1;
+}
+
+.sidePanelPath .pathCategoryAddButton {
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 500;
   line-height: 1;
 }
 
@@ -3633,6 +3733,42 @@ body.virtualVideoListView .sidebar {
   grid-template-columns: 96px minmax(0, 1fr);
   min-height: 72px;
   padding: 6px;
+}
+
+.channels > .videos.favoriteVideos .video.is-favorite-grouped {
+  border-left-color: #a65e68;
+}
+
+.channels > .videos.favoriteVideos .video.is-favorite-group-drop-target {
+  border-color: #6fa878 !important;
+  box-shadow: 0 0 0 2px rgba(111, 168, 120, 0.35);
+}
+
+.favoriteGroupBadge {
+  background: #5b3037;
+  border: 1px solid #a65e68;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  left: 10px;
+  line-height: 1.15;
+  padding: 2px 6px;
+  pointer-events: none;
+  position: absolute;
+  top: 10px;
+  z-index: 2;
+}
+
+body.videoTitleOnlyMode .channels.videoListHost .favoriteGroupBadge {
+  left: auto;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+body.videoTitleOnlyMode .channels.videoListHost .videoTitle {
+  padding-right: 48px !important;
 }
 
 .channels > .videos.favoriteVideos .watchLaterButton {
