@@ -662,7 +662,8 @@ function appendPathItem(container, text, onClick, options = {}) {
 function expandCategoryPanelToContent() {
   if (!sidePanelPathEl) return;
   clearCategoryOverflowIndicator();
-  const nextHeight = Math.max(52, sidePanelPathEl.scrollHeight);
+  const overflowContainer = categoryOverflowContainer();
+  const nextHeight = Math.max(52, overflowContainer.scrollHeight);
   categoryPanelHeight = nextHeight;
   document.documentElement.style.setProperty("--category-panel-max-height", `${nextHeight}px`);
   localStorage.setItem(CATEGORY_PANEL_HEIGHT_KEY, String(Math.round(categoryPanelHeight)));
@@ -1011,7 +1012,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.1";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1052,7 +1053,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.1";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -2098,8 +2099,12 @@ function appendCategoryPath(container) {
 }
 
 function appendFavoriteCategoryPath(container) {
-  container.classList.toggle("has-many-categories", favoriteCategories.length > 3);
-  appendSettingsPathItem(container);
+  container.classList.remove("has-many-categories");
+  const categoryArea = document.createElement("div");
+  categoryArea.className = "pathCategoryArea";
+  categoryArea.classList.toggle("has-many-categories", favoriteCategories.length > 3);
+  container.append(categoryArea);
+  appendSettingsPathItem(categoryArea);
 
   const expandedParentId = expandedCategoryParentId(favoriteCategories, activeFavoriteCategoryId);
   const expandedParent = favoriteCategories.find((category) => category.id === expandedParentId);
@@ -2108,7 +2113,7 @@ function appendFavoriteCategoryPath(container) {
     : [];
   for (const category of sortedCategorySiblings(favoriteCategories)) {
     const children = sortedCategorySiblings(favoriteCategories, category.id);
-    appendPathItem(container, category.name, () => showFavoritesCategory(category.id), {
+    appendPathItem(categoryArea, category.name, () => showFavoritesCategory(category.id), {
       active: activeView === "favorites" && activeFavoriteCategoryId === category.id,
       ancestorActive: activeView === "favorites" && expandedParentId === category.id && activeFavoriteCategoryId !== category.id,
       kind: children.length ? "parent" : "",
@@ -2118,7 +2123,7 @@ function appendFavoriteCategoryPath(container) {
     });
   }
 
-  appendPathItem(container, uiMessage("uncategorized"), () => showFavoritesCategory(UNCATEGORIZED_CATEGORY_ID), {
+  appendPathItem(categoryArea, uiMessage("uncategorized"), () => showFavoritesCategory(UNCATEGORIZED_CATEGORY_ID), {
     active: activeView === "favorites" && activeFavoriteCategoryId === UNCATEGORIZED_CATEGORY_ID,
     dropFavoriteCategoryId: UNCATEGORIZED_CATEGORY_ID
   });
@@ -2129,7 +2134,7 @@ function appendFavoriteCategoryPath(container) {
 
     const title = document.createElement("div");
     title.className = "pathSubcategoryTitle";
-    title.textContent = `Subcategories · ${expandedParent.name}`;
+    title.textContent = uiMessage("subcategories");
     section.append(title);
 
     for (const child of expandedChildren) {
@@ -2321,10 +2326,17 @@ function changeCategoryZoom(delta) {
 
 function clearCategoryOverflowIndicator() {
   if (!sidePanelPathEl) return;
+  sidePanelPathEl.querySelectorAll(".has-overflow-indicator").forEach((container) => {
+    container.classList.remove("has-overflow-indicator");
+  });
   sidePanelPathEl.classList.remove("has-overflow-indicator");
   sidePanelPathEl.querySelector(".pathMoreRow")?.remove();
   sidePanelPathEl.querySelectorAll(".is-overflow-hidden").forEach((row) => row.classList.remove("is-overflow-hidden"));
   sidePanelPathEl.querySelectorAll(".pathRow.is-justified").forEach((row) => row.classList.remove("is-justified"));
+}
+
+function categoryOverflowContainer() {
+  return sidePanelPathEl?.querySelector(":scope > .pathCategoryArea") || sidePanelPathEl;
 }
 
 function justifyCompleteCategoryLines(container, selector) {
@@ -2346,8 +2358,9 @@ function justifyCompleteCategoryLines(container, selector) {
 function syncCategoryLineJustification() {
   if (!sidePanelPathEl) return;
   sidePanelPathEl.querySelectorAll(".pathRow.is-justified").forEach((row) => row.classList.remove("is-justified"));
+  const overflowContainer = categoryOverflowContainer();
   justifyCompleteCategoryLines(
-    sidePanelPathEl,
+    overflowContainer,
     ":scope > .pathRow:not(.pathSettingsRow):not(.pathMoreRow)"
   );
   sidePanelPathEl.querySelectorAll(":scope > .pathSubcategorySection").forEach((section) => {
@@ -2358,24 +2371,23 @@ function syncCategoryLineJustification() {
 function syncCategoryOverflowState() {
   if (!sidePanelPathEl) return;
   clearCategoryOverflowIndicator();
-  if (!sidePanelPathEl.classList.contains("has-many-categories")) {
-    sidePanelPathEl.classList.remove("is-fully-expanded");
+  const overflowContainer = categoryOverflowContainer();
+  if (!overflowContainer.classList.contains("has-many-categories")) {
+    overflowContainer.classList.remove("is-fully-expanded");
     syncCategoryLineJustification();
     return;
   }
-  const visibleHeight = sidePanelPathEl.getBoundingClientRect().height;
-  const contentHeight = sidePanelPathEl.scrollHeight;
+  const visibleHeight = overflowContainer.getBoundingClientRect().height;
+  const contentHeight = overflowContainer.scrollHeight;
   const isFullyExpanded = contentHeight <= visibleHeight + 2;
-  sidePanelPathEl.classList.toggle("is-fully-expanded", isFullyExpanded);
+  overflowContainer.classList.toggle("is-fully-expanded", isFullyExpanded);
   if (isFullyExpanded) {
     syncCategoryLineJustification();
     return;
   }
 
-  const rows = [...sidePanelPathEl.querySelectorAll(
-    ":scope > .pathRow:not(.pathMoreRow), :scope > .pathSubcategorySection"
-  )];
-  const containerTop = sidePanelPathEl.getBoundingClientRect().top;
+  const rows = [...overflowContainer.querySelectorAll(":scope > .pathRow:not(.pathMoreRow)")];
+  const containerTop = overflowContainer.getBoundingClientRect().top;
   const visibleBottom = containerTop + visibleHeight;
   let firstHiddenIndex = rows.findIndex((row) => row.getBoundingClientRect().bottom > visibleBottom + 1);
   if (firstHiddenIndex < 0) {
@@ -2384,13 +2396,13 @@ function syncCategoryOverflowState() {
   }
 
   while (firstHiddenIndex >= 0) {
-    sidePanelPathEl.querySelector(".pathMoreRow")?.remove();
+    overflowContainer.querySelector(".pathMoreRow")?.remove();
     rows.forEach((row) => row.classList.remove("is-overflow-hidden"));
 
     const hiddenCount = rows.length - firstHiddenIndex;
     const indicator = makePathMoreIndicator(hiddenCount);
-    sidePanelPathEl.insertBefore(indicator, rows[firstHiddenIndex]);
-    sidePanelPathEl.classList.add("has-overflow-indicator");
+    overflowContainer.insertBefore(indicator, rows[firstHiddenIndex]);
+    overflowContainer.classList.add("has-overflow-indicator");
     rows.slice(firstHiddenIndex).forEach((row) => row.classList.add("is-overflow-hidden"));
 
     if (indicator.getBoundingClientRect().bottom <= visibleBottom + 1 || firstHiddenIndex === 0) break;
@@ -2414,17 +2426,18 @@ function makeCategoryResizeHandle() {
   handle.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     categoryResizeStartY = event.clientY;
-    categoryResizeStartHeight = sidePanelPathEl.getBoundingClientRect().height;
+    categoryResizeStartHeight = categoryOverflowContainer().getBoundingClientRect().height;
     handle.setPointerCapture(event.pointerId);
   });
   handle.addEventListener("pointermove", (event) => {
     if (!handle.hasPointerCapture(event.pointerId)) return;
     clearCategoryOverflowIndicator();
-    const maxHeight = Math.max(90, sidePanelPathEl.scrollHeight);
+    const overflowContainer = categoryOverflowContainer();
+    const maxHeight = Math.max(90, overflowContainer.scrollHeight);
     const nextHeight = Math.max(52, Math.min(maxHeight, categoryResizeStartHeight + event.clientY - categoryResizeStartY));
     categoryPanelHeight = nextHeight;
     document.documentElement.style.setProperty("--category-panel-max-height", `${nextHeight}px`);
-    sidePanelPathEl.classList.toggle("is-fully-expanded", nextHeight >= maxHeight - 2);
+    overflowContainer.classList.toggle("is-fully-expanded", nextHeight >= maxHeight - 2);
     requestAnimationFrame(syncCategoryOverflowState);
   });
   handle.addEventListener("pointerup", (event) => {
