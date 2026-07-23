@@ -159,6 +159,7 @@ if (listLayout === "rows" || listLayout === "thumbs") listLayout = "wide";
 if (!["wide", "grid", "single"].includes(listLayout)) listLayout = "grid";
 const CHANNEL_LIST_MODE_KEY_PREFIX = "channelListMode:";
 const CHANNEL_LIST_MODE_SCOPES = ["channels", "category", "channelVideos", "newVideos", "watchLater"];
+const VIDEO_LIST_MODE_SCOPES = ["channelVideos", "newVideos", "watchLater"];
 const storedChannelListMode = localStorage.getItem("channelListMode");
 const fallbackChannelListMode = ["icons", "columns", "single"].includes(storedChannelListMode)
   ? storedChannelListMode
@@ -166,7 +167,10 @@ const fallbackChannelListMode = ["icons", "columns", "single"].includes(storedCh
 let channelListMode = fallbackChannelListMode;
 let channelListModes = Object.fromEntries(CHANNEL_LIST_MODE_SCOPES.map((scope) => {
   const value = localStorage.getItem(CHANNEL_LIST_MODE_KEY_PREFIX + scope) || fallbackChannelListMode;
-  return [scope, ["icons", "columns", "single"].includes(value) ? value : "columns"];
+  const allowedModes = VIDEO_LIST_MODE_SCOPES.includes(scope)
+    ? ["icons", "columns", "single", "titles", "compactTitles"]
+    : ["icons", "columns", "single"];
+  return [scope, allowedModes.includes(value) ? value : "columns"];
 }));
 let sidePanelCategoriesExpanded = false;
 let categoryAssignChannel = null;
@@ -183,6 +187,7 @@ let categoryResizeStartY = 0;
 let categoryResizeStartHeight = 0;
 let categoryOverflowSyncFrame = 0;
 let pendingImportKind = "";
+let draggedFavoriteCategoryId = "";
 const STORAGE_KEY = "youtubeChannelShelfConfig";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
@@ -211,6 +216,7 @@ const SPLIT_COLUMN_MIN_WIDTH = 450;
 const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
+const FAVORITE_CATEGORY_DRAG_TYPE = "application/x-youtube-shelf-favorite-category";
 const YOUTUBE_SEARCH_BATCH_SIZE = 20;
 const YOUTUBE_REGION_BY_LANGUAGE = {
   ar: "SA", de: "DE", en: "US", es: "ES", fr: "FR", hi: "IN", it: "IT",
@@ -518,7 +524,7 @@ function preventMouseFocus(element) {
   };
   element.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || event.pointerType === "keyboard") return;
-    event.preventDefault();
+    if (!element.draggable) event.preventDefault();
     clearMouseCaret();
   }, { capture: true });
   element.addEventListener("mouseup", clearMouseCaret);
@@ -550,6 +556,9 @@ function makePathButton(text, onClick, options = {}) {
   if (options.dropCategoryId) attachCategoryDropTarget(button, options.dropCategoryId);
   if (Object.prototype.hasOwnProperty.call(options, "dropFavoriteCategoryId")) {
     attachFavoriteCategoryDropTarget(button, options.dropFavoriteCategoryId);
+  }
+  if (options.reorderFavoriteCategoryId) {
+    attachFavoriteCategoryReorder(button, options.reorderFavoriteCategoryId);
   }
   return button;
 }
@@ -641,7 +650,12 @@ function makeCategoryZoomButton(direction) {
   const isZoomIn = direction > 0;
   button.className = `pathSettingsButton pathCategoryZoomButton ${isZoomIn ? "pathCategoryZoomIn" : "pathCategoryZoomOut"}`;
   button.type = "button";
-  button.dataset.label = isZoomIn ? "+" : "-";
+  const label = isZoomIn ? "Zoom in categories" : "Zoom out categories";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.innerHTML = isZoomIn
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6M10 7v6"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6"/></svg>';
   preventMouseFocus(button);
   button.addEventListener("click", () => changeCategoryZoom(isZoomIn ? CATEGORY_ZOOM_STEP : -CATEGORY_ZOOM_STEP));
   return button;
@@ -1697,15 +1711,11 @@ function appendFavoriteCategoryPath(container) {
   container.classList.toggle("has-many-categories", favoriteCategories.length > 3);
   appendSettingsPathItem(container);
 
-  appendPathItem(container, "All Favorite", () => showFavoritesCategory(""), {
-    active: activeView === "favorites" && !activeFavoriteCategoryId,
-    dropFavoriteCategoryId: "",
-    contextActions: [
-      { label: "Add category", action: openAddFavoriteCategoryDialog }
-    ]
-  });
-
   const expandedParentId = expandedCategoryParentId(favoriteCategories, activeFavoriteCategoryId);
+  const expandedParent = favoriteCategories.find((category) => category.id === expandedParentId);
+  const expandedChildren = expandedParent
+    ? sortedCategorySiblings(favoriteCategories, expandedParent.id)
+    : [];
   for (const category of sortedCategorySiblings(favoriteCategories)) {
     const children = sortedCategorySiblings(favoriteCategories, category.id);
     appendPathItem(container, category.name, () => showFavoritesCategory(category.id), {
@@ -1713,25 +1723,37 @@ function appendFavoriteCategoryPath(container) {
       ancestorActive: activeView === "favorites" && expandedParentId === category.id && activeFavoriteCategoryId !== category.id,
       kind: children.length ? "parent" : "",
       dropFavoriteCategoryId: category.id,
+      reorderFavoriteCategoryId: category.id,
       contextActions: favoriteCategoryContextActions(category)
     });
-    if (expandedParentId === category.id) {
-      for (const child of children) {
-        appendPathItem(container, child.name, () => showFavoritesCategory(child.id), {
-          level: 1,
-          kind: "subcategory",
-          active: activeView === "favorites" && activeFavoriteCategoryId === child.id,
-          dropFavoriteCategoryId: child.id,
-          contextActions: favoriteCategoryContextActions(child)
-        });
-      }
-    }
   }
 
   appendPathItem(container, "Uncategorized", () => showFavoritesCategory(UNCATEGORIZED_CATEGORY_ID), {
     active: activeView === "favorites" && activeFavoriteCategoryId === UNCATEGORIZED_CATEGORY_ID,
     dropFavoriteCategoryId: UNCATEGORIZED_CATEGORY_ID
   });
+
+  if (expandedParent && expandedChildren.length) {
+    const section = document.createElement("div");
+    section.className = "pathSubcategorySection";
+
+    const title = document.createElement("div");
+    title.className = "pathSubcategoryTitle";
+    title.textContent = `Subcategories · ${expandedParent.name}`;
+    section.append(title);
+
+    for (const child of expandedChildren) {
+      appendPathItem(section, child.name, () => showFavoritesCategory(child.id), {
+        level: 1,
+        kind: "subcategory",
+        active: activeView === "favorites" && activeFavoriteCategoryId === child.id,
+        dropFavoriteCategoryId: child.id,
+        reorderFavoriteCategoryId: child.id,
+        contextActions: favoriteCategoryContextActions(child)
+      });
+    }
+    container.append(section);
+  }
 }
 
 function attachFavoriteCategoryDropTarget(element, categoryId = "") {
@@ -1751,6 +1773,82 @@ function attachFavoriteCategoryDropTarget(element, categoryId = "") {
     event.stopPropagation();
     element.classList.remove("is-category-drop-target");
     addVideoToFavorites(video, categoryId).catch((error) => showInfoPopup(`Favorite update failed: ${error.message}`, "error"));
+  });
+}
+
+function clearFavoriteCategoryReorderTargets() {
+  document.querySelectorAll(".is-category-reorder-before, .is-category-reorder-after").forEach((element) => {
+    element.classList.remove("is-category-reorder-before", "is-category-reorder-after");
+  });
+}
+
+async function reorderFavoriteCategory(sourceId, targetId, placeAfter) {
+  if (!sourceId || sourceId === targetId) return;
+  const source = favoriteCategories.find((category) => category.id === sourceId);
+  const target = favoriteCategories.find((category) => category.id === targetId);
+  if (!source || !target || (source.parentId || "") !== (target.parentId || "")) return;
+
+  const siblingIds = sortedCategorySiblings(favoriteCategories, source.parentId || "").map((category) => category.id);
+  const sourceIndex = siblingIds.indexOf(sourceId);
+  if (sourceIndex < 0) return;
+  siblingIds.splice(sourceIndex, 1);
+  let targetIndex = siblingIds.indexOf(targetId);
+  if (targetIndex < 0) return;
+  if (placeAfter) targetIndex += 1;
+  siblingIds.splice(targetIndex, 0, sourceId);
+
+  const orderById = new Map(siblingIds.map((id, index) => [id, index]));
+  favoriteCategories = favoriteCategories.map((category) => (
+    orderById.has(category.id) ? { ...category, order: orderById.get(category.id) } : category
+  ));
+  await saveConfig();
+  renderSidePanelPath();
+}
+
+function attachFavoriteCategoryReorder(element, categoryId) {
+  element.draggable = true;
+  element.classList.add("is-category-reorderable");
+  element.title = [element.title, "Drag to reorder"].filter(Boolean).join(" · ");
+  element.addEventListener("dragstart", (event) => {
+    draggedFavoriteCategoryId = categoryId;
+    event.dataTransfer?.setData(FAVORITE_CATEGORY_DRAG_TYPE, categoryId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    element.classList.add("is-category-reordering");
+  });
+  element.addEventListener("dragover", (event) => {
+    if (!draggedFavoriteCategoryId) return;
+    const sourceId = draggedFavoriteCategoryId;
+    const source = favoriteCategories.find((category) => category.id === sourceId);
+    const target = favoriteCategories.find((category) => category.id === categoryId);
+    if (!source || !target || source.id === target.id || (source.parentId || "") !== (target.parentId || "")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    clearFavoriteCategoryReorderTargets();
+    const bounds = element.getBoundingClientRect();
+    element.classList.add(event.clientX >= bounds.left + bounds.width / 2
+      ? "is-category-reorder-after"
+      : "is-category-reorder-before");
+  });
+  element.addEventListener("dragleave", () => {
+    element.classList.remove("is-category-reorder-before", "is-category-reorder-after");
+  });
+  element.addEventListener("drop", (event) => {
+    const sourceId = draggedFavoriteCategoryId || event.dataTransfer?.getData(FAVORITE_CATEGORY_DRAG_TYPE);
+    if (!sourceId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = element.getBoundingClientRect();
+    const placeAfter = event.clientX >= bounds.left + bounds.width / 2;
+    clearFavoriteCategoryReorderTargets();
+    reorderFavoriteCategory(sourceId, categoryId, placeAfter).catch((error) => {
+      showInfoPopup(`Category reorder failed: ${error.message}`, "error");
+    });
+  });
+  element.addEventListener("dragend", () => {
+    draggedFavoriteCategoryId = "";
+    element.classList.remove("is-category-reordering");
+    clearFavoriteCategoryReorderTargets();
   });
 }
 
@@ -1841,7 +1939,9 @@ function syncCategoryOverflowState() {
   sidePanelPathEl.classList.toggle("is-fully-expanded", isFullyExpanded);
   if (isFullyExpanded) return;
 
-  const rows = [...sidePanelPathEl.querySelectorAll(":scope > .pathRow:not(.pathMoreRow)")];
+  const rows = [...sidePanelPathEl.querySelectorAll(
+    ":scope > .pathRow:not(.pathMoreRow), :scope > .pathSubcategorySection"
+  )];
   const containerTop = sidePanelPathEl.getBoundingClientRect().top;
   const visibleBottom = containerTop + visibleHeight;
   let firstHiddenIndex = rows.findIndex((row) => row.getBoundingClientRect().bottom > visibleBottom + 1);
@@ -1940,6 +2040,7 @@ async function showSidePanelChannels() {
 function currentListLayoutScope() {
   if (activeView === "newVideos") return "newVideos";
   if (activeView === "watchLater") return "watchLater";
+  if (activePrimarySection === "youtube") return "channelVideos";
   if (activeView === "favorites") return "channelVideos";
   if (activeChannel) return "channelVideos";
   if (activeView === "channels" && activeCategoryId) return "category";
@@ -1951,7 +2052,10 @@ function listModeForScope(scope = currentListLayoutScope()) {
 }
 
 function setListModeForScope(scope, mode) {
-  if (!["icons", "columns", "single"].includes(mode)) return;
+  const allowedModes = VIDEO_LIST_MODE_SCOPES.includes(scope)
+    ? ["icons", "columns", "single", "titles", "compactTitles"]
+    : ["icons", "columns", "single"];
+  if (!allowedModes.includes(mode)) return;
   channelListModes = { ...channelListModes, [scope]: mode };
   localStorage.setItem(CHANNEL_LIST_MODE_KEY_PREFIX + scope, mode);
 }
@@ -1960,6 +2064,8 @@ function applyListLayout() {
   channelListMode = listModeForScope();
   document.body.classList.toggle("channelIconMode", channelListMode === "icons");
   document.body.classList.toggle("channelListSingleColumn", channelListMode === "single");
+  document.body.classList.toggle("videoTitleOnlyMode", channelListMode === "titles");
+  document.body.classList.toggle("videoCompactTitleMode", channelListMode === "compactTitles");
   syncChannelIconModeButton();
   syncVideoLayoutButton();
   updateSplitColumnState();
@@ -1973,6 +2079,7 @@ function applyListZoom() {
   listZoom = clampListZoom(listZoom);
   channelsEl.style.setProperty("--list-zoom", String(listZoom));
   channelsEl.style.zoom = String(listZoom);
+  channelsEl.style.width = `${100 / listZoom}%`;
   localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
   const percent = Math.round(listZoom * 100);
   channelZoomOutEl?.toggleAttribute("disabled", listZoom <= LIST_ZOOM_MIN);
@@ -2001,14 +2108,16 @@ function syncChannelIconModeButton() {
   const labels = {
     icons: "Icons only",
     columns: "List with names in automatic columns",
-    single: "List in one column"
+    single: "List in one column",
+    titles: "Video titles only",
+    compactTitles: "Video titles with small thumbnails"
   };
-  const nextLabels = {
-    icons: "List with names in automatic columns",
-    columns: "List in one column",
-    single: "Icons only"
-  };
-  const label = `${scopeLabels[scope]}: ${labels[channelListMode]}. Next: ${nextLabels[channelListMode]}`;
+  const availableModes = VIDEO_LIST_MODE_SCOPES.includes(scope)
+    ? ["icons", "columns", "single", "titles", "compactTitles"]
+    : ["icons", "columns", "single"];
+  const currentIndex = Math.max(0, availableModes.indexOf(channelListMode));
+  const nextMode = availableModes[(currentIndex + 1) % availableModes.length];
+  const label = `${scopeLabels[scope]}: ${labels[channelListMode]}. Next: ${labels[nextMode]}`;
   channelIconModeEl.title = label;
   channelIconModeEl.setAttribute("aria-label", label);
   channelIconModeEl.setAttribute("aria-pressed", String(channelListMode === "icons"));
@@ -2854,7 +2963,7 @@ function setHeader(title = "", showActions = false) {
   channelActionsEl.hidden = !showActions;
   videoTitleLineEl.hidden = true;
   refreshEl.hidden = false;
-  document.title = title || "Youtube";
+  document.title = title || "YouTube";
 }
 
 function showPlayerView() {
@@ -3003,6 +3112,7 @@ function createVideoCard(video) {
         favoriteCategoryList.append(...assignedCategories.map((category) => {
           const chip = document.createElement("span");
           chip.className = "channelCategoryChip";
+          chip.classList.toggle("is-subcategory", Boolean(category.parentId));
           chip.role = "button";
           chip.tabIndex = 0;
           chip.textContent = category.name;
@@ -3311,9 +3421,77 @@ function mergeChannels(imported) {
   allChannels = [...existing.values()].sort((a, b) => a.title.localeCompare(b.title, "fr"));
 }
 
+function mergeImportedCategories(existingCategories, importedCategories) {
+  const merged = (Array.isArray(existingCategories) ? existingCategories : []).map((category) => ({ ...category }));
+  const imported = Array.isArray(importedCategories) ? importedCategories : [];
+  const idMap = new Map();
+
+  for (const category of imported) {
+    if (!category?.id || !category?.name) continue;
+    const parentId = category.parentId ? idMap.get(category.parentId) || "" : "";
+    const sameCategory = merged.find((candidate) => (
+      (candidate.parentId || "") === parentId
+      && candidate.name.toLocaleLowerCase("fr") === category.name.toLocaleLowerCase("fr")
+    ));
+    if (sameCategory) {
+      idMap.set(category.id, sameCategory.id);
+      continue;
+    }
+
+    const baseId = slugify(category.id) || slugify(category.name) || "imported-category";
+    let id = baseId;
+    let suffix = 2;
+    while (merged.some((candidate) => candidate.id === id)) {
+      id = `${baseId}-${suffix}`;
+      suffix += 1;
+    }
+    merged.push({ ...category, id, parentId });
+    idMap.set(category.id, id);
+  }
+
+  return { categories: merged, idMap };
+}
+
+function remapImportedCategoryIds(categoryIds, idMap) {
+  return [...new Set((Array.isArray(categoryIds) ? categoryIds : []).map((id) => idMap.get(id)).filter(Boolean))];
+}
+
+function mergeNativeConfig(parsed) {
+  const channelCategoriesMerge = mergeImportedCategories(allCategories, parsed.categories);
+  const favoriteCategoriesMerge = mergeImportedCategories(favoriteCategories, parsed.favoriteCategories);
+
+  allCategories = channelCategoriesMerge.categories;
+  favoriteCategories = favoriteCategoriesMerge.categories;
+
+  const importedChannels = (Array.isArray(parsed.channels) ? parsed.channels : []).map((channel) => ({
+    ...channel,
+    categories: remapImportedCategoryIds(channel.categories, channelCategoriesMerge.idMap)
+  }));
+  mergeChannels(importedChannels);
+
+  for (const [videoId, item] of Object.entries(parsed.favorites || {})) {
+    const current = favorites[videoId] || {};
+    favorites[videoId] = {
+      ...item,
+      ...current,
+      categories: [...new Set([
+        ...(current.categories || []),
+        ...remapImportedCategoryIds(item?.categories, favoriteCategoriesMerge.idMap)
+      ])]
+    };
+  }
+  seenVideos = { ...(parsed.seenVideos || {}), ...seenVideos };
+  watchLater = { ...(parsed.watchLater || {}), ...watchLater };
+}
+
 async function importNativeConfigFromText(text) {
   const parsed = JSON.parse(text);
   if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Shelf file");
+  if (parsed.importMode === "merge") {
+    mergeNativeConfig(parsed);
+    await saveConfig();
+    return;
+  }
   config = { ...emptyConfig(), ...parsed, updatedAt: new Date().toISOString() };
   allCategories = config.categories || [];
   favoriteCategories = config.favoriteCategories || [];
@@ -3357,6 +3535,7 @@ async function runImportFilePicker(kind) {
       renderSidePanelPath();
       videosEl.replaceChildren();
       setStatus("Import complete", true);
+      closeImportExportDialog();
     } catch (error) {
       setStatus(`Import failed: ${error.message}`, true);
     }
@@ -3389,8 +3568,8 @@ function openImportPickerDialog(kind) {
   pendingImportKind = kind;
   importExportPromptEl.hidden = false;
   const labels = {
-    native: "Import YouTube Shelf",
-    freetube: "Import FreeTube"
+    native: "Import/restore YouTube Shelf datas",
+    freetube: "Import from FreeTube"
   };
   for (const button of [exportNativeConfigEl, exportNewPipeConfigEl, importNativeConfigEl, importFreetubeConfigEl]) {
     button.hidden = true;
@@ -3407,8 +3586,8 @@ function openFullImportExportDialog() {
   exportNewPipeConfigEl.hidden = false;
   importNativeConfigEl.hidden = false;
   importFreetubeConfigEl.hidden = false;
-  importNativeConfigEl.textContent = "Import YouTube Shelf";
-  importFreetubeConfigEl.textContent = "Import FreeTube";
+  importNativeConfigEl.textContent = "Import/restore YouTube Shelf datas";
+  importFreetubeConfigEl.textContent = "Import from FreeTube";
 }
 function openImportExportDialog() {
   openFullImportExportDialog();
@@ -3707,6 +3886,11 @@ function channelCountForCategory(categoryId) {
 
 function sortedCategorySiblings(sourceCategories, parentId = "") {
   return sourceCategories.filter((category) => (category.parentId || "") === parentId).sort((a, b) => {
+    if (sourceCategories === favoriteCategories) {
+      const sourceOrder = Number.isFinite(a.order) ? a.order : sourceCategories.indexOf(a);
+      const targetOrder = Number.isFinite(b.order) ? b.order : sourceCategories.indexOf(b);
+      return sourceOrder - targetOrder;
+    }
     const countDelta = sourceCategories === allCategories ? channelCountForCategory(b.id) - channelCountForCategory(a.id) : 0;
     if (countDelta) return countDelta;
     return (a.name || "").localeCompare(b.name || "", "fr");
@@ -4789,7 +4973,9 @@ function syncChannelCategoryLineHeights() {
       const categoryList = button.querySelector(".channelCategoryList");
       const chips = categoryList ? [...categoryList.children] : [];
       const rowCount = chips.length ? new Set(chips.map((chip) => chip.offsetTop)).size : 0;
-      const extraHeight = Math.max(0, rowCount - 1) * 22;
+      const categoryHeight = chips.length ? categoryList.scrollHeight : 0;
+      const extraHeight = categoryHeight ? categoryHeight + 4 : 0;
+      button.classList.toggle("has-category-lines", categoryHeight > 0);
       button.classList.toggle("has-multiple-category-lines", rowCount > 1);
       button.style.setProperty("--category-extra-height", `${extraHeight}px`);
     }
@@ -5136,6 +5322,29 @@ function appendYoutubeSearchBatch() {
   return batch.length;
 }
 
+function renderYoutubeSearchLoading(query) {
+  const indicator = document.createElement("div");
+  indicator.className = "youtubeResultsSearching";
+  indicator.role = "status";
+  indicator.setAttribute("aria-live", "polite");
+
+  const icon = document.createElement("span");
+  icon.className = "youtubeResultsSearchingIcon";
+  icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5"/></svg>';
+
+  const label = document.createElement("span");
+  label.textContent = `Searching YouTube for “${query}”…`;
+  indicator.append(icon, label);
+  channelsEl.replaceChildren(indicator);
+}
+
+function renderYoutubeSearchError(message) {
+  const error = document.createElement("p");
+  error.className = "meta channelSearchEmpty";
+  error.textContent = message;
+  channelsEl.replaceChildren(error);
+}
+
 function renderYoutubeSearchResults() {
   youtubeSearchLoadObserver?.disconnect();
   youtubeSearchLoadObserver = null;
@@ -5225,7 +5434,7 @@ async function searchYoutube(query, options = {}) {
   currentVideos = [];
   videosEl.replaceChildren();
   channelsEl.classList.add("videoListHost");
-  channelsEl.replaceChildren();
+  renderYoutubeSearchLoading(trimmed);
   setStatus("Searching YouTube…", true);
 
   if (!options.skipHistory) pushHistory({ type: "search", id: trimmed });
@@ -5265,7 +5474,9 @@ async function searchYoutube(query, options = {}) {
   } catch (error) {
     if (youtubeSearchInitialQuery === trimmed) youtubeSearchInitialPromise = null;
     if (activeView !== "search" || activeSearchQuery !== trimmed) return;
-    setStatus(`YouTube search failed: ${error.message}`, true);
+    const message = `YouTube search failed: ${error.message}`;
+    renderYoutubeSearchError(message);
+    setStatus(message, true);
   }
 }
 
@@ -5718,7 +5929,11 @@ channelVideoSourceOptionEl?.addEventListener("change", () => {
 channelIconModeEl?.addEventListener("click", () => {
   const scope = currentListLayoutScope();
   const currentMode = listModeForScope(scope);
-  const nextMode = currentMode === "icons" ? "columns" : currentMode === "columns" ? "single" : "icons";
+  const availableModes = VIDEO_LIST_MODE_SCOPES.includes(scope)
+    ? ["icons", "columns", "single", "titles", "compactTitles"]
+    : ["icons", "columns", "single"];
+  const currentIndex = Math.max(0, availableModes.indexOf(currentMode));
+  const nextMode = availableModes[(currentIndex + 1) % availableModes.length];
   setListModeForScope(scope, nextMode);
   applyListLayout();
 });
