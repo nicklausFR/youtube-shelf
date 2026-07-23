@@ -2079,7 +2079,7 @@ function applyListZoom() {
   listZoom = clampListZoom(listZoom);
   channelsEl.style.setProperty("--list-zoom", String(listZoom));
   channelsEl.style.zoom = String(listZoom);
-  channelsEl.style.width = `${100 / listZoom}%`;
+  channelsEl.style.width = "100%";
   localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
   const percent = Math.round(listZoom * 100);
   channelZoomOutEl?.toggleAttribute("disabled", listZoom <= LIST_ZOOM_MIN);
@@ -4541,6 +4541,34 @@ async function completeDroppedVideoMetadata(video) {
   if (hasTitle && video.channel && video.channelId) return video;
   let completed = { ...video };
   try {
+    const watchUrl = new URL("https://www.youtube.com/watch");
+    watchUrl.searchParams.set("v", video.id);
+    watchUrl.searchParams.set("hl", "en");
+    const response = await fetch(watchUrl, {
+      cache: "no-store",
+      credentials: "omit"
+    });
+    if (response.ok) {
+      const html = await response.text();
+      const videoDetailsJson = extractJsonObjectAfter(html, "\"videoDetails\":");
+      const videoDetails = videoDetailsJson ? JSON.parse(videoDetailsJson) : null;
+      if (videoDetails?.videoId === video.id) {
+        completed = {
+          ...completed,
+          title: hasTitle ? completed.title : String(videoDetails.title || completed.title || video.id).trim(),
+          channelId: completed.channelId || String(videoDetails.channelId || "").trim(),
+          channel: completed.channel || String(videoDetails.author || "").trim(),
+          description: completed.description || String(videoDetails.shortDescription || "").trim(),
+          tags: completed.tags?.length ? completed.tags : videoDetails.keywords || [],
+          views: completed.views || String(videoDetails.viewCount || "").trim()
+        };
+      }
+    }
+  } catch {
+    // Fall back to oEmbed and YouTube search metadata below.
+  }
+  if (completed.title && completed.title !== completed.id && completed.channel && completed.channelId) return completed;
+  try {
     const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`;
     const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`, {
       cache: "force-cache",
@@ -4560,6 +4588,26 @@ async function completeDroppedVideoMetadata(video) {
     }
   } catch {
     // Fall back to YouTube search metadata below.
+  }
+  if (!hasTitle && completed.channelId) {
+    try {
+      const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(completed.channelId)}`, {
+        cache: "no-store"
+      });
+      if (response.ok) {
+        const feedVideo = parseFeed(await response.text()).find((item) => item.id === video.id);
+        if (feedVideo?.title) {
+          completed = {
+            ...completed,
+            title: feedVideo.title,
+            description: completed.description || feedVideo.description || "",
+            tags: completed.tags?.length ? completed.tags : feedVideo.tags || []
+          };
+        }
+      }
+    } catch {
+      // Keep the title carried by the drop or returned by oEmbed.
+    }
   }
   if (completed.title && completed.title !== completed.id && completed.channel && completed.channelId) return completed;
   try {
@@ -4715,7 +4763,24 @@ function droppedVideoFromDataTransfer(dataTransfer) {
   }
   const value = dataTransfer?.getData("text/uri-list") || dataTransfer?.getData("text/plain") || "";
   const id = videoIdFromInput(value.split(/\r?\n/).find((line) => line && !line.startsWith("#")) || value);
-  return id ? { id, title: id } : null;
+  if (!id) return null;
+
+  let title = "";
+  const html = dataTransfer?.getData("text/html") || "";
+  if (html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const matchingLink = [...doc.querySelectorAll("a[href]")].find((link) => videoIdFromInput(link.href) === id);
+    const titleCandidates = [
+      matchingLink?.getAttribute("title"),
+      matchingLink?.getAttribute("aria-label"),
+      matchingLink?.querySelector("img[alt]")?.getAttribute("alt"),
+      matchingLink?.textContent
+    ];
+    title = titleCandidates
+      .map((candidate) => String(candidate || "").replace(/\s+/g, " ").trim())
+      .find((candidate) => candidate && candidate !== id && !videoIdFromInput(candidate)) || "";
+  }
+  return { id, title: title || id };
 }
 
 function renderFavoritesHome() {
@@ -5962,6 +6027,7 @@ openAppSessionEl.addEventListener("click", () => {
 for (const tab of primaryTabEls) {
   tab.addEventListener("click", async () => {
     const section = tab.dataset.section;
+    const isReselectedSection = activePrimarySection === section;
     hideGlobalSearchSuggestions();
 
     if (section === "youtube") {
@@ -5984,7 +6050,6 @@ for (const tab of primaryTabEls) {
       clearChannelSearch();
       setActivePrimarySection("watchLater");
       activeView = "watchLater";
-      activeCategoryId = "";
       pushHistory({ type: "watchLater", id: "watchLater" });
       renderCategories();
       renderChannels([]);
@@ -5998,18 +6063,30 @@ for (const tab of primaryTabEls) {
       await maybePromptSeenForWatchLater();
       clearChannelSearch();
       setActivePrimarySection("favorites");
-      activeFavoriteCategoryId = "";
-      pushHistory({ type: "favorites", id: "" });
+      if (isReselectedSection) activeFavoriteCategoryId = "";
+      pushHistory({ type: "favorites", id: activeFavoriteCategoryId });
       renderFavoritesHome();
       searchInputEl.value = "";
       searchInputEl.focus();
       return;
     }
 
-    await showRootChannels();
+    if (isReselectedSection || !activeCategoryId) {
+      await showRootChannels();
+    } else if (activeCategoryId === NEW_VIDEOS_CATEGORY_ID) {
+      showNewVideos();
+    } else {
+      await showCategoryChannels(activeCategoryId);
+    }
     searchInputEl.value = "";
     searchInputEl.focus();
   });
+}
+
+function clearVideoDropIndicators() {
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
+  document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
+  document.querySelectorAll(".is-favorite-drop-target").forEach((item) => item.classList.remove("is-favorite-drop-target"));
 }
 
 const watchLaterTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "watchLater");
@@ -6029,8 +6106,7 @@ watchLaterTabEl?.addEventListener("drop", async (event) => {
   if (!video) return;
   event.preventDefault();
   event.stopPropagation();
-  document.body.classList.remove("isChannelDropTarget");
-  watchLaterTabEl.classList.remove("is-watch-later-drop-target");
+  clearVideoDropIndicators();
   await addVideoToWatchLater(video);
 });
 
@@ -6049,8 +6125,7 @@ favoritesTabEl?.addEventListener("drop", async (event) => {
   if (!video) return;
   event.preventDefault();
   event.stopPropagation();
-  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget");
-  favoritesTabEl.classList.remove("is-favorite-drop-target");
+  clearVideoDropIndicators();
   await addVideoToFavorites(video);
 });
 
@@ -6150,19 +6225,15 @@ document.addEventListener("dragover", (event) => {
 
 document.addEventListener("dragleave", (event) => {
   if (event.relatedTarget) return;
-  document.body.classList.remove("isChannelDropTarget");
-  document.body.classList.remove("isWatchLaterDropTarget");
-  document.body.classList.remove("isFavoriteDropTarget");
-  document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
-  document.querySelectorAll(".is-favorite-drop-target").forEach((item) => item.classList.remove("is-favorite-drop-target"));
+  clearVideoDropIndicators();
 });
 
 document.addEventListener("drop", async (event) => {
+  clearVideoDropIndicators();
   if (activePrimarySection === "favorites") {
     const video = droppedVideoFromDataTransfer(event.dataTransfer);
     if (!video) return;
     event.preventDefault();
-    document.body.classList.remove("isFavoriteDropTarget");
     await addVideoToFavorites(video, activeFavoriteCategoryId);
     return;
   }
@@ -6170,7 +6241,6 @@ document.addEventListener("drop", async (event) => {
     const video = droppedVideoFromDataTransfer(event.dataTransfer);
     if (!video) return;
     event.preventDefault();
-    document.body.classList.remove("isWatchLaterDropTarget");
     await addVideoToWatchLater(video);
     return;
   }
@@ -6180,9 +6250,10 @@ document.addEventListener("drop", async (event) => {
   const data = event.dataTransfer?.getData("text/uri-list") || event.dataTransfer?.getData("text/plain") || "";
   if (!data) return;
   event.preventDefault();
-  document.body.classList.remove("isChannelDropTarget");
   await addDroppedChannel(data);
 });
+
+document.addEventListener("dragend", clearVideoDropIndicators);
 
 sidePanelBackEl?.addEventListener("click", showSidePanelChannels);
 
