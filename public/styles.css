@@ -1847,6 +1847,40 @@ body.sidePanelVideos .favoriteButton {
   user-select: none;
 }
 
+.sidePanelPath .pathCategoryArea {
+  align-items: start;
+  display: flex;
+  flex: 1 0 100%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-start;
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+
+.sidePanelPath .pathCategoryArea.has-many-categories {
+  max-height: var(--category-panel-max-height, 90px);
+  overflow: hidden;
+}
+
+.sidePanelPath .pathCategoryArea.has-many-categories::after {
+  background: linear-gradient(to bottom, rgba(17, 17, 17, 0), #111 82%);
+  bottom: 0;
+  content: "";
+  height: 28px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.sidePanelPath .pathCategoryArea.has-many-categories.is-fully-expanded::after {
+  content: none;
+  display: none;
+}
+
 .pathRow {
   align-items: center;
   display: grid;
@@ -2554,6 +2588,10 @@ body.sidePanelVideos .videos {
 
 .sidePanelPath .pathSubcategorySection .pathRow {
   flex: 0 1 auto;
+}
+
+.sidePanelPath .pathSubcategorySection .pathRow.is-justified {
+  flex-grow: 1;
 }
 
 .sidePanelPath .pathButton {
