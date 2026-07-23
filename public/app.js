@@ -2541,6 +2541,7 @@ function setListModeForScope(scope, mode) {
 function applyListLayout() {
   channelListMode = listModeForScope();
   document.body.classList.toggle("channelIconMode", channelListMode === "icons");
+  document.body.classList.toggle("channelListColumns", channelListMode === "columns");
   document.body.classList.toggle("channelListSingleColumn", channelListMode === "single");
   document.body.classList.toggle("videoTitleOnlyMode", channelListMode === "titles");
   document.body.classList.toggle("videoCompactTitleMode", channelListMode === "compactTitles");
@@ -2585,7 +2586,7 @@ function syncChannelIconModeButton() {
   channelIconModeEl.disabled = false;
   const labels = {
     icons: "Icons only",
-    columns: "List with names in automatic columns",
+    columns: "List with names in adaptive columns",
     single: "List in one column",
     titles: "Video titles only",
     compactTitles: "Video titles with small thumbnails"
