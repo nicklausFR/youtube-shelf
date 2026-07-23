@@ -130,6 +130,7 @@
   "sortOldestLatestVideoFirst": { "message": "Oldest latest video first" },
   "sortNewestFirst": { "message": "Newest first" },
   "sortOldestFirst": { "message": "Oldest first" },
+  "sortDateAdded": { "message": "Date added" },
   "sortMostViewed": { "message": "Most viewed" },
   "sortLeastViewed": { "message": "Least viewed" },
   "sortMostSubscribers": { "message": "Most subscribers" },

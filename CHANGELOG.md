@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.4 - 2026-07-23
+
+- Added YouTube-native Popular and Latest ordering with continuation pagination for channel videos.
+- Added date-added sorting to Favorites and Watch later.
+- Displayed channel videos before loading optional metadata and avoided redundant metadata requests.
+
 ## 3.3.3 - 2026-07-23
 
 - Localized sorting options and highlighted the active sort without check marks.
