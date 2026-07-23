@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.3 - 2026-07-23
+
+- Localized sorting options and highlighted the active sort without check marks.
+- Reworked category assignment as a compact, collapsible tree with aligned controls.
+
 ## 3.3.2 - 2026-07-23
 
 - Made YouTube the default tab and moved the weekly subscribed-channel video list there.

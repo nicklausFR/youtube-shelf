@@ -2092,18 +2092,73 @@ body.sidePanelVideos .favoriteButton {
   padding: 0 10px;
 }
 
-.categoryAssignItem.is-subcategory {
-  background: rgba(113, 70, 78, 0.12);
-  border-left: 3px solid #a65e68;
-  margin-left: 22px;
-  position: relative;
+.categoryAssignTreeItem {
+  cursor: default;
+  gap: 0;
+  grid-template-columns: 22px minmax(0, 1fr);
+  min-height: 36px;
+  padding: 0 8px;
 }
 
-.categoryAssignItem.is-subcategory::before {
-  color: #cf7a84;
-  content: "\2514";
-  left: -18px;
-  position: absolute;
+.categoryAssignGroup {
+  display: grid;
+  gap: 4px;
+}
+
+.categoryAssignToggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  width: 22px;
+}
+
+.categoryAssignToggle::before {
+  content: "\25B8";
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.categoryAssignToggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+.categoryAssignToggle:hover,
+.categoryAssignGroup.is-expanded .categoryAssignToggle {
+  color: var(--text);
+}
+
+.categoryAssignDisclosureSpacer {
+  display: block;
+  height: 22px;
+  width: 22px;
+}
+
+.categoryAssignChoice {
+  align-items: center;
+  align-self: stretch;
+  cursor: pointer;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.categoryAssignChildren {
+  border-left: 1px solid #363636;
+  display: grid;
+  gap: 4px;
+  margin-left: 11px;
+  padding-left: 11px;
+}
+
+.categoryAssignTreeItem.is-subcategory {
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .categoryAssignItem:hover {
@@ -2167,6 +2222,16 @@ body.sidePanelVideos .favoriteButton {
 
 .contextMenu button.is-danger {
   color: #ff736d;
+}
+
+.contextMenu button.is-active {
+  background: #321d1b;
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--text);
+}
+
+.contextMenu button.is-active:hover {
+  background: #432320;
 }
 
 body.isChannelDropTarget::after {

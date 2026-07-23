@@ -206,6 +206,7 @@ let channelListModes = Object.fromEntries(CHANNEL_LIST_MODE_SCOPES.map((scope) =
 let sidePanelCategoriesExpanded = false;
 let categoryAssignChannel = null;
 let categoryAssignFavoriteVideoId = "";
+const expandedCategoryAssignmentIds = new Set();
 let channelAssignCategory = null;
 let categoryBeingRenamed = null;
 let categoryDialogScope = "channels";
@@ -338,17 +339,17 @@ function currentSortScope() {
 
 function sortModeLabel(mode, scope = currentSortScope()) {
   const labels = {
-    default: scope === "youtube" ? "Relevance" : "Default order",
-    "title-asc": "Title A–Z",
-    "title-desc": "Title Z–A",
-    "date-desc": scope === "channels" ? "Latest video first" : "Newest first",
-    "date-asc": scope === "channels" ? "Oldest latest video first" : "Oldest first",
-    "views-desc": "Most viewed",
-    "views-asc": "Least viewed",
-    "subscribers-desc": "Most subscribers",
-    "subscribers-asc": "Least subscribers"
+    default: scope === "youtube" ? "sortRelevance" : "sortDefaultOrder",
+    "title-asc": "sortTitleAscending",
+    "title-desc": "sortTitleDescending",
+    "date-desc": scope === "channels" ? "sortLatestVideoFirst" : "sortNewestFirst",
+    "date-asc": scope === "channels" ? "sortOldestLatestVideoFirst" : "sortOldestFirst",
+    "views-desc": "sortMostViewed",
+    "views-asc": "sortLeastViewed",
+    "subscribers-desc": "sortMostSubscribers",
+    "subscribers-asc": "sortLeastSubscribers"
   };
-  return labels[mode] || labels.default;
+  return uiMessage(labels[mode] || labels.default);
 }
 
 function sortOptionsForCurrentScope() {
@@ -358,7 +359,7 @@ function sortOptionsForCurrentScope() {
     : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
   return modes.map((mode) => ({
     label: sortModeLabel(mode, scope),
-    checked: sortModes[scope] === mode,
+    highlighted: sortModes[scope] === mode,
     action: () => setSortMode(scope, mode)
   }));
 }
@@ -367,7 +368,7 @@ function syncSortButton() {
   if (!sortResultsEl) return;
   const scope = currentSortScope();
   const mode = sortModes[scope] || "default";
-  const label = `Sort: ${sortModeLabel(mode, scope)}`;
+  const label = uiMessage("sortBy", [sortModeLabel(mode, scope)]);
   sortResultsEl.title = label;
   sortResultsEl.setAttribute("aria-label", label);
   sortResultsEl.classList.toggle("is-active", mode !== "default");
@@ -1024,7 +1025,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.2";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.3";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1065,7 +1066,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.2";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.3";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -1913,6 +1914,7 @@ function contextMenuButtons(actions) {
     button.type = "button";
     button.textContent = item.checked ? "[x] " + uiText(item.label) : uiText(item.label);
     if (item.danger) button.classList.add("is-danger");
+    if (item.highlighted) button.classList.add("is-active");
     button.addEventListener("click", async (clickEvent) => {
       clickEvent.preventDefault();
       clickEvent.stopPropagation();
@@ -4239,24 +4241,75 @@ function renderCategoryAssignmentList() {
   const favoriteItem = categoryAssignFavoriteVideoId ? favorites[categoryAssignFavoriteVideoId] : null;
   const sourceCategories = favoriteItem ? favoriteCategories : allCategories;
   const selectedCategoryIds = favoriteItem?.categories || categoryAssignChannel?.categories || [];
-  categoryAssignListEl.replaceChildren(
-    ...sortedCategoryTree(sourceCategories).map((category) => {
-      const label = document.createElement("label");
-      label.className = "categoryAssignItem";
-      label.classList.toggle("is-subcategory", Boolean(category.parentId));
+  const makeItem = (category, disclosure = null) => {
+    const row = document.createElement("div");
+    row.className = "categoryAssignItem categoryAssignTreeItem";
+    row.classList.toggle("is-subcategory", Boolean(category.parentId));
+    row.classList.toggle("has-children", Boolean(disclosure));
 
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.value = category.id;
-      checkbox.checked = selectedCategoryIds.includes(category.id);
+    if (disclosure) {
+      row.append(disclosure);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "categoryAssignDisclosureSpacer";
+      spacer.setAttribute("aria-hidden", "true");
+      row.append(spacer);
+    }
 
-      const name = document.createElement("span");
-      name.textContent = category.name;
+    const label = document.createElement("label");
+    label.className = "categoryAssignChoice";
 
-      label.append(checkbox, name);
-      return label;
-    })
-  );
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = category.id;
+    checkbox.checked = selectedCategoryIds.includes(category.id);
+
+    const name = document.createElement("span");
+    name.textContent = category.name;
+    label.append(checkbox, name);
+    row.append(label);
+    return row;
+  };
+
+  const groups = sortedCategorySiblings(sourceCategories).map((category) => {
+    const children = sortedCategorySiblings(sourceCategories, category.id);
+    if (!children.length) return makeItem(category);
+
+    const expanded = expandedCategoryAssignmentIds.has(category.id);
+    const group = document.createElement("div");
+    group.className = "categoryAssignGroup";
+    group.classList.toggle("is-expanded", expanded);
+
+    const toggle = document.createElement("button");
+    toggle.className = "categoryAssignToggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(expanded));
+
+    const childrenContainer = document.createElement("div");
+    childrenContainer.className = "categoryAssignChildren";
+    childrenContainer.hidden = !expanded;
+    const childItems = children.map((child) => makeItem(child));
+    childrenContainer.append(...childItems);
+
+    const syncToggle = () => {
+      const isExpanded = !childrenContainer.hidden;
+      toggle.title = uiMessage(isExpanded ? "collapseSubcategories" : "expandSubcategories");
+      toggle.setAttribute("aria-label", toggle.title);
+      toggle.setAttribute("aria-expanded", String(isExpanded));
+      group.classList.toggle("is-expanded", isExpanded);
+    };
+    toggle.addEventListener("click", () => {
+      childrenContainer.hidden = !childrenContainer.hidden;
+      if (childrenContainer.hidden) expandedCategoryAssignmentIds.delete(category.id);
+      else expandedCategoryAssignmentIds.add(category.id);
+      syncToggle();
+    });
+    syncToggle();
+    group.append(makeItem(category, toggle), childrenContainer);
+    return group;
+  });
+
+  categoryAssignListEl.replaceChildren(...groups);
 }
 
 function renderChannelAssignmentList() {
@@ -4316,6 +4369,7 @@ function openCategoryAssignment(channel = activeChannel) {
   categoryAssignChannel = channel;
   const title = categoryAssignPromptEl.querySelector("#categoryAssignTitle");
   if (title) title.textContent = "Channel categories";
+  expandedCategoryAssignmentIds.clear();
   newCategoryNameEl.value = "";
   renderCategoryAssignmentList();
   categoryAssignPromptEl.hidden = false;
@@ -4328,6 +4382,7 @@ function openFavoriteCategoryAssignment(video) {
   categoryAssignFavoriteVideoId = video.id;
   const title = categoryAssignPromptEl.querySelector("#categoryAssignTitle");
   if (title) title.textContent = "Favorite categories";
+  expandedCategoryAssignmentIds.clear();
   newCategoryNameEl.value = "";
   renderCategoryAssignmentList();
   categoryAssignPromptEl.hidden = false;
@@ -4338,6 +4393,7 @@ function closeCategoryAssignment() {
   categoryAssignPromptEl.hidden = true;
   categoryAssignChannel = null;
   categoryAssignFavoriteVideoId = "";
+  expandedCategoryAssignmentIds.clear();
   newCategoryNameEl.value = "";
 }
 
