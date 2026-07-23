@@ -197,6 +197,80 @@ function mergeChannels(config, imported) {
   return config;
 }
 
+function categoryIdBase(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "imported-category";
+}
+
+function mergeImportedCategories(existingCategories, importedCategories) {
+  const merged = (Array.isArray(existingCategories) ? existingCategories : []).map((category) => ({ ...category }));
+  const idMap = new Map();
+
+  for (const category of Array.isArray(importedCategories) ? importedCategories : []) {
+    if (!category?.id || !category?.name) continue;
+    const parentId = category.parentId ? idMap.get(category.parentId) || "" : "";
+    const sameCategory = merged.find((candidate) => (
+      (candidate.parentId || "") === parentId
+      && candidate.name.toLocaleLowerCase("fr") === category.name.toLocaleLowerCase("fr")
+    ));
+    if (sameCategory) {
+      idMap.set(category.id, sameCategory.id);
+      continue;
+    }
+
+    const baseId = categoryIdBase(category.id || category.name);
+    let id = baseId;
+    let suffix = 2;
+    while (merged.some((candidate) => candidate.id === id)) {
+      id = `${baseId}-${suffix}`;
+      suffix += 1;
+    }
+    merged.push({ ...category, id, parentId });
+    idMap.set(category.id, id);
+  }
+
+  return { categories: merged, idMap };
+}
+
+function remapImportedCategoryIds(categoryIds, idMap) {
+  return [...new Set((Array.isArray(categoryIds) ? categoryIds : []).map((id) => idMap.get(id)).filter(Boolean))];
+}
+
+function mergeNativeConfig(config, imported) {
+  const channelCategoriesMerge = mergeImportedCategories(config.categories, imported.categories);
+  const favoriteCategoriesMerge = mergeImportedCategories(config.favoriteCategories, imported.favoriteCategories);
+  config.categories = channelCategoriesMerge.categories;
+  config.favoriteCategories = favoriteCategoriesMerge.categories;
+
+  mergeChannels(config, (imported.channels || []).map((channel) => ({
+    ...channel,
+    categories: remapImportedCategoryIds(channel.categories, channelCategoriesMerge.idMap)
+  })));
+
+  const existingFavorites = config.favorites || {};
+  for (const [videoId, item] of Object.entries(imported.favorites || {})) {
+    const current = existingFavorites[videoId] || {};
+    existingFavorites[videoId] = {
+      ...item,
+      ...current,
+      categories: [...new Set([
+        ...(current.categories || []),
+        ...remapImportedCategoryIds(item?.categories, favoriteCategoriesMerge.idMap)
+      ])]
+    };
+  }
+  config.favorites = existingFavorites;
+  config.seenVideos = { ...(imported.seenVideos || {}), ...(config.seenVideos || {}) };
+  config.watchLater = { ...(imported.watchLater || {}), ...(config.watchLater || {}) };
+  config.updatedAt = new Date().toISOString();
+  return config;
+}
+
 async function exportNative() {
   const config = await readConfig();
   downloadText(`youtube-shelf-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(config, null, 2));
@@ -216,9 +290,14 @@ async function importFile(kind, file) {
   if (kind === "native") {
     const parsed = JSON.parse(text);
     if (!Array.isArray(parsed.channels)) throw new Error("Invalid YouTube Shelf file");
-    const nextConfig = { ...emptyConfig(), ...parsed, updatedAt: new Date().toISOString() };
+    const currentConfig = await readConfig();
+    const nextConfig = parsed.importMode === "merge"
+      ? mergeNativeConfig(currentConfig, parsed)
+      : { ...emptyConfig(), ...parsed, updatedAt: new Date().toISOString() };
     await writeConfig(nextConfig);
-    return nextConfig.channels.length;
+    return parsed.importMode === "merge"
+      ? Object.keys(parsed.favorites || {}).length + (parsed.channels || []).length
+      : nextConfig.channels.length;
   }
 
   let imported = [];
@@ -283,14 +362,14 @@ function addImportButton(kind, label, autoOpen = false) {
 
 function render() {
   const labels = {
-    exportNative: "Export YouTube Shelf",
+    exportNative: "Export/Save YouTube Shelf datas",
     exportNewPipe: "Export for NewPipe",
-    importNative: "Import YouTube Shelf",
-    importFreetube: "Import FreeTube",
+    importNative: "Import/restore YouTube Shelf datas",
+    importFreetube: "Import from FreeTube",
     cleanSlate: "Clean Slate"
   };
 
-  titleEl.textContent = labels[command] || "Import / Export";
+  titleEl.textContent = labels[command] || "Import/export/save";
 
   if (command === "exportNative") addButton("Export", exportNative, "primary");
   else if (command === "exportNewPipe") {
@@ -313,10 +392,10 @@ function render() {
       window.setTimeout(() => window.close(), 1200);
     }, "primary danger");
   } else {
-    addButton("Export YouTube Shelf", exportNative);
+    addButton("Export/Save YouTube Shelf datas", exportNative);
     addButton("Export for NewPipe", exportNewPipe);
-    addImportButton("native", "Import YouTube Shelf");
-    addImportButton("freetube", "Import FreeTube");
+    addImportButton("native", "Import/restore YouTube Shelf datas");
+    addImportButton("freetube", "Import from FreeTube");
   }
 }
 
