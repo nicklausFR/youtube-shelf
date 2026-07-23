@@ -245,6 +245,7 @@ const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
 const FAVORITE_CATEGORY_DRAG_TYPE = "application/x-youtube-shelf-favorite-category";
 const FAVORITE_VIDEO_GROUP_DRAG_TYPE = "application/x-youtube-shelf-favorite-video";
+const FAVORITE_VIDEO_CATEGORY_DRAG_TYPE = "application/x-youtube-shelf-favorite-videos";
 const YOUTUBE_SEARCH_BATCH_SIZE = 20;
 const YOUTUBE_REGION_BY_LANGUAGE = {
   ar: "SA", de: "DE", en: "US", es: "ES", fr: "FR", hi: "IN", it: "IT",
@@ -253,6 +254,8 @@ const YOUTUBE_REGION_BY_LANGUAGE = {
 };
 const youtubeOriginalTitleCache = new Map();
 const youtubeAutomaticTitleCache = new Map();
+const expandedFavoriteVideoGroups = new Set();
+const selectedFavoriteVideoIds = new Set();
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
 let youtubeTitleLanguage = ["auto", "original"].includes(localStorage.getItem(YOUTUBE_TITLE_LANGUAGE_KEY))
   ? localStorage.getItem(YOUTUBE_TITLE_LANGUAGE_KEY)
@@ -1008,7 +1011,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.2";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1049,7 +1052,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.2";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -1742,6 +1745,7 @@ function favoriteVideoGroupIds(groupId) {
 function normalizeFavoriteVideoGroup(groupId) {
   const videoIds = favoriteVideoGroupIds(groupId);
   if (videoIds.length < 2) {
+    expandedFavoriteVideoGroups.delete(groupId);
     for (const videoId of videoIds) {
       const { videoGroupId: _groupId, videoGroupOrder: _groupOrder, ...item } = favorites[videoId];
       favorites[videoId] = item;
@@ -1757,7 +1761,7 @@ function normalizeFavoriteVideoGroup(groupId) {
   });
 }
 
-async function groupFavoriteVideos(sourceVideoId, targetVideoId) {
+async function groupFavoriteVideos(sourceVideoId, targetVideoId, placement = "after") {
   if (!sourceVideoId || !targetVideoId || sourceVideoId === targetVideoId) return;
   const source = favorites[sourceVideoId];
   const target = favorites[targetVideoId];
@@ -1765,19 +1769,20 @@ async function groupFavoriteVideos(sourceVideoId, targetVideoId) {
 
   const sourceGroupId = source.videoGroupId || "";
   const targetGroupId = target.videoGroupId || "";
+  const reorderingSameGroup = Boolean(sourceGroupId && sourceGroupId === targetGroupId);
   let groupId = targetGroupId || sourceGroupId || `favorite-video-group-${crypto.randomUUID?.() || Date.now().toString(36)}`;
   let orderedIds;
 
-  if (sourceGroupId && sourceGroupId === targetGroupId) {
+  if (reorderingSameGroup) {
     orderedIds = favoriteVideoGroupIds(groupId).filter((videoId) => videoId !== sourceVideoId);
     const targetIndex = orderedIds.indexOf(targetVideoId);
-    orderedIds.splice(targetIndex + 1, 0, sourceVideoId);
+    orderedIds.splice(targetIndex + (placement === "before" ? 0 : 1), 0, sourceVideoId);
   } else {
     const targetIds = targetGroupId ? favoriteVideoGroupIds(targetGroupId) : [targetVideoId];
     const sourceIds = sourceGroupId ? favoriteVideoGroupIds(sourceGroupId) : [sourceVideoId];
     orderedIds = targetIds.filter((videoId) => !sourceIds.includes(videoId));
     const targetIndex = orderedIds.indexOf(targetVideoId);
-    orderedIds.splice(targetIndex + 1, 0, ...sourceIds);
+    orderedIds.splice(targetIndex + (placement === "before" ? 0 : 1), 0, ...sourceIds);
   }
 
   orderedIds.forEach((videoId, index) => {
@@ -1790,6 +1795,8 @@ async function groupFavoriteVideos(sourceVideoId, targetVideoId) {
   if (sourceGroupId && sourceGroupId !== groupId) normalizeFavoriteVideoGroup(sourceGroupId);
   if (targetGroupId && targetGroupId !== groupId) normalizeFavoriteVideoGroup(targetGroupId);
   normalizeFavoriteVideoGroup(groupId);
+  if (reorderingSameGroup) expandedFavoriteVideoGroups.add(groupId);
+  else expandedFavoriteVideoGroups.delete(groupId);
   await saveConfig();
   renderFavoritesHome();
 }
@@ -1798,15 +1805,21 @@ async function ungroupFavoriteVideo(videoId) {
   const item = favorites[videoId];
   const groupId = item?.videoGroupId || "";
   if (!groupId) return;
-  const { videoGroupId: _groupId, videoGroupOrder: _groupOrder, ...ungrouped } = item;
-  favorites[videoId] = ungrouped;
-  normalizeFavoriteVideoGroup(groupId);
+  for (const groupedVideoId of favoriteVideoGroupIds(groupId)) {
+    const { videoGroupId: _groupId, videoGroupOrder: _groupOrder, ...ungrouped } = favorites[groupedVideoId];
+    favorites[groupedVideoId] = ungrouped;
+  }
+  expandedFavoriteVideoGroups.delete(groupId);
   await saveConfig();
   renderFavoritesHome();
 }
 
 function videoContextActions(video) {
   if (activePrimarySection === "favorites") {
+    const selectedIds = selectedFavoriteVideoIds.has(video.id)
+      ? [...selectedFavoriteVideoIds].filter((videoId) => favorites[videoId])
+      : [video.id];
+    const removesMultiple = selectedIds.length > 1;
     const actions = [
       {
         label: "Open in new tab",
@@ -1821,8 +1834,10 @@ function videoContextActions(video) {
         action: () => openFavoriteCategoryAssignment(video)
       },
       {
-        label: "Remove from Favorites",
-        action: () => removeFavorite(video),
+        label: removesMultiple
+          ? uiMessage("removeSelectedFavorites", [selectedIds.length])
+          : "Remove from Favorites",
+        action: () => removeFavorites(selectedIds, video),
         danger: true
       }
     ];
@@ -2142,6 +2157,16 @@ function attachFavoriteCategoryDropTarget(element, categoryId = "") {
   });
   element.addEventListener("dragleave", () => element.classList.remove("is-category-drop-target"));
   element.addEventListener("drop", (event) => {
+    const favoriteVideoIds = droppedFavoriteVideoIdsFromDataTransfer(event.dataTransfer);
+    if (favoriteVideoIds.length) {
+      event.preventDefault();
+      event.stopPropagation();
+      element.classList.remove("is-category-drop-target");
+      addFavoriteVideosToCategory(favoriteVideoIds, categoryId).catch((error) => {
+        showInfoPopup(`Favorite update failed: ${error.message}`, "error");
+      });
+      return;
+    }
     const video = droppedVideoFromDataTransfer(event.dataTransfer);
     if (!video) return;
     event.preventDefault();
@@ -3453,6 +3478,8 @@ function createVideoCard(video) {
       card.tabIndex = 0;
       card.role = "button";
       card.dataset.videoId = video.id;
+      card.classList.toggle("is-multi-selected", activePrimarySection === "favorites" && selectedFavoriteVideoIds.has(video.id));
+      card.setAttribute("aria-selected", String(activePrimarySection === "favorites" && selectedFavoriteVideoIds.has(video.id)));
       card.classList.toggle("is-favorite-grouped", activePrimarySection === "favorites" && Number(video.videoGroupSize || 0) > 1);
       card.draggable = true;
       card.addEventListener("dragstart", (event) => {
@@ -3469,6 +3496,14 @@ function createVideoCard(video) {
         if (activePrimarySection === "favorites" && favorites[video.id]) {
           draggedFavoriteVideoId = video.id;
           event.dataTransfer?.setData(FAVORITE_VIDEO_GROUP_DRAG_TYPE, video.id);
+          const groupId = favorites[video.id].videoGroupId || "";
+          const selectedIds = selectedFavoriteVideoIds.has(video.id)
+            ? [...selectedFavoriteVideoIds].filter((videoId) => favorites[videoId])
+            : [];
+          const categoryDragIds = selectedIds.length > 1
+            ? selectedIds
+            : groupId ? favoriteVideoGroupIds(groupId) : [video.id];
+          event.dataTransfer?.setData(FAVORITE_VIDEO_CATEGORY_DRAG_TYPE, JSON.stringify(categoryDragIds));
         }
         event.dataTransfer?.setData("text/uri-list", `https://www.youtube.com/watch?v=${video.id}`);
         event.dataTransfer?.setData("text/plain", `https://www.youtube.com/watch?v=${video.id}`);
@@ -3478,7 +3513,10 @@ function createVideoCard(video) {
       card.addEventListener("dragend", () => {
         draggedFavoriteVideoId = "";
         card.classList.remove("is-dragging");
-        document.querySelectorAll(".is-favorite-group-drop-target").forEach((item) => item.classList.remove("is-favorite-group-drop-target"));
+        document.querySelectorAll(".is-favorite-group-drop-target").forEach((item) => {
+          item.classList.remove("is-favorite-group-drop-target");
+          delete item.dataset.favoriteDropPlacement;
+        });
         document.body.classList.remove("isWatchLaterDropTarget");
         document.body.classList.remove("isFavoriteDropTarget");
         document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
@@ -3492,22 +3530,45 @@ function createVideoCard(video) {
           event.stopPropagation();
           if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
           document.body.classList.remove("isFavoriteDropTarget");
+          const bounds = card.getBoundingClientRect();
+          card.dataset.favoriteDropPlacement = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
           card.classList.add("is-favorite-group-drop-target");
         });
-        card.addEventListener("dragleave", () => card.classList.remove("is-favorite-group-drop-target"));
+        card.addEventListener("dragleave", () => {
+          card.classList.remove("is-favorite-group-drop-target");
+          delete card.dataset.favoriteDropPlacement;
+        });
         card.addEventListener("drop", (event) => {
           const sourceVideoId = draggedFavoriteVideoId || event.dataTransfer?.getData(FAVORITE_VIDEO_GROUP_DRAG_TYPE) || "";
           if (!sourceVideoId || sourceVideoId === video.id) return;
           event.preventDefault();
           event.stopPropagation();
+          const placement = card.dataset.favoriteDropPlacement || "after";
           clearVideoDropIndicators();
           card.classList.remove("is-favorite-group-drop-target");
-          groupFavoriteVideos(sourceVideoId, video.id).catch((error) => {
+          delete card.dataset.favoriteDropPlacement;
+          groupFavoriteVideos(sourceVideoId, video.id, placement).catch((error) => {
             showInfoPopup(`Favorite group update failed: ${error.message}`, "error");
           });
         });
       }
-      card.addEventListener("click", () => openOfficialYoutube(video));
+      card.addEventListener("click", (event) => {
+        if (activePrimarySection === "favorites" && (event.ctrlKey || event.metaKey)) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (selectedFavoriteVideoIds.has(video.id)) selectedFavoriteVideoIds.delete(video.id);
+          else selectedFavoriteVideoIds.add(video.id);
+          syncFavoriteVideoSelection();
+          return;
+        }
+        const interactive = event.target instanceof Element
+          ? event.target.closest("button, a, input, select, textarea, [role='button']")
+          : null;
+        if (interactive && interactive !== card) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openOfficialYoutube(video);
+      });
       card.addEventListener("keydown", (event) => {
         if (event.target !== card) return;
         if (event.key === "Enter" || event.key === " ") {
@@ -4719,7 +4780,145 @@ function renderFavoriteVideoResults(videos) {
   favoriteList.className = "videos favoriteVideos";
   channelsEl.classList.add("videoListHost");
   channelsEl.replaceChildren(favoriteList);
-  renderVideos(videos, favoriteList);
+  const sortedVideos = sortVideosForDisplay(videos);
+  const visibleGroups = new Map();
+  for (const video of sortedVideos) {
+    if (!video.videoGroupId) continue;
+    if (!visibleGroups.has(video.videoGroupId)) visibleGroups.set(video.videoGroupId, []);
+    visibleGroups.get(video.videoGroupId).push(video);
+  }
+  for (const members of visibleGroups.values()) {
+    members.sort((left, right) => Number(left.videoGroupOrder || 0) - Number(right.videoGroupOrder || 0));
+  }
+
+  const renderedGroups = new Set();
+  const items = [];
+  for (const video of sortedVideos) {
+    const members = visibleGroups.get(video.videoGroupId) || [];
+    if (members.length < 2) {
+      items.push(createVideoCard(video));
+      continue;
+    }
+    if (renderedGroups.has(video.videoGroupId)) continue;
+    renderedGroups.add(video.videoGroupId);
+    items.push(createFavoriteVideoGroup(members));
+  }
+  favoriteList.replaceChildren(...items);
+  enableFavoriteMarqueeSelection(favoriteList);
+  syncFavoriteVideoSelection();
+  setActiveVideoButton();
+  syncVideoLayoutAvailability();
+}
+
+function syncFavoriteVideoSelection() {
+  document.querySelectorAll(".favoriteVideos .video[data-video-id]").forEach((card) => {
+    const selected = selectedFavoriteVideoIds.has(card.dataset.videoId || "");
+    card.classList.toggle("is-multi-selected", selected);
+    card.setAttribute("aria-selected", String(selected));
+  });
+}
+
+function enableFavoriteMarqueeSelection(favoriteList) {
+  favoriteList.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !(event.target instanceof Element)) return;
+    if (event.target.closest(".video, button, a, input, select, textarea, [role='button']")) return;
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const initialSelection = event.ctrlKey || event.metaKey
+      ? new Set(selectedFavoriteVideoIds)
+      : new Set();
+    if (!event.ctrlKey && !event.metaKey) {
+      selectedFavoriteVideoIds.clear();
+      syncFavoriteVideoSelection();
+    }
+
+    const marquee = document.createElement("div");
+    marquee.className = "favoriteSelectionMarquee";
+    marquee.hidden = true;
+    document.body.append(marquee);
+    let moved = false;
+
+    const handlePointerMove = (moveEvent) => {
+      const left = Math.min(startX, moveEvent.clientX);
+      const top = Math.min(startY, moveEvent.clientY);
+      const width = Math.abs(moveEvent.clientX - startX);
+      const height = Math.abs(moveEvent.clientY - startY);
+      moved ||= width > 3 || height > 3;
+      if (!moved) return;
+
+      marquee.hidden = false;
+      Object.assign(marquee.style, {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: `${height}px`
+      });
+
+      selectedFavoriteVideoIds.clear();
+      initialSelection.forEach((videoId) => selectedFavoriteVideoIds.add(videoId));
+      const selectionRect = { left, top, right: left + width, bottom: top + height };
+      favoriteList.querySelectorAll(".video[data-video-id]").forEach((card) => {
+        const bounds = card.getBoundingClientRect();
+        const intersects = bounds.right >= selectionRect.left
+          && bounds.left <= selectionRect.right
+          && bounds.bottom >= selectionRect.top
+          && bounds.top <= selectionRect.bottom;
+        if (intersects) selectedFavoriteVideoIds.add(card.dataset.videoId);
+      });
+      syncFavoriteVideoSelection();
+    };
+
+    const handlePointerUp = () => {
+      marquee.remove();
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("pointercancel", handlePointerUp);
+    };
+
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointercancel", handlePointerUp);
+  });
+}
+
+function createFavoriteVideoGroup(members) {
+  const groupId = members[0]?.videoGroupId || "";
+  const expanded = expandedFavoriteVideoGroups.has(groupId);
+  const group = document.createElement("div");
+  group.className = "favoriteVideoGroup";
+  group.classList.toggle("is-expanded", expanded);
+  group.dataset.favoriteGroupId = groupId;
+
+  const summary = createVideoCard(members[0]);
+  summary.classList.add("is-favorite-group-summary");
+  summary.querySelector(".favoriteGroupBadge")?.remove();
+
+  const toggle = document.createElement("button");
+  toggle.className = "favoriteGroupToggle";
+  toggle.type = "button";
+  toggle.textContent = `1/${members.length} ${expanded ? "▴" : "▾"}`;
+  toggle.title = uiMessage(expanded ? "collapseFavoriteGroup" : "expandFavoriteGroup", [members.length]);
+  toggle.setAttribute("aria-label", toggle.title);
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (expanded) expandedFavoriteVideoGroups.delete(groupId);
+    else expandedFavoriteVideoGroups.add(groupId);
+    renderFavoritesHome();
+  });
+  summary.append(toggle);
+  group.append(summary);
+
+  if (expanded) {
+    const memberList = document.createElement("div");
+    memberList.className = "favoriteVideoGroupMembers";
+    memberList.append(...members.slice(1).map(createVideoCard));
+    group.append(memberList);
+  }
+  return group;
 }
 
 function channelNeedsMetadata(channel) {
@@ -5006,14 +5205,29 @@ async function toggleFavorite(video) {
 }
 
 async function removeFavorite(video) {
-  if (!video?.id || !favorites[video.id]) return;
-  if (!await requestConfirmation(`Remove "${video.title || video.id}" from Favorites?`)) return;
-  const groupId = favorites[video.id].videoGroupId || "";
-  delete favorites[video.id];
-  normalizeFavoriteVideoGroup(groupId);
-  await saveConfig();
+  return removeFavorites(video?.id ? [video.id] : [], video);
+}
+
+async function removeFavorites(videoIds, fallbackVideo = null) {
+  const ids = [...new Set(videoIds)].filter((videoId) => favorites[videoId]);
+  if (!ids.length) return;
+  const confirmation = ids.length > 1
+    ? uiMessage("confirmRemoveSelectedFavorites", [ids.length])
+    : `Remove "${fallbackVideo?.title || favorites[ids[0]]?.title || ids[0]}" from Favorites?`;
+  if (!await requestConfirmation(confirmation)) return;
+
+  const affectedGroupIds = new Set(ids.map((videoId) => favorites[videoId]?.videoGroupId).filter(Boolean));
+  ids.forEach((videoId) => {
+    delete favorites[videoId];
+    selectedFavoriteVideoIds.delete(videoId);
+  });
+  affectedGroupIds.forEach(normalizeFavoriteVideoGroup);
+
+  // Refresh immediately from the in-memory collection instead of leaving the
+  // deleted cards visible while extension storage is being written.
   renderFavoritesHome();
-  syncFavoriteButtons(video.id);
+  ids.forEach(syncFavoriteButtons);
+  await saveConfig();
 }
 
 async function completeDroppedVideoMetadata(video) {
@@ -5232,6 +5446,43 @@ async function addVideoToFavorites(video, categoryId = "") {
   syncFavoriteButtons(video.id);
   showInfoPopup(`"${video.title || video.id}" added to Favorites.`, "ok");
   return true;
+}
+
+function droppedFavoriteVideoIdsFromDataTransfer(dataTransfer) {
+  const payload = dataTransfer?.getData(FAVORITE_VIDEO_CATEGORY_DRAG_TYPE) || "";
+  if (!payload) return [];
+  try {
+    const videoIds = JSON.parse(payload);
+    if (!Array.isArray(videoIds)) return [];
+    return [...new Set(videoIds.filter((videoId) => typeof videoId === "string" && favorites[videoId]))];
+  } catch {
+    return [];
+  }
+}
+
+async function addFavoriteVideosToCategory(videoIds, categoryId = "") {
+  const ids = [...new Set(videoIds)].filter((videoId) => favorites[videoId]);
+  if (!ids.length) return;
+
+  const clearCategories = categoryId === UNCATEGORIZED_CATEGORY_ID;
+  const targetCategoryId = favoriteCategories.some((category) => category.id === categoryId) ? categoryId : "";
+  if (!clearCategories && !targetCategoryId) return;
+
+  let changed = 0;
+  ids.forEach((videoId) => {
+    const item = favorites[videoId];
+    const categories = clearCategories
+      ? []
+      : [...new Set([...(item.categories || []), targetCategoryId])];
+    if (JSON.stringify(categories) === JSON.stringify(item.categories || [])) return;
+    favorites[videoId] = { ...item, categories };
+    changed += 1;
+  });
+  if (!changed) return;
+
+  renderFavoritesHome();
+  await saveConfig();
+  showInfoPopup(uiMessage("favoritesAddedToCategory", [changed]), "ok");
 }
 
 function droppedVideoFromDataTransfer(dataTransfer) {
@@ -6598,7 +6849,10 @@ for (const tab of primaryTabEls) {
 function clearVideoDropIndicators() {
   draggedFavoriteVideoId = "";
   document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
-  document.querySelectorAll(".is-favorite-group-drop-target").forEach((item) => item.classList.remove("is-favorite-group-drop-target"));
+  document.querySelectorAll(".is-favorite-group-drop-target").forEach((item) => {
+    item.classList.remove("is-favorite-group-drop-target");
+    delete item.dataset.favoriteDropPlacement;
+  });
   document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
   document.querySelectorAll(".is-favorite-drop-target").forEach((item) => item.classList.remove("is-favorite-drop-target"));
 }
