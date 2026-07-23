@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#101010">
-    <title>Youtube</title>
+    <title>YouTube</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -68,6 +68,9 @@
         <div class="resultsToolbar" aria-label="Result display controls">
           <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
             <span></span><span></span><span></span>
+          </button>
+          <button id="sortResults" class="channelZoomButton resultsSortButton" type="button" title="Sort results" aria-label="Sort results">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h11M8 12h8M8 18h5M3 5v14M1 17l2 2 2-2"/></svg>
           </button>
           <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6"/></svg>
@@ -136,6 +139,18 @@
       </div>
     </div>
 
+    <div id="videoNotePrompt" class="modalOverlay" hidden>
+      <div class="modal videoNoteModal" role="dialog" aria-modal="true" aria-labelledby="videoNoteTitle">
+        <h2 id="videoNoteTitle">Personal note</h2>
+        <p id="videoNoteVideoTitle" class="modalHint"></p>
+        <textarea id="videoNoteText" rows="6" maxlength="4000" placeholder="Add a personal note about this video…"></textarea>
+        <div class="modalActions">
+          <button id="cancelVideoNote" class="modalButton secondary" type="button">Cancel</button>
+          <button id="saveVideoNote" class="modalButton primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
 
     <div id="categoryAssignPrompt" class="modalOverlay" hidden>
       <div class="modal categoryModal" role="dialog" aria-modal="true" aria-labelledby="categoryAssignTitle">
@@ -176,12 +191,12 @@
 
     <div id="importExportPrompt" class="modalOverlay" hidden>
       <div class="modal importExportModal" role="dialog" aria-modal="true" aria-labelledby="importExportTitle">
-        <h2 id="importExportTitle">Import / Export</h2>
+        <h2 id="importExportTitle">Import/export/save</h2>
         <div class="importExportGrid">
-          <button id="exportNativeConfig" class="modalButton secondary" type="button">Export YouTube Shelf</button>
+          <button id="exportNativeConfig" class="modalButton secondary" type="button">Export/Save YouTube Shelf datas</button>
           <button id="exportNewPipeConfig" class="modalButton secondary" type="button">Export for NewPipe</button>
-          <button id="importNativeConfig" class="modalButton secondary" type="button">Import YouTube Shelf</button>
-          <button id="importFreetubeConfig" class="modalButton secondary" type="button">Import FreeTube</button>
+          <button id="importNativeConfig" class="modalButton secondary" type="button">Import/restore YouTube Shelf datas</button>
+          <button id="importFreetubeConfig" class="modalButton secondary" type="button">Import from FreeTube</button>
         </div>
         <div class="modalActions">
           <button id="closeImportExport" class="modalButton primary" type="button">Close</button>
@@ -208,7 +223,7 @@
 
     <div id="youtubeDataOptionsPrompt" class="modalOverlay" hidden>
       <div class="modal youtubeDataOptionsModal" role="dialog" aria-modal="true" aria-labelledby="youtubeDataOptionsTitle">
-        <h2 id="youtubeDataOptionsTitle">YouTube data options</h2>
+        <h2 id="youtubeDataOptionsTitle">YouTube options</h2>
         <label class="modalCheckbox">
           <input id="sniffYoutubeOption" type="checkbox" />
           <span>Sniff YouTube metadata</span>
