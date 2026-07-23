@@ -301,6 +301,10 @@ let sortModes = (() => {
     return { youtube: "default", channels: "default", channelVideos: "date-desc", watchLater: "date-desc", favorites: "date-desc" };
   }
 })();
+if (sortModes.channelVideos === "added-desc") {
+  sortModes = { ...sortModes, channelVideos: "date-desc" };
+  localStorage.setItem(SORT_MODES_KEY, JSON.stringify(sortModes));
+}
 
 function setActivePrimarySection(section) {
   if (!["youtube", "channels", "watchLater", "favorites"].includes(section)) return;
@@ -358,7 +362,7 @@ function sortOptionsForCurrentScope() {
   const modes = scope === "channels"
     ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "subscribers-desc", "subscribers-asc"]
     : scope === "channelVideos" && activeChannel
-      ? ["default", "added-desc", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
+      ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
       : scope === "favorites" || scope === "watchLater"
         ? ["default", "added-desc", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
         : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
@@ -1049,7 +1053,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.4";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.5";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1090,7 +1094,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.4";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.5";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -5984,7 +5988,6 @@ function mergeChannelVideoLists(current, additional) {
 
 function youtubeOrderForChannelMode(mode) {
   if (mode === "views-desc") return "popular";
-  if (mode === "added-desc") return "latest";
   return "";
 }
 
