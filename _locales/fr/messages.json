@@ -162,6 +162,7 @@
   "addChannelHere": { "message": "Ajouter une chaîne ici" },
   "addSubcategory": { "message": "Ajouter une sous-catégorie" },
   "subcategories": { "message": "Sous-catégories" },
+  "all": { "message": "Toutes" },
   "expandSubcategories": { "message": "Afficher les sous-catégories" },
   "collapseSubcategories": { "message": "Masquer les sous-catégories" },
   "renameCategory": { "message": "Renommer la catégorie" },
