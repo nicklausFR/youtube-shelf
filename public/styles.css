@@ -493,6 +493,28 @@ svg {
   width: 100%;
 }
 
+.thisWeekToolbarButton {
+  background: transparent;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  margin-right: auto;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.thisWeekToolbarButton:hover {
+  border-color: #555;
+}
+
+.thisWeekToolbarButton.is-active {
+  background: #321d1b;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .channelSearch input {
   background: var(--panel);
   border: 1px solid var(--soft-line);
@@ -2611,9 +2633,10 @@ body.sidePanelVideos .videos {
 
 .sidePanelPath .pathCategoryAddButton {
   color: var(--text);
-  font-size: 19px;
-  font-weight: 500;
-  line-height: 1;
+}
+
+.resultsAddButton {
+  color: var(--text);
 }
 
 .sidePanelPath .pathCategoryZoomButton::before {

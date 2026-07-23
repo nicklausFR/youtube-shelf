@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.2 - 2026-07-23
+
+- Made YouTube the default tab and moved the weekly subscribed-channel video list there.
+- Added weekly-list zeroing, restoration, exclusion controls, and an accurate video counter.
+- Added list-toolbar actions for creating channels and adding Favorite or Watch later videos.
+- Removed the weekly list from Channels and moved Watch later to the final tab position.
+
 ## 3.3.1 - 2026-07-23
 
 - Kept favorite subcategories visible independently from the main category overflow.
