@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3 - 2026-07-23
+
+- Added collapsible favorite video groups with visible sequence positions and drag-and-drop reordering.
+- Added multiple selection with `Ctrl`+click or a selection rectangle.
+- Added bulk favorite deletion and bulk category assignment, including complete grouped-series drops.
+- Fixed opening videos from expanded favorite groups and immediate list refresh after deletion.
+
 ## 3.1 - 2026-07-23
 
 - Added additive Nextcloud bookmark imports for categorized YouTube favorites.
