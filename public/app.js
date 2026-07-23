@@ -7543,7 +7543,9 @@ async function detectYoutubeSearchLocale(query) {
   return localeForYoutubeLanguage(language);
 }
 
-async function fetchYoutubeGlobalSearchPage(query, options = {}) {
+const YOUTUBE_SEARCH_ATTEMPTS = 3;
+
+async function fetchYoutubeGlobalSearchPageOnce(query, options = {}) {
   const trimmed = query.trim();
   if (!trimmed) return { results: [], continuation: "", apiKey: "", clientVersion: "" };
 
@@ -7602,6 +7604,23 @@ async function fetchYoutubeGlobalSearchPage(query, options = {}) {
     clientVersion: youtubeConfigValue(html, "INNERTUBE_CLIENT_VERSION") || youtubeConfigValue(html, "INNERTUBE_CONTEXT_CLIENT_VERSION"),
     locale
   };
+}
+
+async function fetchYoutubeGlobalSearchPage(query, options = {}) {
+  let lastError;
+  let lastEmptyPage = null;
+  for (let attempt = 1; attempt <= YOUTUBE_SEARCH_ATTEMPTS; attempt += 1) {
+    try {
+      const page = await fetchYoutubeGlobalSearchPageOnce(query, options);
+      if (options.continuation || page.results.length || page.continuation) return page;
+      lastEmptyPage = page;
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = error;
+    }
+  }
+  if (lastEmptyPage) return lastEmptyPage;
+  throw lastError;
 }
 
 async function fetchYoutubeGlobalSearchResults(query, { limit = 24, signal } = {}) {
@@ -8062,7 +8081,6 @@ loadChannels().then(async () => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
 
 
 
