@@ -28,10 +28,10 @@
     </header>
 
     <nav class="primaryTabs" aria-label="Main sections">
-      <button class="primaryTab" type="button" data-section="youtube">YouTube</button>
-      <button class="primaryTab is-active" type="button" data-section="channels" aria-current="page">Channels</button>
-      <button class="primaryTab" type="button" data-section="watchLater">Watch later</button>
+      <button class="primaryTab is-active" type="button" data-section="youtube" aria-current="page">YouTube</button>
+      <button class="primaryTab" type="button" data-section="channels">Channels</button>
       <button class="primaryTab" type="button" data-section="favorites">Favorites</button>
+      <button class="primaryTab" type="button" data-section="watchLater">Watch later</button>
     </nav>
 
     <header class="mainbar" aria-label="Navigation">
@@ -66,6 +66,7 @@
           <div id="categories" class="categories"></div>
         </div>
         <div class="resultsToolbar" aria-label="Result display controls">
+          <button id="youtubeThisWeek" class="thisWeekToolbarButton" type="button" hidden></button>
           <button id="channelIconMode" class="pathIconModeButton" type="button" aria-label="Show channel icons" aria-pressed="false">
             <span></span><span></span><span></span>
           </button>
@@ -77,6 +78,9 @@
           </button>
           <button id="channelZoomIn" class="channelZoomButton" type="button" title="Zoom in list" aria-label="Zoom in list">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6M10 7v6"/></svg>
+          </button>
+          <button id="addListItem" class="channelZoomButton resultsAddButton" type="button" title="Add" aria-label="Add" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
         <div id="channelListSeparator" class="channelListSeparator" aria-hidden="true"></div>
@@ -353,6 +357,19 @@
         <div id="addChannelResults" class="addChannelResults"></div>
         <div class="modalActions">
           <button id="closeAddChannel" class="modalButton secondary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="addVideoPrompt" class="modalOverlay" hidden>
+      <div class="modal addVideoModal" role="dialog" aria-modal="true" aria-labelledby="addVideoTitle">
+        <h2 id="addVideoTitle">Add video</h2>
+        <form id="addVideoForm" class="modalSearch">
+          <input id="addVideoInput" type="text" placeholder="YouTube video URL or ID" autocomplete="off">
+          <button class="modalButton primary" type="submit">Add</button>
+        </form>
+        <div class="modalActions">
+          <button id="closeAddVideo" class="modalButton secondary" type="button">Close</button>
         </div>
       </div>
     </div>
