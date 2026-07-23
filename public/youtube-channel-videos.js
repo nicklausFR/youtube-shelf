@@ -7,6 +7,7 @@ const WEB_CLIENT_NAME = "WEB";
 const WEB_CLIENT_ID = "1";
 const WEB_CLIENT_VERSION_FALLBACK = "2.20260120.01.00";
 const VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA";
+const VIDEO_SORTS = new Set(["latest", "popular"]);
 
 let cachedClientVersion = "";
 
@@ -145,10 +146,22 @@ function continuationContent(response) {
     ...(response?.onResponseReceivedActions || []),
     ...(response?.onResponseReceivedCommands || [])
   ];
-  return actions
+  const itemGroups = actions
     .map((action) => action?.appendContinuationItemsAction?.continuationItems
       || action?.reloadContinuationItemsCommand?.continuationItems)
-    .find(Array.isArray) || response?.continuationContents || null;
+    .filter(Array.isArray);
+  return itemGroups.length ? itemGroups.flat() : response?.continuationContents || null;
+}
+
+function sortContinuation(response, sort) {
+  if (sort === "latest") return "";
+  // Follow YouTube's server-provided command, as NewPipe does for channel pagination,
+  // instead of guessing an undocumented browse parameter for each sort order.
+  const chips = videosTabContent(response)?.richGridRenderer?.header?.chipBarViewModel?.chips || [];
+  const selectedChip = chips
+    .map((item) => item?.chipViewModel)
+    .find((chip) => String(chip?.text || chip?.accessibilityLabel || "").trim().toLocaleLowerCase() === sort);
+  return selectedChip?.tapCommand?.innertubeCommand?.continuationCommand?.token || "";
 }
 
 async function youtubeClientVersion(fetchImpl) {
@@ -208,6 +221,7 @@ async function postBrowse(fetchImpl, body, clientVersion) {
 export async function fetchYoutubeChannelVideosPage({
   channelId,
   continuation = "",
+  sort = "latest",
   fetchImpl = fetch
 } = {}) {
   const normalizedId = String(channelId || "").trim();
@@ -216,8 +230,10 @@ export async function fetchYoutubeChannelVideosPage({
   }
 
   const clientVersion = await youtubeClientVersion(fetchImpl);
+  const normalizedSort = VIDEO_SORTS.has(sort) ? sort : "latest";
   let resolvedChannelId = normalizedId;
   let response;
+  let responseIsContinuation = Boolean(continuation);
   if (continuation) {
     response = await postBrowse(fetchImpl, requestBody(clientVersion, resolvedChannelId, continuation), clientVersion);
   } else {
@@ -228,8 +244,14 @@ export async function fetchYoutubeChannelVideosPage({
       if (!redirectId.startsWith("UC")) throw new Error("YouTube redirected to something other than a channel");
       resolvedChannelId = redirectId;
     }
+    if (normalizedSort !== "latest") {
+      const sortToken = sortContinuation(response, normalizedSort);
+      if (!sortToken) throw new Error(`YouTube returned no ${normalizedSort} video filter`);
+      response = await postBrowse(fetchImpl, requestBody(clientVersion, resolvedChannelId, sortToken), clientVersion);
+      responseIsContinuation = true;
+    }
   }
-  const pageContent = continuation ? continuationContent(response) || response : videosTabContent(response);
+  const pageContent = responseIsContinuation ? continuationContent(response) || response : videosTabContent(response);
   if (!pageContent) throw new Error("YouTube returned no Videos tab content");
   const collected = collectPageData(pageContent);
 
@@ -237,6 +259,7 @@ export async function fetchYoutubeChannelVideosPage({
     videos: collected.videos,
     continuation: collected.continuation,
     clientVersion,
-    resolvedChannelId
+    resolvedChannelId,
+    sort: normalizedSort
   };
 }
