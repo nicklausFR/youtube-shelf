@@ -2087,7 +2087,7 @@ function appendCategoryPath(container) {
 
   appendSettingsPathItem(container);
 
-  appendPathItem(container, uiMessage("allChannels"), showRootChannels, {
+  appendPathItem(container, uiMessage("all"), showRootChannels, {
     active: activeView === "channels" && !activeCategoryId && !activeChannel,
     contextActions: [
       { label: "Add category", action: () => addCategoryEl.click() }
@@ -2100,13 +2100,19 @@ function appendCategoryPath(container) {
     appendPathItem(container, category.name, () => {
       showCategoryChannels(category.id);
     }, {
-      active: activeView === "channels" && activeCategoryId === category.id && !activeChannel,
-      ancestorActive: activeView === "channels" && expandedParentId === category.id && activeCategoryId !== category.id,
+      active: activeView === "channels" && activeCategoryId === category.id && !activeChannel && !children.length,
+      ancestorActive: activeView === "channels" && expandedParentId === category.id && Boolean(children.length),
       kind: children.length ? "parent" : "",
       contextActions: categoryContextActions(category),
       dropCategoryId: category.id
     });
-    if (expandedParentId === category.id) {
+    if (expandedParentId === category.id && children.length) {
+      appendPathItem(container, uiMessage("all"), () => showCategoryChannels(category.id), {
+        level: 1,
+        kind: "subcategory",
+        active: activeView === "channels" && activeCategoryId === category.id && !activeChannel,
+        dropCategoryId: category.id
+      });
       for (const child of children) {
         appendPathItem(container, child.name, () => showCategoryChannels(child.id), {
           level: 1,
@@ -2134,6 +2140,10 @@ function appendFavoriteCategoryPath(container) {
   container.append(categoryArea);
   appendSettingsPathItem(categoryArea);
 
+  appendPathItem(categoryArea, uiMessage("all"), () => showFavoritesCategory(""), {
+    active: activeView === "favorites" && !activeFavoriteCategoryId
+  });
+
   const expandedParentId = expandedCategoryParentId(favoriteCategories, activeFavoriteCategoryId);
   const expandedParent = favoriteCategories.find((category) => category.id === expandedParentId);
   const expandedChildren = expandedParent
@@ -2142,8 +2152,8 @@ function appendFavoriteCategoryPath(container) {
   for (const category of sortedCategorySiblings(favoriteCategories)) {
     const children = sortedCategorySiblings(favoriteCategories, category.id);
     appendPathItem(categoryArea, category.name, () => showFavoritesCategory(category.id), {
-      active: activeView === "favorites" && activeFavoriteCategoryId === category.id,
-      ancestorActive: activeView === "favorites" && expandedParentId === category.id && activeFavoriteCategoryId !== category.id,
+      active: activeView === "favorites" && activeFavoriteCategoryId === category.id && !children.length,
+      ancestorActive: activeView === "favorites" && expandedParentId === category.id && Boolean(children.length),
       kind: children.length ? "parent" : "",
       dropFavoriteCategoryId: category.id,
       reorderFavoriteCategoryId: category.id,
@@ -2164,6 +2174,13 @@ function appendFavoriteCategoryPath(container) {
     title.className = "pathSubcategoryTitle";
     title.textContent = uiMessage("subcategories");
     section.append(title);
+
+    appendPathItem(section, uiMessage("all"), () => showFavoritesCategory(expandedParent.id), {
+      level: 1,
+      kind: "subcategory",
+      active: activeView === "favorites" && activeFavoriteCategoryId === expandedParent.id,
+      dropFavoriteCategoryId: expandedParent.id
+    });
 
     for (const child of expandedChildren) {
       appendPathItem(section, child.name, () => showFavoritesCategory(child.id), {
