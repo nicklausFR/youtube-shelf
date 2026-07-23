@@ -344,6 +344,7 @@ function sortModeLabel(mode, scope = currentSortScope()) {
     "title-desc": "sortTitleDescending",
     "date-desc": scope === "channels" ? "sortLatestVideoFirst" : "sortNewestFirst",
     "date-asc": scope === "channels" ? "sortOldestLatestVideoFirst" : "sortOldestFirst",
+    "added-desc": "sortDateAdded",
     "views-desc": "sortMostViewed",
     "views-asc": "sortLeastViewed",
     "subscribers-desc": "sortMostSubscribers",
@@ -356,7 +357,11 @@ function sortOptionsForCurrentScope() {
   const scope = currentSortScope();
   const modes = scope === "channels"
     ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "subscribers-desc", "subscribers-asc"]
-    : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
+    : scope === "channelVideos" && activeChannel
+      ? ["default", "added-desc", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
+      : scope === "favorites" || scope === "watchLater"
+        ? ["default", "added-desc", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
+        : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
   return modes.map((mode) => ({
     label: sortModeLabel(mode, scope),
     highlighted: sortModes[scope] === mode,
@@ -375,10 +380,19 @@ function syncSortButton() {
 }
 
 function setSortMode(scope, mode) {
+  const previousMode = sortModes[scope] || "default";
   sortModes = { ...sortModes, [scope]: mode };
   localStorage.setItem(SORT_MODES_KEY, JSON.stringify(sortModes));
   syncSortButton();
-  refreshSortedView();
+  const channelYoutubeOrderChanged = scope === "channelVideos"
+    && Boolean(activeChannel)
+    && youtubeOrderForChannelMode(previousMode) !== youtubeOrderForChannelMode(mode);
+  if (channelYoutubeOrderChanged) {
+    const youtubeOrder = youtubeOrderForChannelMode(mode);
+    if (youtubeOrder) loadChannelVideosForYoutubeOrder(youtubeOrder).catch(() => {});
+    else loadFeed().catch(() => {});
+  }
+  else refreshSortedView();
   if (scope === "channels" && mode.startsWith("subscribers-")) {
     refreshMissingSubscriberCounts().catch(() => {});
   }
@@ -453,13 +467,22 @@ function sortVideosForDisplay(videos) {
   const sorted = [...videos];
   if (mode.startsWith("title-")) {
     sorted.sort((left, right) => compareTitles(left, right, mode.endsWith("desc") ? "desc" : "asc"));
+  } else if (mode === "added-desc" && !(activeChannel && channelVideosLoadedSort === "latest")) {
+    sorted.sort((left, right) => compareOptionalNumbers(
+      relativeDateValue(left.savedAt || left.published || left.publishedText),
+      relativeDateValue(right.savedAt || right.published || right.publishedText),
+      "desc"
+    ) || compareTitles(left, right));
   } else if (mode.startsWith("date-")) {
     sorted.sort((left, right) => compareOptionalNumbers(
       relativeDateValue(left.published || left.publishedText),
       relativeDateValue(right.published || right.publishedText),
       mode.endsWith("asc") ? "asc" : "desc"
     ) || compareTitles(left, right));
-  } else if (mode.startsWith("views-")) {
+  } else if (
+    mode.startsWith("views-")
+    && !(mode === "views-desc" && activeChannel && channelVideosLoadedSort === "popular")
+  ) {
     sorted.sort((left, right) => compareOptionalNumbers(
       metricCountValue(left.views || left.viewCountText),
       metricCountValue(right.views || right.viewCountText),
@@ -559,6 +582,7 @@ let channelVideoSource = ["hybrid", "innertube", "rss"].includes(storedChannelVi
 let channelVideosContinuation = "";
 let channelVideosLoadingMore = false;
 let channelVideosInnertubeFailed = false;
+let channelVideosLoadedSort = "latest";
 let channelVideoLoadRequestId = 0;
 let listZoom = Number(localStorage.getItem(LIST_ZOOM_KEY)) || 1;
 let categoryPanelHeight = Number(localStorage.getItem(CATEGORY_PANEL_HEIGHT_KEY)) || 90;
@@ -1025,7 +1049,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.3";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.4";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1066,7 +1090,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.3";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.4";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -5225,6 +5249,7 @@ function renderWatchLater() {
   currentVideos = Object.entries(watchLater).map(([id, item]) => ({
     id,
     title: item.title || id,
+    savedAt: item.savedAt || "",
     published: item.savedAt || "",
     channelId: item.channelId || "",
     channel: item.channel || allChannels.find((channel) => channel.id === item.channelId)?.title || "",
@@ -5621,6 +5646,7 @@ function renderFavoritesHome() {
     .map(([id, item]) => ({
       id,
       title: item.title || id,
+      savedAt: item.savedAt || "",
       published: item.savedAt || "",
       channelId: item.channelId || "",
       channel: item.channel || allChannels.find((channel) => channel.id === item.channelId)?.title || "",
@@ -5956,18 +5982,65 @@ function mergeChannelVideoLists(current, additional) {
   return [...merged.values()];
 }
 
+function youtubeOrderForChannelMode(mode) {
+  if (mode === "views-desc") return "popular";
+  if (mode === "added-desc") return "latest";
+  return "";
+}
+
+function requestedChannelVideosYoutubeSort() {
+  return youtubeOrderForChannelMode(sortModes.channelVideos) || "latest";
+}
+
+async function loadChannelVideosForYoutubeOrder(sort) {
+  if (!activeChannel?.id) return;
+  const channel = activeChannel;
+  const requestId = ++channelVideoLoadRequestId;
+  channelVideosContinuation = "";
+  channelVideosLoadingMore = false;
+  channelVideosInnertubeFailed = false;
+  channelVideosLoadedSort = "local";
+  setStatus("Loading...", true);
+  refreshEl.disabled = true;
+
+  try {
+    const page = await fetchYoutubeChannelVideosPage({ channelId: channel.id, sort });
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
+    currentVideos = innertubeVideosWithChannel(page.videos, channel);
+    channelVideosContinuation = page.continuation || "";
+    channelVideosLoadedSort = page.sort || sort;
+    if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
+    else renderChannelVideos(currentVideos);
+    setStatus();
+  } catch (error) {
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
+    channelVideosLoadedSort = "local";
+    if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
+    else renderChannelVideos(currentVideos);
+    setStatus(`YouTube ${sort} order unavailable: ${error.message}`, true);
+  } finally {
+    if (requestId === channelVideoLoadRequestId) refreshEl.disabled = false;
+  }
+}
+
 async function loadMoreChannelVideos() {
   if (!activeChannel?.id || !channelVideosContinuation || channelVideosLoadingMore) return;
   const channel = activeChannel;
   const continuation = channelVideosContinuation;
+  const loadedSort = channelVideosLoadedSort;
   const requestId = channelVideoLoadRequestId;
   channelVideosLoadingMore = true;
   renderChannelVideos(currentVideos);
   try {
-    const page = await fetchYoutubeChannelVideosPage({ channelId: channel.id, continuation });
+    const page = await fetchYoutubeChannelVideosPage({
+      channelId: channel.id,
+      continuation,
+      sort: loadedSort === "popular" ? "popular" : "latest"
+    });
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
     currentVideos = mergeChannelVideoLists(currentVideos, innertubeVideosWithChannel(page.videos, channel));
     channelVideosContinuation = page.continuation || "";
+    if (loadedSort !== "local") channelVideosLoadedSort = page.sort || loadedSort;
     channelVideosInnertubeFailed = false;
     if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
     else {
@@ -5999,6 +6072,8 @@ async function loadFeed() {
   }
 
   const channel = activeChannel;
+  const requestedYoutubeOrder = youtubeOrderForChannelMode(sortModes.channelVideos);
+  const requestedYoutubeSort = requestedChannelVideosYoutubeSort();
   const requestId = ++channelVideoLoadRequestId;
   channelVideosContinuation = "";
   channelVideosLoadingMore = false;
@@ -6011,10 +6086,20 @@ async function loadFeed() {
     let rssLoaded = false;
     let innertubePage = null;
     let partialMessage = "";
-    if (channelVideoSource === "hybrid") {
+    if (requestedYoutubeOrder) {
+      try {
+        innertubePage = await fetchYoutubeChannelVideosPage({
+          channelId: channel.id,
+          sort: requestedYoutubeSort
+        });
+      } catch (error) {
+        partialMessage = `YouTube ${requestedYoutubeSort} order unavailable: using the loaded videos (${error.message}).`;
+      }
+    }
+    if (!innertubePage && channelVideoSource === "hybrid") {
       const [rssResult, innertubeResult] = await Promise.allSettled([
         fetchRssChannelVideos(channel),
-        fetchYoutubeChannelVideosPage({ channelId: channel.id })
+        fetchYoutubeChannelVideosPage({ channelId: channel.id, sort: "latest" })
       ]);
       if (rssResult.status === "fulfilled") {
         rssVideos = rssResult.value;
@@ -6024,15 +6109,18 @@ async function loadFeed() {
       if (rssResult.status === "rejected" && innertubeResult.status === "rejected") {
         throw rssResult.reason || innertubeResult.reason || new Error("No videos returned");
       }
-      if (rssResult.status === "rejected") partialMessage = "RSS unavailable: dates come from Innertube.";
+      if (rssResult.status === "rejected") partialMessage ||= "RSS unavailable: dates come from Innertube.";
       if (innertubeResult.status === "rejected") {
         channelVideosInnertubeFailed = true;
         const detail = innertubeResult.reason?.message || "unknown error";
-        partialMessage = `Pagination unavailable: showing the RSS feed (${detail}).`;
+        partialMessage ||= `Pagination unavailable: showing the RSS feed (${detail}).`;
       }
-    } else if (channelVideoSource === "innertube") {
-      innertubePage = await fetchYoutubeChannelVideosPage({ channelId: channel.id });
-    } else {
+    } else if (!innertubePage && channelVideoSource === "innertube") {
+      innertubePage = await fetchYoutubeChannelVideosPage({
+        channelId: channel.id,
+        sort: "latest"
+      });
+    } else if (!innertubePage && channelVideoSource === "rss") {
       rssVideos = await fetchRssChannelVideos(channel);
       rssLoaded = true;
     }
@@ -6042,7 +6130,18 @@ async function loadFeed() {
     currentVideos = channelVideoSource === "hybrid"
       ? mergeChannelVideoLists(rssVideos, innertubeVideos)
       : channelVideoSource === "innertube" ? innertubeVideos : rssVideos;
+    if (requestedYoutubeOrder && innertubePage?.sort === requestedYoutubeSort) currentVideos = innertubeVideos;
     channelVideosContinuation = innertubePage?.continuation || "";
+    channelVideosLoadedSort = requestedYoutubeOrder && innertubePage?.sort === requestedYoutubeSort
+      ? requestedYoutubeSort
+      : "local";
+
+    if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) {
+      renderSearchedVideos();
+    } else {
+      renderChannelVideos(currentVideos);
+      setStatus(partialMessage, Boolean(partialMessage));
+    }
 
     let channelVideoCount = channel.channelVideoCount || 0;
     let channelMetadata = {
@@ -6051,15 +6150,19 @@ async function loadFeed() {
       subscriberCount: channel.subscriberCount,
       subscriberCountText: channel.subscriberCountText || ""
     };
-    try {
-      channelVideoCount = await fetchChannelVideoCount(channel.id) || channelVideoCount;
-    } catch {
-      // The selected video source remains usable even when YouTube page parsing fails.
+    const needsVideoCount = !Number.isFinite(channel.channelVideoCount) || channel.channelVideoCount <= 0;
+    const needsMetadata = !channel.description
+      || !channel.tags?.length
+      || !Number.isFinite(channel.subscriberCount);
+    const [videoCountResult, metadataResult] = await Promise.allSettled([
+      needsVideoCount ? fetchChannelVideoCount(channel.id) : Promise.resolve(0),
+      needsMetadata ? fetchChannelMetadata(channel.id) : Promise.resolve(null)
+    ]);
+    if (videoCountResult.status === "fulfilled") {
+      channelVideoCount = videoCountResult.value || channelVideoCount;
     }
-    try {
-      channelMetadata = { ...channelMetadata, ...await fetchChannelMetadata(channel.id) };
-    } catch {
-      // Metadata is optional.
+    if (metadataResult.status === "fulfilled" && metadataResult.value) {
+      channelMetadata = { ...channelMetadata, ...metadataResult.value };
     }
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
 
@@ -6086,12 +6189,6 @@ async function loadFeed() {
     };
     allChannels = allChannels.map((channel) => (channel.id === activeChannel.id ? { ...channel, ...activeChannel } : channel));
     setActiveChannelButton();
-    if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) {
-      renderSearchedVideos();
-    } else {
-      renderChannelVideos(currentVideos);
-      setStatus(partialMessage, Boolean(partialMessage));
-    }
   } catch (error) {
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
     currentVideos = [];
