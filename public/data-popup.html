@@ -3,16 +3,22 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101010">
     <title>YouTube Shelf</title>
+    <script src="theme.js"></script>
     <style>
       :root {
-        color-scheme: dark;
-        --bg: #151515;
-        --line: #343434;
-        --text: #f2f2f2;
-        --muted: #a9a9a9;
-        --accent: #ff4e45;
+        color-scheme: light dark;
+        --bg: light-dark(#ffffff, #151515);
+        --line: light-dark(#cfd3da, #343434);
+        --text: light-dark(#202124, #f2f2f2);
+        --muted: light-dark(#62676f, #a9a9a9);
+        --accent: light-dark(#c9372f, #ff4e45);
+        --hover-line: light-dark(#7a8089, #666);
+        --danger: light-dark(#b4231c, #ff736d);
       }
+      :root[data-theme="light"] { color-scheme: light; }
+      :root[data-theme="dark"] { color-scheme: dark; }
       * { box-sizing: border-box; }
       html, body { min-height: 100%; }
       body {
@@ -54,13 +60,13 @@
         padding: 0 14px;
         white-space: normal;
       }
-      button:hover { border-color: #666; }
+      button:hover { border-color: var(--hover-line); }
       .primary {
         background: var(--accent);
         border-color: var(--accent);
         color: #fff;
       }
-      .danger { color: #ff736d; }
+      .danger { color: var(--danger); }
       input[type="file"] { display: none; }
       #status {
         font-size: 13px;
@@ -79,4 +85,3 @@
     <script src="data-popup.js" type="module"></script>
   </body>
 </html>
-
