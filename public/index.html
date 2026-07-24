@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#101010">
     <title>YouTube</title>
+    <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -207,20 +208,24 @@
         </div>
       </div>
     </div>
-    <div id="displayOptionsPrompt" class="modalOverlay" hidden>
-      <div class="modal displayOptionsModal" role="dialog" aria-modal="true" aria-labelledby="displayOptionsTitle">
-        <h2 id="displayOptionsTitle">YouTube Display</h2>
-        <label class="modalCheckbox">
-          <input id="hideCommentsOption" type="checkbox" />
-          <span>Hide comments</span>
+    <div id="appearanceOptionsPrompt" class="modalOverlay" hidden>
+      <div class="modal displayOptionsModal" role="dialog" aria-modal="true" aria-labelledby="appearanceOptionsTitle">
+        <h2 id="appearanceOptionsTitle">Display</h2>
+        <label class="modalSelectField" for="themeOption">
+          <span>Interface theme</span>
+          <select id="themeOption">
+            <option value="auto">Automatic (system)</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
         </label>
-        <label class="modalCheckbox">
-          <input id="hideSuggestionsOption" type="checkbox" />
-          <span>Hide suggestion list</span>
+        <label class="modalSelectField" for="splitColumnWidthOption">
+          <span>Two columns from</span>
+          <input id="splitColumnWidthOption" type="number" min="240" max="2000" step="10" inputmode="numeric" value="450" />
         </label>
-        <p id="displayOptionsInactive" class="modalHint" hidden>Page display options apply only while the extension panel is open.</p>
+        <p class="modalHint">Panel width in pixels.</p>
         <div class="modalActions">
-          <button id="closeDisplayOptions" class="modalButton primary" type="button">Close</button>
+          <button id="closeAppearanceOptions" class="modalButton primary" type="button">Close</button>
         </div>
       </div>
     </div>
@@ -291,7 +296,9 @@
 
     <div id="youtubeDataOptionsPrompt" class="modalOverlay" hidden>
       <div class="modal youtubeDataOptionsModal" role="dialog" aria-modal="true" aria-labelledby="youtubeDataOptionsTitle">
-        <h2 id="youtubeDataOptionsTitle">YouTube Sniff</h2>
+        <h2 id="youtubeDataOptionsTitle">YouTube</h2>
+        <section class="youtubeOptionsSection">
+          <h3>Sniff</h3>
         <label class="modalCheckbox">
           <input id="sniffYoutubeOption" type="checkbox" />
           <span>Sniff YouTube metadata</span>
@@ -306,6 +313,19 @@
           </select>
         </label>
         <p class="modalHint">Hybrid keeps exact RSS dates for recent videos and adds older videos through Innertube pagination.</p>
+        </section>
+        <section class="youtubeOptionsSection">
+          <h3>Display</h3>
+          <label class="modalCheckbox">
+            <input id="hideCommentsOption" type="checkbox" />
+            <span>Hide comments</span>
+          </label>
+          <label class="modalCheckbox">
+            <input id="hideSuggestionsOption" type="checkbox" />
+            <span>Hide suggestion list</span>
+          </label>
+          <p id="displayOptionsInactive" class="modalHint" hidden>Page display options apply only while the extension panel is open.</p>
+        </section>
         <div class="modalActions">
           <button id="closeYoutubeDataOptions" class="modalButton primary" type="button">Close</button>
         </div>
@@ -393,10 +413,5 @@
     <script src="app.js" type="module"></script>
   </body>
 </html>
-
-
-
-
-
 
 

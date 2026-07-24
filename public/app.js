@@ -77,10 +77,12 @@ const exportNewPipeConfigEl = document.querySelector("#exportNewPipeConfig");
 const importNativeConfigEl = document.querySelector("#importNativeConfig");
 const importFreetubeConfigEl = document.querySelector("#importFreetubeConfig");
 const closeImportExportEl = document.querySelector("#closeImportExport");
-const displayOptionsPromptEl = document.querySelector("#displayOptionsPrompt");
+const appearanceOptionsPromptEl = document.querySelector("#appearanceOptionsPrompt");
+const themeOptionEl = document.querySelector("#themeOption");
+const splitColumnWidthOptionEl = document.querySelector("#splitColumnWidthOption");
 const hideCommentsOptionEl = document.querySelector("#hideCommentsOption");
 const hideSuggestionsOptionEl = document.querySelector("#hideSuggestionsOption");
-const closeDisplayOptionsEl = document.querySelector("#closeDisplayOptions");
+const closeAppearanceOptionsEl = document.querySelector("#closeAppearanceOptions");
 const displayOptionsInactiveEl = document.querySelector("#displayOptionsInactive");
 const languageOptionsPromptEl = document.querySelector("#languageOptionsPrompt");
 const youtubeTitleLanguageOptionEl = document.querySelector("#youtubeTitleLanguageOption");
@@ -234,6 +236,7 @@ const YOUTUBE_TITLE_LANGUAGE_KEY = "youtubeChannelShelfTitleLanguage";
 const INTERFACE_LANGUAGE_KEY = "youtubeChannelShelfInterfaceLanguage";
 const TRANSLATION_OVERRIDES_KEY = "youtubeChannelShelfTranslationOverrides";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
+const SPLIT_COLUMN_WIDTH_KEY = "youtubeChannelShelfSplitColumnWidth";
 const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
 const CATEGORY_ZOOM_KEY = "youtubeChannelShelfCategoryZoom";
 const SORT_MODES_KEY = "youtubeChannelShelfSortModes";
@@ -248,7 +251,9 @@ const LIST_ZOOM_STEP = 0.1;
 const CATEGORY_ZOOM_MIN = 0.8;
 const CATEGORY_ZOOM_MAX = 1.4;
 const CATEGORY_ZOOM_STEP = 0.1;
-const SPLIT_COLUMN_MIN_WIDTH = 450;
+const SPLIT_COLUMN_DEFAULT_WIDTH = 450;
+const SPLIT_COLUMN_MIN_WIDTH = 240;
+const SPLIT_COLUMN_MAX_WIDTH = 2000;
 const VIDEO_GRID_MIN_COLUMN_WIDTH = 220;
 const NEW_VIDEOS_CATEGORY_ID = "__new_videos";
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized";
@@ -266,6 +271,10 @@ const youtubeAutomaticTitleCache = new Map();
 const expandedFavoriteVideoGroups = new Set();
 const selectedFavoriteVideoIds = new Set();
 let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
+let splitColumnWidth = Math.min(
+  SPLIT_COLUMN_MAX_WIDTH,
+  Math.max(SPLIT_COLUMN_MIN_WIDTH, Number.parseInt(localStorage.getItem(SPLIT_COLUMN_WIDTH_KEY), 10) || SPLIT_COLUMN_DEFAULT_WIDTH)
+);
 let youtubeTitleLanguage = ["auto", "original"].includes(localStorage.getItem(YOUTUBE_TITLE_LANGUAGE_KEY))
   ? localStorage.getItem(YOUTUBE_TITLE_LANGUAGE_KEY)
   : "original";
@@ -909,15 +918,20 @@ function syncDisplayOptionsDialog() {
   });
 }
 
-function openDisplayOptionsDialog() {
-  if (!displayOptionsPromptEl) return;
-  syncDisplayOptionsDialog();
-  displayOptionsPromptEl.hidden = false;
-  hideCommentsOptionEl?.focus();
+function syncAppearanceOptionsDialog() {
+  if (themeOptionEl) themeOptionEl.value = globalThis.youtubeShelfTheme?.preference || "auto";
+  if (splitColumnWidthOptionEl) splitColumnWidthOptionEl.value = String(splitColumnWidth);
 }
 
-function closeDisplayOptionsDialog() {
-  if (displayOptionsPromptEl) displayOptionsPromptEl.hidden = true;
+function openAppearanceOptionsDialog() {
+  if (!appearanceOptionsPromptEl) return;
+  syncAppearanceOptionsDialog();
+  appearanceOptionsPromptEl.hidden = false;
+  themeOptionEl?.focus();
+}
+
+function closeAppearanceOptionsDialog() {
+  if (appearanceOptionsPromptEl) appearanceOptionsPromptEl.hidden = true;
 }
 
 function syncLanguageOptionsDialog() {
@@ -1169,7 +1183,7 @@ function synchronizableConfig(value = {}) {
 function setWebDavStatus(message, error = false) {
   if (!webDavStatusEl) return;
   webDavStatusEl.textContent = message;
-  webDavStatusEl.style.color = error ? "#ff736d" : "";
+  webDavStatusEl.style.color = error ? "var(--danger)" : "";
 }
 
 function webDavSettingsFromFields() {
@@ -1603,6 +1617,7 @@ function setSniffYoutubeEnabled(value) {
 function syncYoutubeDataOptionsDialog() {
   if (sniffYoutubeOptionEl) sniffYoutubeOptionEl.checked = sniffYoutubeEnabled;
   if (channelVideoSourceOptionEl) channelVideoSourceOptionEl.value = channelVideoSource;
+  syncDisplayOptionsDialog();
 }
 
 function openYoutubeDataOptionsDialog() {
@@ -1641,13 +1656,8 @@ function settingsContextActions() {
       label: "Data",
       submenu: dataContextActions()
     },
-    {
-      label: "YouTube",
-      submenu: [
-        { label: "Sniff", action: openYoutubeDataOptionsDialog },
-        { label: "Display", action: openDisplayOptionsDialog }
-      ]
-    },
+    { label: "YouTube", action: openYoutubeDataOptionsDialog },
+    { label: "Display", action: openAppearanceOptionsDialog },
     { label: "Language", action: openLanguageOptionsDialog },
     { label: "About", action: openAboutDialog }
   ];
@@ -2651,10 +2661,19 @@ function syncVideoLayoutAvailability() {
 }
 
 function updateSplitColumnState() {
-  const hasEnoughWidth = window.innerWidth >= SPLIT_COLUMN_MIN_WIDTH;
+  const hasEnoughWidth = window.innerWidth >= splitColumnWidth;
   document.body.classList.toggle("useSplitColumns", hasEnoughWidth);
   syncStackedChannelViewState();
   syncVideoLayoutAvailability();
+}
+
+function setSplitColumnWidth(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return;
+  splitColumnWidth = Math.min(SPLIT_COLUMN_MAX_WIDTH, Math.max(SPLIT_COLUMN_MIN_WIDTH, parsed));
+  localStorage.setItem(SPLIT_COLUMN_WIDTH_KEY, String(splitColumnWidth));
+  if (splitColumnWidthOptionEl) splitColumnWidthOptionEl.value = String(splitColumnWidth);
+  updateSplitColumnState();
 }
 
 function syncStackedChannelViewState() {
@@ -2679,9 +2698,18 @@ function syncYoutubeThisWeekButton() {
   if (active) youtubeThisWeekEl.setAttribute("aria-current", "page");
   else youtubeThisWeekEl.removeAttribute("aria-current");
   const count = collectNewVideos().length;
-  youtubeThisWeekEl.textContent = `${uiMessage("thisWeekInYourChannels")} (${count})`;
-  youtubeThisWeekEl.title = uiMessage("thisWeekInYourChannels");
-  youtubeThisWeekEl.setAttribute("aria-label", youtubeThisWeekEl.textContent);
+  const label = uiMessage("thisWeekInYourChannels");
+  const countEl = document.createElement("span");
+  countEl.className = "newVideosCount";
+  countEl.textContent = String(count);
+  youtubeThisWeekEl.replaceChildren(
+    document.createTextNode(`${label} (`),
+    countEl,
+    document.createTextNode(")")
+  );
+  youtubeThisWeekEl.classList.toggle("is-loading", newVideosRefreshPending);
+  youtubeThisWeekEl.title = label;
+  youtubeThisWeekEl.setAttribute("aria-label", `${label} (${count})`);
 }
 
 function syncAddListItemButton() {
@@ -4769,8 +4797,13 @@ function updateChannelSearchPlaceholder() {
       : activeView === "newVideos"
       ? "Search this week"
       : "Search channel";
-  channelSearchInputEl.placeholder = placeholder;
-  channelSearchInputEl.setAttribute("aria-label", placeholder);
+  const localizedPlaceholder = uiText(placeholder);
+  channelSearchInputEl.placeholder = localizedPlaceholder;
+  channelSearchInputEl.setAttribute("aria-label", localizedPlaceholder);
+  if (activePrimarySection === "channels") {
+    searchInputEl.placeholder = localizedPlaceholder;
+    searchInputEl.setAttribute("aria-label", localizedPlaceholder);
+  }
 }
 
 function syncChannelSearchState() {
@@ -6936,7 +6969,17 @@ exportNativeConfigEl.addEventListener("click", exportNativeConfig);
 exportNewPipeConfigEl?.addEventListener("click", exportNewPipeConfig);
 importNativeConfigEl.addEventListener("click", () => runImportFilePicker("native"));
 importFreetubeConfigEl.addEventListener("click", () => runImportFilePicker("freetube"));
-closeDisplayOptionsEl?.addEventListener("click", closeDisplayOptionsDialog);
+closeAppearanceOptionsEl?.addEventListener("click", closeAppearanceOptionsDialog);
+themeOptionEl?.addEventListener("change", () => {
+  globalThis.youtubeShelfTheme?.set(themeOptionEl.value);
+});
+splitColumnWidthOptionEl?.addEventListener("input", () => {
+  const value = Number.parseInt(splitColumnWidthOptionEl.value, 10);
+  if (value >= SPLIT_COLUMN_MIN_WIDTH && value <= SPLIT_COLUMN_MAX_WIDTH) setSplitColumnWidth(value);
+});
+splitColumnWidthOptionEl?.addEventListener("change", () => {
+  setSplitColumnWidth(splitColumnWidthOptionEl.value || SPLIT_COLUMN_DEFAULT_WIDTH);
+});
 closeLanguageOptionsEl?.addEventListener("click", closeLanguageOptionsDialog);
 youtubeTitleLanguageOptionEl?.addEventListener("change", () => setYoutubeTitleLanguage(youtubeTitleLanguageOptionEl.value));
 interfaceLanguageOptionEl?.addEventListener("change", () => setInterfaceLanguage(interfaceLanguageOptionEl.value));
@@ -7155,7 +7198,7 @@ searchInputEl.addEventListener("input", () => {
     }
     return;
   }
-  if (activePrimarySection === "channels" && (activeView !== "channels" || activeChannel)) {
+  if (activePrimarySection === "channels" && activeView !== "channels") {
     showChannelListState("");
   }
   channelSearchQuery = searchInputEl.value;
@@ -7543,7 +7586,9 @@ async function detectYoutubeSearchLocale(query) {
   return localeForYoutubeLanguage(language);
 }
 
-async function fetchYoutubeGlobalSearchPage(query, options = {}) {
+const YOUTUBE_SEARCH_ATTEMPTS = 3;
+
+async function fetchYoutubeGlobalSearchPageOnce(query, options = {}) {
   const trimmed = query.trim();
   if (!trimmed) return { results: [], continuation: "", apiKey: "", clientVersion: "" };
 
@@ -7602,6 +7647,23 @@ async function fetchYoutubeGlobalSearchPage(query, options = {}) {
     clientVersion: youtubeConfigValue(html, "INNERTUBE_CLIENT_VERSION") || youtubeConfigValue(html, "INNERTUBE_CONTEXT_CLIENT_VERSION"),
     locale
   };
+}
+
+async function fetchYoutubeGlobalSearchPage(query, options = {}) {
+  let lastError;
+  let lastEmptyPage = null;
+  for (let attempt = 1; attempt <= YOUTUBE_SEARCH_ATTEMPTS; attempt += 1) {
+    try {
+      const page = await fetchYoutubeGlobalSearchPageOnce(query, options);
+      if (options.continuation || page.results.length || page.continuation) return page;
+      lastEmptyPage = page;
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = error;
+    }
+  }
+  if (lastEmptyPage) return lastEmptyPage;
+  throw lastError;
 }
 
 async function fetchYoutubeGlobalSearchResults(query, { limit = 24, signal } = {}) {
@@ -8062,7 +8124,3 @@ loadChannels().then(async () => {
     openOfficialYoutube(initialVideoId);
   }
 });
-
-
-
-
