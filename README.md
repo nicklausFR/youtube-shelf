@@ -2,7 +2,7 @@
 
 Browser extension for managing YouTube channels and favorite videos from the side panel.
 
-Current version: `3.3.12`.
+Current version: `3.3.13`.
 
 ## Main Features
 

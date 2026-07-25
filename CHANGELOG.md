@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.13 - 2026-07-25
+
+- Added progressive YouTube-powered searches within channels, with immediate local title matches and duplicate-free result merging.
+- Followed YouTube search continuations to return older matching videos instead of only the first result page.
+- Added compact animated search dots and fixed stale channel-list messages while searching channel videos.
+- Improved YouTube search reliability with service-worker transport, retries, and complete WEB client context.
+
 ## 3.3.12 - 2026-07-25
 
 - Kept the video-list presentation controls visible when the extension is narrowed to a single-column layout.
