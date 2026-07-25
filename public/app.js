@@ -1082,7 +1082,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.7";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.8";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1123,7 +1123,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.7";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.8";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -1329,7 +1329,7 @@ function closeWebDavSyncDialog() {
 
 async function readSynchronizationEnvelope(settings = webDavSyncSettings) {
   const response = await webDavFetch(settings.url, { method: "GET" }, settings);
-  if (response.status === 404) return { envelope: null, etag: "", exists: false };
+  if (response.status === 404) return { envelope: null, etag: "", lastModified: "", exists: false };
   if (!response.ok) throw await webDavError(response, "Unable to read the synchronization file");
   const parsed = await response.json();
   if (!parsed || parsed.formatVersion !== 1 || !parsed.current?.data || !Array.isArray(parsed.current.data.channels)) {
@@ -1344,20 +1344,32 @@ async function readSynchronizationEnvelope(settings = webDavSyncSettings) {
   return {
     envelope: { ...parsed, current: normalizedCurrent },
     etag: response.headers.get("ETag") || "",
+    lastModified: response.headers.get("Last-Modified") || "",
     exists: true,
     requiresCompaction: JSON.stringify(parsed.current.data) !== JSON.stringify(synchronizedData)
   };
 }
 
+function isStrongWebDavEtag(etag) {
+  return Boolean(etag && !/^\s*W\//i.test(etag));
+}
+
 async function writeSynchronizationEnvelope(envelope, options = {}, settings = webDavSyncSettings) {
-  const { etag = "", exists = false } = options;
+  const { etag = "", lastModified = "", exists = false } = options;
+  const writePrecondition = isStrongWebDavEtag(etag)
+    ? { "If-Match": etag }
+    : exists && lastModified
+      ? { "If-Unmodified-Since": lastModified }
+      : exists
+        ? {}
+        : { "If-None-Match": "*" };
   let response;
   try {
     response = await webDavFetch(settings.url, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(etag ? { "If-Match": etag } : exists ? {} : { "If-None-Match": "*" })
+        ...writePrecondition
       },
       body: JSON.stringify(envelope)
     }, settings);
