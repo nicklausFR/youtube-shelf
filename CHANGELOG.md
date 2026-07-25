@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.7 - 2026-07-25
+
+- Improved adaptive display behavior and scoped channel search.
+- Made YouTube channel video loading and refreshes more resilient and configurable.
+- Reorganized YouTube sniff and display options with clearer refresh controls.
+- Fixed missing weekly videos when a channel's local feed cache is unavailable.
+
 ## 3.3.4 - 2026-07-23
 
 - Added YouTube-native Popular and Latest ordering with continuation pagination for channel videos.
