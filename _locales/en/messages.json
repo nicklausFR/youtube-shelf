@@ -169,6 +169,8 @@
   "noChannelRecognized": { "message": "No channel recognized" },
   "searchYoutubeEmpty": { "message": "Search YouTube to see results." },
   "searchingYoutube": { "message": "Searching YouTube…" },
+  "youtubeChannelResult": { "message": "$1 result from YouTube" },
+  "youtubeChannelResults": { "message": "$1 results from YouTube" },
   "noYoutubeVideoFound": { "message": "No YouTube video found." },
   "youtubeSearchSuggestions": { "message": "YouTube search suggestions" },
   "addChannelHere": { "message": "Add a channel here" },

@@ -50,6 +50,67 @@ chrome.webRequest.onErrorOccurred.addListener((details) => {
   reportThumbnailNetwork({ requests: 1, failures: 1, activeDelta: -1 });
 }, { urls: THUMBNAIL_URLS, types: ["image"] });
 
+async function fetchYoutubeSearchWithRetry(url, options) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!["YOUTUBE_SHELF_SEARCH_PAGE", "YOUTUBE_SHELF_SEARCH_CONTINUATION"].includes(message?.type)) {
+    return undefined;
+  }
+  const isContinuation = message.type === "YOUTUBE_SHELF_SEARCH_CONTINUATION";
+  let url;
+  if (isContinuation) {
+    url = new URL("https://www.youtube.com/youtubei/v1/search?prettyPrint=false");
+  } else {
+    try {
+      url = new URL(message.url);
+    } catch {
+      sendResponse({ ok: false, error: "Invalid YouTube search URL" });
+      return false;
+    }
+    if (url.protocol !== "https:" || url.hostname !== "www.youtube.com" || url.pathname !== "/results") {
+      sendResponse({ ok: false, error: "Unsupported YouTube search URL" });
+      return false;
+    }
+  }
+  const options = isContinuation ? {
+    method: "POST",
+    cache: "no-store",
+    credentials: "omit",
+    headers: {
+      "Content-Type": "application/json",
+      "X-YouTube-Client-Name": "1",
+      "X-YouTube-Client-Version": String(message.clientVersion || ""),
+      ...(message.visitorData ? { "X-Goog-Visitor-Id": String(message.visitorData) } : {})
+    },
+    body: JSON.stringify(message.body || {})
+  } : {
+    cache: "no-store",
+    credentials: "omit"
+  };
+  fetchYoutubeSearchWithRetry(url, options)
+    .then(async (response) => {
+      if (!response.ok) {
+        sendResponse({ ok: false, error: `HTTP ${response.status}` });
+        return;
+      }
+      sendResponse(isContinuation
+        ? { ok: true, data: await response.json() }
+        : { ok: true, text: await response.text() });
+    })
+    .catch((error) => sendResponse({ ok: false, error: error.message || "YouTube search failed" }));
+  return true;
+});
+
 chrome.sidePanel?.onOpened?.addListener?.((info) => {
   if (info.windowId !== undefined) openWindows.add(info.windowId);
 });

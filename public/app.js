@@ -1,5 +1,5 @@
 import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-export.js";
-import { searchYoutubeChannelVideos } from "./youtube-channel-search.js";
+import { searchTextMatchesQuery } from "./youtube-channel-search.js";
 import { fetchYoutubeChannelVideosPage } from "./youtube-channel-videos.js";
 import { createI18n } from "./i18n.js";
 import { mergeSynchronizationData, synchronizationContentChanged } from "./sync-merge.js";
@@ -187,6 +187,7 @@ let channelVideoSearchQueryKey = "";
 let channelVideoSearchResults = [];
 let channelVideoSearchLoading = false;
 let channelVideoSearchError = "";
+let channelVideoSearchUsedYoutube = false;
 let currentWatchLaterStartedAt = 0;
 let lastVideoChannelNavigationAt = 0;
 let lastVideoChannelNavigationId = "";
@@ -3998,6 +3999,15 @@ function renderChannelVideos(videos = currentVideos) {
   });
 }
 
+function appendChannelSearchProgress() {
+  const progress = document.createElement("div");
+  progress.className = "channelSearchProgress";
+  progress.textContent = "...";
+  progress.setAttribute("role", "status");
+  progress.setAttribute("aria-label", uiMessage("searchingYoutube"));
+  videosEl.append(progress);
+}
+
 async function toggleWatchLater(video) {
   if (watchLater[video.id]) {
     delete watchLater[video.id];
@@ -4885,7 +4895,7 @@ function sourceChannelsForSearch() {
 }
 
 function isSelectedChannelSearchScope() {
-  return activeView === "channels" && Boolean(activeChannel);
+  return activePrimarySection === "channels" && Boolean(activeChannel);
 }
 
 function updateChannelSearchPlaceholder() {
@@ -4986,27 +4996,20 @@ function resetSelectedChannelVideoSearch() {
   channelVideoSearchResults = [];
   channelVideoSearchLoading = false;
   channelVideoSearchError = "";
+  channelVideoSearchUsedYoutube = false;
 }
 
 async function runSelectedChannelVideoSearch(channel, rawQuery, requestId) {
   const controller = new AbortController();
   channelVideoSearchController = controller;
-  channelVideoSearchLoading = true;
-  channelVideoSearchError = "";
-  renderSearchedVideos();
   try {
-    const result = await searchYoutubeChannelVideos({
-      channelId: channel.id,
-      query: rawQuery,
-      signal: controller.signal,
-      onPage: ({ videos }) => {
-        if (requestId !== channelVideoSearchRequestId || activeChannel?.id !== channel.id) return;
-        channelVideoSearchResults = innertubeVideosWithChannel(videos, channel);
-        renderSearchedVideos();
-      }
+    const result = await fetchYoutubeScopedChannelSearch(channel, rawQuery, controller.signal, (videos) => {
+      if (requestId !== channelVideoSearchRequestId || activeChannel?.id !== channel.id) return;
+      channelVideoSearchResults = videos;
+      renderSearchedVideos();
     });
     if (requestId !== channelVideoSearchRequestId || activeChannel?.id !== channel.id) return;
-    channelVideoSearchResults = innertubeVideosWithChannel(result.videos, channel);
+    channelVideoSearchResults = result;
   } catch (error) {
     if (error?.name === "AbortError" || requestId !== channelVideoSearchRequestId) return;
     channelVideoSearchError = error.message || "YouTube channel search failed";
@@ -5035,8 +5038,11 @@ function scheduleSelectedChannelVideoSearch() {
   const requestId = channelVideoSearchRequestId;
   channelVideoSearchQueryKey = queryKey;
   channelVideoSearchResults = [];
-  channelVideoSearchLoading = false;
   channelVideoSearchError = "";
+  channelVideoSearchUsedYoutube = !channelVideoMetadataIsComplete(channel);
+  channelVideoSearchLoading = channelVideoSearchUsedYoutube;
+  renderSearchedVideos();
+  if (!channelVideoSearchUsedYoutube) return;
   channelVideoSearchTimer = window.setTimeout(() => {
     channelVideoSearchTimer = 0;
     runSelectedChannelVideoSearch(channel, rawQuery, requestId).catch(() => {});
@@ -5052,15 +5058,30 @@ function renderSearchedVideos() {
     return;
   }
 
+  const activeChannelIsRendered = [...channelsEl.querySelectorAll(".channel")]
+    .some((button) => button.dataset.channelId === activeChannel?.id);
+  if (activeChannel?.id && !activeChannelIsRendered) renderChannels([activeChannel]);
+
   const localVideos = channelVideoSearchCandidates(activeChannel)
-    .filter((video) => searchableTextForChannelVideo(video).includes(query));
+    .filter((video) => searchTextMatchesQuery(searchableTextForChannelVideo(video), query));
+  const immediateLocalVideos = localVideos
+    .filter((video) => searchTextMatchesQuery(video.title, query));
   const remoteVideos = channelVideoSearchQueryKey === query ? channelVideoSearchResults : [];
-  const filteredVideos = mergeChannelVideoLists(remoteVideos, localVideos);
+  const usesYoutube = channelVideoSearchQueryKey === query && channelVideoSearchUsedYoutube;
+  const filteredVideos = usesYoutube
+    ? mergeChannelVideoLists(immediateLocalVideos, remoteVideos)
+    : localVideos;
   renderChannelVideos(filteredVideos);
-  if (channelVideoSearchQueryKey === query && channelVideoSearchLoading) {
-    setStatus(`Searching all channel videos… ${filteredVideos.length} found`, true);
-  } else if (channelVideoSearchQueryKey === query && channelVideoSearchError) {
-    setStatus(`Full channel search unavailable: ${channelVideoSearchError}`, true);
+  if (usesYoutube && channelVideoSearchLoading) {
+    appendChannelSearchProgress();
+    setStatus();
+  } else if (usesYoutube && channelVideoSearchError) {
+    setStatus(`YouTube channel search unavailable: ${channelVideoSearchError}`, true);
+  } else if (usesYoutube) {
+    setStatus(
+      uiMessage(filteredVideos.length === 1 ? "youtubeChannelResult" : "youtubeChannelResults", [filteredVideos.length]),
+      !filteredVideos.length
+    );
   } else {
     setStatus(filteredVideos.length ? `${filteredVideos.length} videos found` : "No videos found in this channel.", !filteredVideos.length);
   }
@@ -5255,7 +5276,9 @@ async function enrichChannelsForSearch(channels) {
         changed = true;
         if (activeChannel?.id) activeChannel = allChannels.find((item) => item.id === activeChannel.id) || activeChannel;
         renderCategories();
-        renderChannels(sourceChannelsForSearch());
+        if (!isSelectedChannelSearchScope() && normalizeSearchText(channelSearchQuery.trim()) === query) {
+          renderChannels(sourceChannelsForSearch());
+        }
       } catch {
         // Search metadata is opportunistic.
       }
@@ -5867,7 +5890,9 @@ function showFavoritesCategory(categoryId = "", options = {}) {
 
 function renderChannels(channels) {
   channelsEl.classList.remove("videoListHost");
-  const visibleChannels = sortChannelsForDisplay(filterChannelsForSearch(channels));
+  const visibleChannels = sortChannelsForDisplay(
+    isSelectedChannelSearchScope() ? channels : filterChannelsForSearch(channels)
+  );
   if (!visibleChannels.length) {
     if (!channelSearchQuery.trim()) {
       channelsEl.replaceChildren();
@@ -6188,6 +6213,125 @@ async function loadChannelVideosForYoutubeOrder(sort) {
   } finally {
     if (requestId === channelVideoLoadRequestId) refreshEl.disabled = false;
   }
+}
+
+function channelVideoMetadataIsComplete(channel) {
+  const expectedVideoCount = Number(channel?.channelVideoCount);
+  if (!Number.isFinite(expectedVideoCount) || expectedVideoCount <= 0) return false;
+  const availableVideoIds = new Set(
+    channelVideoSearchCandidates(channel)
+      .map((video) => video?.id)
+      .filter(Boolean)
+  );
+  return availableVideoIds.size >= expectedVideoCount;
+}
+
+async function fetchYoutubeScopedChannelSearch(channel, rawQuery, signal, onPage) {
+  const searchQuery = [rawQuery, channel.title].filter(Boolean).join(" ");
+  const locale = await detectYoutubeSearchLocale(rawQuery);
+  const url = new URL("https://www.youtube.com/results");
+  url.searchParams.set("search_query", searchQuery);
+  url.searchParams.set("sp", "EgIQAfABAQ%3D%3D");
+  url.searchParams.set("hl", locale.hl);
+  url.searchParams.set("gl", locale.gl);
+  const html = await fetchYoutubeSearchHtml(url, signal);
+  const initialData = extractJsonObjectAfter(html, "ytInitialData")
+    || extractJsonObjectAfter(html, "var ytInitialData =");
+  if (!initialData) throw new Error("YouTube returned no search data");
+  const data = JSON.parse(initialData);
+  const matches = new Map();
+  const appendMatches = (results) => {
+    for (const result of results) {
+      if (result.type !== "video" || result.channelId !== channel.id) continue;
+      if (!searchTextMatchesQuery(result.title, rawQuery)) continue;
+      const { type: _type, ...video } = result;
+      matches.set(video.id, videoWithChannel(video, channel));
+    }
+    onPage?.([...matches.values()]);
+  };
+
+  appendMatches(youtubeSearchResultsFromData(data));
+  let continuation = youtubeSearchContinuationToken(data);
+  const apiKey = youtubeConfigValue(html, "INNERTUBE_API_KEY");
+  const clientVersion = youtubeConfigValue(html, "INNERTUBE_CLIENT_VERSION")
+    || youtubeConfigValue(html, "INNERTUBE_CONTEXT_CLIENT_VERSION");
+  const visitorData = youtubeConfigValue(html, "VISITOR_DATA")
+    || youtubeConfigValue(html, "INNERTUBE_CONTEXT_VISITOR_DATA");
+  const seenContinuations = new Set();
+
+  while (continuation && clientVersion && !seenContinuations.has(continuation)) {
+    seenContinuations.add(continuation);
+    const page = await fetchYoutubeGlobalSearchPage(searchQuery, {
+      continuation,
+      apiKey,
+      clientVersion,
+      visitorData,
+      locale,
+      signal
+    });
+    appendMatches(page.results);
+    continuation = page.continuation || "";
+  }
+  return [...matches.values()];
+}
+
+async function fetchYoutubeSearchHtml(url, signal) {
+  if (!globalThis.chrome?.runtime?.sendMessage) {
+    const response = await fetch(url, { cache: "no-store", credentials: "omit", signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.text();
+  }
+  const abortPromise = new Promise((_, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  });
+  const result = await Promise.race([
+    chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_SEARCH_PAGE", url: String(url) }),
+    abortPromise
+  ]);
+  if (!result?.ok) throw new Error(result?.error || "YouTube search failed");
+  return result.text || "";
+}
+
+async function fetchYoutubeSearchContinuation(body, { clientVersion, visitorData = "", signal } = {}) {
+  if (!globalThis.chrome?.runtime?.sendMessage) {
+    const response = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "omit",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-YouTube-Client-Name": "1",
+        "X-YouTube-Client-Version": clientVersion,
+        ...(visitorData ? { "X-Goog-Visitor-Id": visitorData } : {})
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }
+  const abortPromise = new Promise((_, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  });
+  const result = await Promise.race([
+    chrome.runtime.sendMessage({
+      type: "YOUTUBE_SHELF_SEARCH_CONTINUATION",
+      body,
+      clientVersion,
+      visitorData
+    }),
+    abortPromise
+  ]);
+  if (!result?.ok) throw new Error(result?.error || "YouTube search failed");
+  return result.data || {};
 }
 
 function syncActiveChannelActions() {
@@ -7491,7 +7635,7 @@ searchInputEl.addEventListener("input", () => {
     }
     return;
   }
-  if (activePrimarySection === "channels" && activeView !== "channels") {
+  if (activePrimarySection === "channels" && !activeChannel && activeView !== "channels") {
     showChannelListState("");
   }
   channelSearchQuery = searchInputEl.value;
@@ -7898,37 +8042,37 @@ async function fetchYoutubeGlobalSearchPageOnce(query, options = {}) {
   const locale = options.locale || await detectYoutubeSearchLocale(trimmed);
 
   if (options.continuation) {
-    if (!options.apiKey || !options.clientVersion) {
+    if (!options.clientVersion) {
       return { results: [], continuation: "", apiKey: options.apiKey || "", clientVersion: options.clientVersion || "" };
     }
-    const response = await fetch(`https://www.youtube.com/youtubei/v1/search?key=${encodeURIComponent(options.apiKey)}&prettyPrint=false`, {
-      method: "POST",
-      cache: "no-store",
-      signal: options.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "X-YouTube-Client-Name": "1",
-        "X-YouTube-Client-Version": options.clientVersion
-      },
-      body: JSON.stringify({
-        context: {
-          client: {
-            clientName: "WEB",
-            clientVersion: options.clientVersion,
-            hl: locale.hl,
-            gl: locale.gl
-          }
+    const body = {
+      context: {
+        client: {
+          clientName: "WEB",
+          clientVersion: options.clientVersion,
+          hl: locale.hl,
+          gl: locale.gl,
+          originalUrl: "https://www.youtube.com",
+          platform: "DESKTOP",
+          utcOffsetMinutes: 0,
+          ...(options.visitorData ? { visitorData: options.visitorData } : {})
         },
-        continuation: options.continuation
-      })
+        request: { internalExperimentFlags: [], useSsl: true },
+        user: { lockedSafetyMode: false }
+      },
+      continuation: options.continuation
+    };
+    const data = await fetchYoutubeSearchContinuation(body, {
+      clientVersion: options.clientVersion,
+      visitorData: options.visitorData,
+      signal: options.signal
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
     return {
       results: youtubeSearchResultsFromData(data),
       continuation: youtubeSearchContinuationToken(data),
       apiKey: options.apiKey,
       clientVersion: options.clientVersion,
+      visitorData: options.visitorData || "",
       locale
     };
   }
@@ -7948,6 +8092,7 @@ async function fetchYoutubeGlobalSearchPageOnce(query, options = {}) {
     continuation: youtubeSearchContinuationToken(data),
     apiKey: youtubeConfigValue(html, "INNERTUBE_API_KEY"),
     clientVersion: youtubeConfigValue(html, "INNERTUBE_CLIENT_VERSION") || youtubeConfigValue(html, "INNERTUBE_CONTEXT_CLIENT_VERSION"),
+    visitorData: youtubeConfigValue(html, "VISITOR_DATA") || youtubeConfigValue(html, "INNERTUBE_CONTEXT_VISITOR_DATA"),
     locale
   };
 }
