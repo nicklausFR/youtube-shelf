@@ -1082,7 +1082,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.8";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.9";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1123,7 +1123,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.8";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.9";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -1350,26 +1350,39 @@ async function readSynchronizationEnvelope(settings = webDavSyncSettings) {
   };
 }
 
-function isStrongWebDavEtag(etag) {
-  return Boolean(etag && !/^\s*W\//i.test(etag));
+function webDavConflictError() {
+  const error = new Error("The remote file changed during synchronization");
+  error.code = "WEBDAV_CONFLICT";
+  return error;
+}
+
+function sameSynchronizationSnapshot(left, right) {
+  if (!left || !right) return left === right;
+  const leftChangeId = String(left.changeId || "");
+  const rightChangeId = String(right.changeId || "");
+  if ((leftChangeId || rightChangeId) && leftChangeId !== rightChangeId) return false;
+  return Number(left.revision || 0) === Number(right.revision || 0)
+    && String(left.checksum || "") === String(right.checksum || "")
+    && String(left.updatedAt || "") === String(right.updatedAt || "");
 }
 
 async function writeSynchronizationEnvelope(envelope, options = {}, settings = webDavSyncSettings) {
-  const { etag = "", lastModified = "", exists = false } = options;
-  const writePrecondition = isStrongWebDavEtag(etag)
-    ? { "If-Match": etag }
-    : exists && lastModified
-      ? { "If-Unmodified-Since": lastModified }
-      : exists
-        ? {}
-        : { "If-None-Match": "*" };
+  const { exists = false } = options;
+  // A number of WebDAV gateways reject conditional PUT requests even when the
+  // resource has not changed. Verify the remote state immediately before the
+  // write instead, then send a plain PUT that these servers accept.
+  const verification = await readSynchronizationEnvelope(settings);
+  if (verification.exists !== exists
+    || (exists
+      && !sameSynchronizationSnapshot(options.envelope?.current, verification.envelope?.current))) {
+    throw webDavConflictError();
+  }
   let response;
   try {
     response = await webDavFetch(settings.url, {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json",
-        ...writePrecondition
+        "Content-Type": "application/json"
       },
       body: JSON.stringify(envelope)
     }, settings);
@@ -1388,9 +1401,7 @@ async function writeSynchronizationEnvelope(envelope, options = {}, settings = w
     throw error;
   }
   if (response.status === 412) {
-    const error = new Error("The remote file changed during synchronization");
-    error.code = "WEBDAV_CONFLICT";
-    throw error;
+    throw webDavConflictError();
   }
   if (!response.ok && response.status !== 201 && response.status !== 204) {
     throw await webDavError(response, "Unable to write the synchronization file");
