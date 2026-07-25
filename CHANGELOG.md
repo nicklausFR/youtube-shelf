@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.10 - 2026-07-25
+
+- Replaced whole-snapshot winner selection with a three-way merge that preserves additions made on different devices.
+- Added a per-device synchronization base so later additions, edits, and deletions can be reconciled safely.
+- Prevented YouTube feed-cache refreshes from making stale synchronized content appear newer.
+- Added the five previous remote snapshots to the synchronization file for recovery.
+
 ## 3.3.9 - 2026-07-25
 
 - Fixed WebDAV synchronization through servers that reject conditional `PUT` requests.
