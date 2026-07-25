@@ -100,6 +100,7 @@
   "display": { "message": "Affichage" },
   "about": { "message": "À propos" },
   "addChannel": { "message": "Ajouter une chaîne" },
+  "addToMyChannels": { "message": "Ajouter à mes chaînes" },
   "addFavoriteVideo": { "message": "Ajouter une vidéo favorite" },
   "addWatchLaterVideo": { "message": "Ajouter une vidéo à la liste À regarder" },
   "youtubeVideoUrlOrId": { "message": "URL ou identifiant de vidéo YouTube" },
@@ -130,6 +131,8 @@
   "allChannels": { "message": "Toutes les chaînes" },
   "thisWeek": { "message": "Cette semaine" },
   "thisWeekInYourChannels": { "message": "Cette semaine dans vos chaînes" },
+  "hideThisWeekInYourChannels": { "message": "Masquer « Cette semaine dans vos chaînes »" },
+  "showThisWeekInYourChannels": { "message": "Afficher « Cette semaine dans vos chaînes »" },
   "sortBy": { "message": "Trier : $1" },
   "sortRelevance": { "message": "Pertinence" },
   "sortDefaultOrder": { "message": "Ordre par défaut" },
@@ -214,5 +217,9 @@
   "searchFailed": { "message": "Échec de la recherche : $1" },
   "channel": { "message": "Chaîne" },
   "searching": { "message": "Recherche en cours…" },
-  "noChannelFound": { "message": "Aucune chaîne trouvée." }
+  "noChannelFound": { "message": "Aucune chaîne trouvée." },
+  "networkMeterLabel": { "message": "Activité des données YouTube" },
+  "networkMeterTooltip": { "message": "$1 requêtes, $2" },
+  "youtubeTab": { "message": "Onglet YouTube" },
+  "blank": { "message": "Blank" }
 }

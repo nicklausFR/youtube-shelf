@@ -5,6 +5,50 @@ const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const HEARTBEAT_TTL_MS = 2500;
+const THUMBNAIL_URLS = [
+  "https://i.ytimg.com/*",
+  "https://yt3.ggpht.com/*",
+  "https://yt3.googleusercontent.com/*"
+];
+const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
+const thumbnailResponseBytes = new Map();
+
+function isExtensionThumbnailRequest(details) {
+  return details.initiator === extensionOrigin || String(details.documentUrl || "").startsWith(extensionOrigin);
+}
+
+function reportThumbnailNetwork(value) {
+  Promise.resolve(chrome.runtime.sendMessage({
+    type: "YOUTUBE_SHELF_THUMBNAIL_NETWORK",
+    ...value
+  })).catch(() => {});
+}
+
+chrome.webRequest.onBeforeRequest.addListener((details) => {
+  if (!isExtensionThumbnailRequest(details)) return;
+  reportThumbnailNetwork({ activeDelta: 1 });
+}, { urls: THUMBNAIL_URLS, types: ["image"] });
+
+chrome.webRequest.onHeadersReceived.addListener((details) => {
+  if (!isExtensionThumbnailRequest(details)) return;
+  const contentLength = details.responseHeaders
+    ?.find((header) => header.name.toLowerCase() === "content-length")
+    ?.value;
+  thumbnailResponseBytes.set(details.requestId, Math.max(0, Number.parseInt(contentLength || "0", 10) || 0));
+}, { urls: THUMBNAIL_URLS, types: ["image"] }, ["responseHeaders"]);
+
+chrome.webRequest.onCompleted.addListener((details) => {
+  if (!isExtensionThumbnailRequest(details)) return;
+  const receivedBytes = thumbnailResponseBytes.get(details.requestId) || 0;
+  thumbnailResponseBytes.delete(details.requestId);
+  reportThumbnailNetwork({ requests: 1, activeDelta: -1, receivedBytes });
+}, { urls: THUMBNAIL_URLS, types: ["image"] });
+
+chrome.webRequest.onErrorOccurred.addListener((details) => {
+  if (!isExtensionThumbnailRequest(details)) return;
+  thumbnailResponseBytes.delete(details.requestId);
+  reportThumbnailNetwork({ requests: 1, failures: 1, activeDelta: -1 });
+}, { urls: THUMBNAIL_URLS, types: ["image"] });
 
 chrome.sidePanel?.onOpened?.addListener?.((info) => {
   if (info.windowId !== undefined) openWindows.add(info.windowId);

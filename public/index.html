@@ -25,6 +25,9 @@
       <form id="searchForm" class="topSearchForm" role="search">
         <input id="searchInput" type="search" placeholder="Search YouTube" autocomplete="off" aria-label="Search YouTube" aria-autocomplete="list" aria-controls="globalSearchResults" aria-expanded="false">
       </form>
+      <button id="networkSniffer" class="networkSnifferButton" type="button" aria-label="Extension network activity">
+        <img class="networkSnifferImage" src="../icons/network-sniffer.png" alt="">
+      </button>
       <div id="globalSearchResults" class="globalSearchResults" role="listbox" aria-label="YouTube search suggestions" hidden></div>
     </header>
 
@@ -224,6 +227,13 @@
           <input id="splitColumnWidthOption" type="number" min="240" max="2000" step="10" inputmode="numeric" value="450" />
         </label>
         <p class="modalHint">Panel width in pixels.</p>
+        <label class="modalSelectField" for="youtubeTabOption">
+          <span>YouTube tab</span>
+          <select id="youtubeTabOption">
+            <option value="this-week">This week in your channels</option>
+            <option value="blank">Blank</option>
+          </select>
+        </label>
         <section class="youtubeOptionsSection">
           <h3>YouTube</h3>
           <label class="modalCheckbox">

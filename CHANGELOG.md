@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.11 - 2026-07-25
+
+- Added a compact YouTube network-activity meter with request and transferred-data totals, including thumbnails.
+- Added a configurable blank YouTube home, with context-menu actions to hide or restore the weekly channel view.
+- Made the weekly channel button force a feed refresh and removed its video counter.
+- Fixed opening videos after navigating from Favorites to a channel that is not yet in the shelf.
+- Added a clear “Add to my channels” action for external channels.
+- Moved list display controls above the active channel’s video list and refined their compact layout.
+
 ## 3.3.10 - 2026-07-25
 
 - Replaced whole-snapshot winner selection with a three-way merge that preserves additions made on different devices.
