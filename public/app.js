@@ -2,6 +2,7 @@ import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-
 import { searchYoutubeChannelVideos } from "./youtube-channel-search.js";
 import { fetchYoutubeChannelVideosPage } from "./youtube-channel-videos.js";
 import { createI18n } from "./i18n.js";
+import { mergeSynchronizationData, synchronizationContentChanged } from "./sync-merge.js";
 
 const interfaceI18n = await createI18n(localStorage.getItem("youtubeChannelShelfInterfaceLanguage") || "auto");
 
@@ -1082,7 +1083,7 @@ function compareVersionNumbers(left, right) {
 
 async function refreshAboutLatestVersion() {
   if (!aboutLatestVersionEl) return;
-  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.9";
+  const currentVersion = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.10";
   if (aboutVersionEl) aboutVersionEl.textContent = currentVersion;
   if (aboutLatestVersionRowEl) aboutLatestVersionRowEl.hidden = false;
   if (aboutDownloadLatestEl) aboutDownloadLatestEl.hidden = true;
@@ -1123,7 +1124,7 @@ async function refreshAboutLatestVersion() {
 
 function openAboutDialog() {
   if (!aboutPromptEl) return;
-  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.9";
+  if (aboutVersionEl) aboutVersionEl.textContent = globalThis.chrome?.runtime?.getManifest?.().version || "3.3.10";
   aboutPromptEl.hidden = false;
   refreshAboutLatestVersion();
   closeAboutEl?.focus();
@@ -1409,18 +1410,18 @@ async function writeSynchronizationEnvelope(envelope, options = {}, settings = w
   return response.headers.get("ETag") || "";
 }
 
-function snapshotTimestamp(snapshot) {
-  return Date.parse(snapshot?.updatedAt || snapshot?.data?.updatedAt || "") || 0;
-}
-
-function compareSyncSnapshots(left, right) {
-  const timestampDifference = snapshotTimestamp(left) - snapshotTimestamp(right);
-  if (timestampDifference) return timestampDifference;
-  const revisionDifference = Number(left?.revision || 0) - Number(right?.revision || 0);
-  if (revisionDifference) return revisionDifference;
-  const deviceDifference = String(left?.updatedBy || "").localeCompare(String(right?.updatedBy || ""));
-  if (deviceDifference) return deviceDifference;
-  return String(left?.checksum || "").localeCompare(String(right?.checksum || ""));
+function synchronizationHistory(envelope, nextSnapshot) {
+  const candidates = [envelope?.current, ...(Array.isArray(envelope?.history) ? envelope.history : [])].filter(Boolean);
+  const seen = new Set([nextSnapshot.changeId, nextSnapshot.checksum].filter(Boolean));
+  const history = [];
+  for (const snapshot of candidates) {
+    const identity = snapshot.changeId || snapshot.checksum;
+    if (!identity || seen.has(identity)) continue;
+    seen.add(identity);
+    history.push(snapshot);
+    if (history.length >= 5) break;
+  }
+  return history;
 }
 
 async function applySynchronizedConfig(snapshot, etag = "") {
@@ -1451,6 +1452,7 @@ async function applySynchronizedConfig(snapshot, etag = "") {
     updatedAt: snapshot.updatedAt || nextConfig.updatedAt,
     updatedBy: snapshot.updatedBy || "",
     checksum: await configChecksum(synchronizedData),
+    baseData: synchronizedData,
     etag
   });
   applyExternalConfig(nextConfig);
@@ -1478,34 +1480,12 @@ async function synchronizeWebDavConfig(options = {}) {
     const localConfig = config;
     const localSynchronizedData = synchronizableConfig(localConfig);
     const localChecksum = await configChecksum(localSynchronizedData);
+    const baseData = webDavSyncSettings.baseData
+      ? synchronizableConfig(webDavSyncSettings.baseData)
+      : null;
+    const baseChecksum = baseData ? await configChecksum(baseData) : "";
     if (config !== localConfig) {
       scheduleWebDavSynchronization();
-      return;
-    }
-    const localMatchesLastSync = Boolean(webDavSyncSettings.checksum) && webDavSyncSettings.checksum === localChecksum;
-    const localSnapshot = {
-      revision: localMatchesLastSync ? Number(webDavSyncSettings.revision || 0) : Number(webDavSyncSettings.revision || 0) + 1,
-      changeId: localMatchesLastSync ? webDavSyncSettings.changeId || "" : "",
-      parentChangeId: webDavSyncSettings.changeId || "",
-      updatedAt: localSynchronizedData.updatedAt || new Date().toISOString(),
-      updatedBy: localMatchesLastSync ? webDavSyncSettings.updatedBy || webDavSyncSettings.deviceId : webDavSyncSettings.deviceId,
-      checksum: localChecksum,
-      data: localSynchronizedData
-    };
-
-    if (remoteSnapshot && compareSyncSnapshots(remoteSnapshot, localSnapshot) > 0) {
-      setWebDavStatus("Applying remote configuration...");
-      let remoteEtag = remoteState.etag;
-      if (remoteState.requiresCompaction) {
-        setWebDavStatus("Compacting remote configuration...");
-        remoteEtag = await writeSynchronizationEnvelope({
-          formatVersion: 1,
-          current: remoteSnapshot,
-          history: Array.isArray(remoteEnvelope.history) ? remoteEnvelope.history : []
-        }, remoteState);
-      }
-      await applySynchronizedConfig(remoteSnapshot, remoteEtag);
-      setWebDavStatus(`Received - revision ${Number(remoteSnapshot.revision || 0)}`);
       return;
     }
 
@@ -1527,9 +1507,46 @@ async function synchronizeWebDavConfig(options = {}) {
         updatedAt: remoteSnapshot.updatedAt || localConfig.updatedAt,
         updatedBy: remoteSnapshot.updatedBy || "",
         checksum: localChecksum,
+        baseData: localSynchronizedData,
         etag: remoteEtag
       });
       setWebDavStatus(`Synchronized - revision ${Number(remoteSnapshot.revision || 0)}`);
+      return;
+    }
+
+    const localChanged = !baseData || localChecksum !== baseChecksum;
+    const remoteChanged = !baseData || !remoteSnapshot || remoteSnapshot.checksum !== baseChecksum;
+
+    if (remoteSnapshot && !localChanged && remoteChanged) {
+      setWebDavStatus("Applying remote configuration...");
+      let remoteEtag = remoteState.etag;
+      if (remoteState.requiresCompaction) {
+        setWebDavStatus("Compacting remote configuration...");
+        remoteEtag = await writeSynchronizationEnvelope({
+          formatVersion: 1,
+          current: remoteSnapshot,
+          history: Array.isArray(remoteEnvelope.history) ? remoteEnvelope.history : []
+        }, remoteState);
+      }
+      await applySynchronizedConfig(remoteSnapshot, remoteEtag);
+      setWebDavStatus(`Received - revision ${Number(remoteSnapshot.revision || 0)}`);
+      return;
+    }
+
+    let synchronizedData = localSynchronizedData;
+    if (remoteSnapshot && remoteChanged) {
+      setWebDavStatus(baseData ? "Merging concurrent changes..." : "Merging devices for first synchronization...");
+      synchronizedData = synchronizableConfig(mergeSynchronizationData(
+        baseData,
+        localSynchronizedData,
+        remoteSnapshot.data
+      ));
+    }
+
+    const synchronizedChecksum = await configChecksum(synchronizedData);
+    if (remoteSnapshot?.checksum === synchronizedChecksum) {
+      await applySynchronizedConfig(remoteSnapshot, remoteState.etag);
+      setWebDavStatus(`Merged - revision ${Number(remoteSnapshot.revision || 0)}`);
       return;
     }
 
@@ -1538,10 +1555,10 @@ async function synchronizeWebDavConfig(options = {}) {
       revision,
       changeId: randomSyncId(),
       parentChangeId: remoteSnapshot?.changeId || webDavSyncSettings.changeId || "",
-      updatedAt: localSynchronizedData.updatedAt || new Date().toISOString(),
+      updatedAt: synchronizedData.updatedAt || new Date().toISOString(),
       updatedBy: webDavSyncSettings.deviceId,
-      checksum: localChecksum,
-      data: localSynchronizedData
+      checksum: synchronizedChecksum,
+      data: synchronizedData
     };
     if (config !== localConfig) {
       scheduleWebDavSynchronization();
@@ -1550,14 +1567,19 @@ async function synchronizeWebDavConfig(options = {}) {
     const nextEnvelope = {
       formatVersion: 1,
       current: snapshot,
-      history: Array.isArray(remoteEnvelope?.history) ? remoteEnvelope.history : []
+      history: synchronizationHistory(remoteEnvelope, snapshot)
     };
     const payloadKilobytes = Math.max(1, Math.round(new Blob([JSON.stringify(nextEnvelope)]).size / 1024));
     setWebDavStatus(`Uploading local configuration (${payloadKilobytes} KB)...`);
     const etag = await writeSynchronizationEnvelope(nextEnvelope, remoteState);
     const { data: _snapshotData, ...snapshotMeta } = snapshot;
-    await writeWebDavSyncSettings({ ...webDavSyncSettings, ...snapshotMeta, etag });
-    setWebDavStatus(`Synchronized - revision ${revision}`);
+    if (synchronizedChecksum !== localChecksum) {
+      await applySynchronizedConfig(snapshot, etag);
+      setWebDavStatus(`Merged - revision ${revision}`);
+    } else {
+      await writeWebDavSyncSettings({ ...webDavSyncSettings, ...snapshotMeta, baseData: synchronizedData, etag });
+      setWebDavStatus(`Synchronized - revision ${revision}`);
+    }
   } catch (error) {
     if (error?.code === "WEBDAV_CONFLICT") {
       setWebDavStatus("Remote file changed - retrying", true);
@@ -5264,7 +5286,7 @@ async function saveConfig() {
     throw new Error("Configuration is not loaded yet");
   }
 
-  config = {
+  const nextConfig = {
     version: 1,
     categories: allCategories,
     favoriteCategories,
@@ -5272,8 +5294,14 @@ async function saveConfig() {
     favorites,
     seenVideos,
     watchLater,
-    updatedAt: new Date().toISOString()
+    updatedAt: config.updatedAt || ""
   };
+  const previousContent = synchronizableConfig({ ...config, updatedAt: "" });
+  const nextContent = synchronizableConfig({ ...nextConfig, updatedAt: "" });
+  nextConfig.updatedAt = synchronizationContentChanged(previousContent, nextContent)
+    ? new Date().toISOString()
+    : config.updatedAt || new Date().toISOString();
+  config = nextConfig;
 
   await writeStoredConfig(config);
   allCategories = config.categories || [];
