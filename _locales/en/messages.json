@@ -100,6 +100,7 @@
   "display": { "message": "Display" },
   "about": { "message": "About" },
   "addChannel": { "message": "Add channel" },
+  "addToMyChannels": { "message": "Add to my channels" },
   "addFavoriteVideo": { "message": "Add favorite video" },
   "addWatchLaterVideo": { "message": "Add video to Watch later" },
   "youtubeVideoUrlOrId": { "message": "YouTube video URL or ID" },
@@ -130,6 +131,8 @@
   "allChannels": { "message": "All channels" },
   "thisWeek": { "message": "This week" },
   "thisWeekInYourChannels": { "message": "This week in your channels" },
+  "hideThisWeekInYourChannels": { "message": "Hide “This week in your channels”" },
+  "showThisWeekInYourChannels": { "message": "Show “This week in your channels”" },
   "sortBy": { "message": "Sort: $1" },
   "sortRelevance": { "message": "Relevance" },
   "sortDefaultOrder": { "message": "Default order" },
@@ -214,5 +217,9 @@
   "searchFailed": { "message": "Search failed: $1" },
   "channel": { "message": "Channel" },
   "searching": { "message": "Searching…" },
-  "noChannelFound": { "message": "No channel found." }
+  "noChannelFound": { "message": "No channel found." },
+  "networkMeterLabel": { "message": "YouTube data activity" },
+  "networkMeterTooltip": { "message": "$1 requests, $2" },
+  "youtubeTab": { "message": "YouTube tab" },
+  "blank": { "message": "Blank" }
 }

@@ -93,13 +93,103 @@ svg {
   border-bottom: 0;
   display: grid;
   gap: 6px;
-  grid-template-columns: 30px 30px 26px 26px minmax(0, 1fr);
+  grid-template-columns: 30px 30px 26px 26px minmax(0, 1fr) 26px;
   height: var(--global-search-bar-height);
   justify-content: stretch;
   padding: 8px 14px;
   position: sticky;
   top: 0;
   z-index: 50;
+}
+
+.networkSnifferButton {
+  align-items: center;
+  align-self: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: help;
+  display: flex;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  width: 26px;
+}
+
+.networkSnifferButton:hover,
+.networkSnifferButton:focus-visible {
+  background: light-dark(#e7e9ed, #292929);
+  outline: 0;
+}
+
+.networkSnifferButton::before {
+  border: 4px solid #343434;
+  border-radius: 50%;
+  box-sizing: border-box;
+  content: "";
+  height: 18px;
+  width: 18px;
+}
+
+:root[data-resolved-theme="dark"] .networkSnifferButton::before {
+  border-color: #f1f1f1;
+}
+
+.networkSnifferButton.is-active::before {
+  display: none;
+}
+
+.networkSnifferButton::after {
+  background: light-dark(#202124, #f1f1f1);
+  border-radius: 6px;
+  color: light-dark(#fff, #111);
+  content: attr(data-tooltip);
+  display: none;
+  font-size: 11px;
+  font-weight: 500;
+  left: auto;
+  line-height: 1.25;
+  padding: 6px 7px;
+  pointer-events: none;
+  position: absolute;
+  text-align: left;
+  top: calc(100% + 7px);
+  right: 0;
+  white-space: nowrap;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  z-index: 80;
+}
+
+.networkSnifferButton:hover::after,
+.networkSnifferButton:focus-visible::after {
+  display: block;
+}
+
+.networkSnifferImage {
+  display: none;
+  filter: none;
+  height: 24px;
+  opacity: 0.78;
+  transform: scale(1.25);
+  width: 24px;
+}
+
+:root[data-resolved-theme="dark"] .networkSnifferImage {
+  filter: invert(1) brightness(1.8);
+}
+
+.networkSnifferButton.is-active .networkSnifferImage {
+  animation: networkSnifferSpin 0.75s linear infinite;
+  display: block;
+  opacity: 1;
+}
+
+@keyframes networkSnifferSpin {
+  to {
+    transform: scale(1.25) rotate(360deg);
+  }
 }
 
 .topSearchForm {
@@ -313,7 +403,7 @@ svg {
 @media (max-width: 420px) {
   .globalYoutubeSearch.channelSearch {
     gap: 3px;
-    grid-template-columns: 30px 30px 26px 26px minmax(0, 1fr);
+    grid-template-columns: 30px 30px 26px 26px minmax(0, 1fr) 26px;
     padding-inline: 8px;
   }
 
@@ -1048,6 +1138,11 @@ p,
   display: block;
   font-size: 13px;
   margin-bottom: 10px;
+}
+
+.youtubeBlankMessage {
+  margin: 48px auto;
+  text-align: center;
 }
 
 .videos {
@@ -2856,6 +2951,10 @@ body.sidePanelVideos .sidePanelPath.has-many-categories.is-fully-expanded::after
   gap: 8px;
 }
 
+.contentToolbar > .resultsToolbar {
+  margin-left: auto;
+}
+
 #toggleListLayout {
   margin-left: 0;
 }
@@ -3426,6 +3525,10 @@ body.isChannelSearching.sidePanelVideos .channel:not(.is-active) {
   justify-content: center;
   padding: 0;
   width: 38px;
+}
+
+#channelIconMode {
+  width: 24px;
 }
 
 .pathIconModeButton span {
