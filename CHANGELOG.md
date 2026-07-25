@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.12 - 2026-07-25
+
+- Kept the video-list presentation controls visible when the extension is narrowed to a single-column layout.
+
 ## 3.3.11 - 2026-07-25
 
 - Added a compact YouTube network-activity meter with request and transferred-data totals, including thumbnails.
