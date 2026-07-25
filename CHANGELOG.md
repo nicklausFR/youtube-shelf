@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.9 - 2026-07-25
+
+- Fixed WebDAV synchronization through servers that reject conditional `PUT` requests.
+- Kept concurrent-change detection by verifying the remote snapshot immediately before each write.
+
 ## 3.3.8 - 2026-07-25
 
 - Fixed repeated WebDAV conflicts on servers that expose weak ETags.
