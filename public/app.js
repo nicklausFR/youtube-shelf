@@ -1169,6 +1169,7 @@ function synchronizableConfig(value = {}) {
       feedVideoCount: _feedVideoCount,
       feedLatestPublished: _feedLatestPublished,
       feedLatestTitle: _feedLatestTitle,
+      feedCheckedAt: _feedCheckedAt,
       channelVideoCount: _channelVideoCount,
       ...content
     } = channel || {};
@@ -1413,6 +1414,7 @@ async function applySynchronizedConfig(snapshot, etag = "") {
       ...(local.feedVideoCount !== undefined ? { feedVideoCount: local.feedVideoCount } : {}),
       ...(local.feedLatestPublished ? { feedLatestPublished: local.feedLatestPublished } : {}),
       ...(local.feedLatestTitle ? { feedLatestTitle: local.feedLatestTitle } : {}),
+      ...(local.feedCheckedAt ? { feedCheckedAt: local.feedCheckedAt } : {}),
       ...(local.channelVideoCount !== undefined ? { channelVideoCount: local.channelVideoCount } : {})
     };
   });
@@ -6310,6 +6312,11 @@ function checkIsDue(lastCheckedAt, intervalMs, now = Date.now()) {
   return !Number.isFinite(checkedAt) || now - checkedAt >= intervalMs;
 }
 
+function channelFeedCacheMissing(channel) {
+  return !Array.isArray(channel?.feedVideos)
+    || (Boolean(channel?.feedLatestPublished) && channel.feedVideos.length === 0);
+}
+
 async function runConcurrent(items, limit, worker) {
   let nextIndex = 0;
   async function runNext() {
@@ -6326,11 +6333,13 @@ async function refreshChannelSummaries(options = {}) {
   const force = Boolean(options.force);
   const now = Date.now();
   const prioritizedChannels = prioritizedChannelsForRefresh();
-  const refreshQueue = prioritizedChannels.filter((channel) => force || checkIsDue(
-    channel.feedCheckedAt,
-    feedCheckIntervalMinutes * 60 * 1000,
-    now
-  ));
+  const refreshQueue = prioritizedChannels.filter((channel) => force
+    || channelFeedCacheMissing(channel)
+    || checkIsDue(
+      channel.feedCheckedAt,
+      feedCheckIntervalMinutes * 60 * 1000,
+      now
+    ));
   const metadataQueue = prioritizedChannels.filter((channel) => force || checkIsDue(
     channel.metadataCheckedAt,
     metadataCheckIntervalDays * 24 * 60 * 60 * 1000,
