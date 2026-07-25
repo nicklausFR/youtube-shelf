@@ -3799,9 +3799,24 @@ body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .contentToolbar {
   padding: 0;
 }
 
-body.videoSingleColumnOnly.sidePanelVideos:not(.isChannelSearching) .contentToolbar,
 body.sidePanelVideos:not(.hasActiveChannel):not(.isChannelSearching) .contentToolbar {
   display: none !important;
+}
+
+body.sidePanelVideos.hasActiveChannel .contentToolbar > .resultsToolbar {
+  flex: 0 0 auto;
+  min-width: max-content;
+  width: auto;
+}
+
+@media (max-width: 449px) {
+  body.sidePanelVideos.hasActiveChannel .contentToolbar {
+    justify-content: flex-end;
+  }
+
+  body.sidePanelVideos.hasActiveChannel .contentToolbar > .resultsToolbar {
+    margin-left: auto;
+  }
 }
 
 /* Channel icon mode must stay a compact icon grid in the channel-list state, including very narrow widths. */
