@@ -1454,7 +1454,9 @@ body.sidePanelVideos .favoriteButton {
 }
 
 .youtubeDataOptionsModal {
+  max-height: min(90vh, 760px);
   max-width: 420px;
+  overflow-y: auto;
 }
 
 .youtubeOptionsSection {
@@ -1478,6 +1480,19 @@ body.sidePanelVideos .favoriteButton {
 
 .youtubeOptionsSection .modalHint:last-child {
   margin-bottom: 0;
+}
+
+.youtubeCheckOptions h4 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.youtubeCheckOptions h4:not(:first-child) {
+  margin-top: 18px;
+}
+
+.youtubeCheckOptions .modalSelectField {
+  margin: 10px 0 0;
 }
 
 .webDavSyncModal {

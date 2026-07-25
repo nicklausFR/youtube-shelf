@@ -224,6 +224,18 @@
           <input id="splitColumnWidthOption" type="number" min="240" max="2000" step="10" inputmode="numeric" value="450" />
         </label>
         <p class="modalHint">Panel width in pixels.</p>
+        <section class="youtubeOptionsSection">
+          <h3>YouTube</h3>
+          <label class="modalCheckbox">
+            <input id="hideCommentsOption" type="checkbox" />
+            <span>Hide comments</span>
+          </label>
+          <label class="modalCheckbox">
+            <input id="hideSuggestionsOption" type="checkbox" />
+            <span>Hide suggestion list</span>
+          </label>
+          <p id="displayOptionsInactive" class="modalHint" hidden>Page display options apply only while the extension panel is open.</p>
+        </section>
         <div class="modalActions">
           <button id="closeAppearanceOptions" class="modalButton primary" type="button">Close</button>
         </div>
@@ -296,35 +308,24 @@
 
     <div id="youtubeDataOptionsPrompt" class="modalOverlay" hidden>
       <div class="modal youtubeDataOptionsModal" role="dialog" aria-modal="true" aria-labelledby="youtubeDataOptionsTitle">
-        <h2 id="youtubeDataOptionsTitle">YouTube</h2>
+        <h2 id="youtubeDataOptionsTitle">Sniff YouTube</h2>
         <section class="youtubeOptionsSection">
-          <h3>Sniff</h3>
-        <label class="modalCheckbox">
-          <input id="sniffYoutubeOption" type="checkbox" />
-          <span>Sniff YouTube metadata</span>
-        </label>
-        <p class="modalHint">Retrieve channel descriptions, tags, and video counts from YouTube pages.</p>
-        <label class="modalSelectField" for="channelVideoSourceOption">
-          <span>Channel video source</span>
-          <select id="channelVideoSourceOption">
-            <option value="hybrid">Hybrid — RSS + Innertube (recommended)</option>
-            <option value="innertube">Innertube — paginated list</option>
-            <option value="rss">RSS — latest videos only</option>
-          </select>
-        </label>
-        <p class="modalHint">Hybrid keeps exact RSS dates for recent videos and adds older videos through Innertube pagination.</p>
-        </section>
-        <section class="youtubeOptionsSection">
-          <h3>Display</h3>
-          <label class="modalCheckbox">
-            <input id="hideCommentsOption" type="checkbox" />
-            <span>Hide comments</span>
+        <div class="youtubeCheckOptions">
+          <h4>Check new channel videos</h4>
+          <label class="modalSelectField" for="feedCheckIntervalOption">
+            <span>Frequency (minutes)</span>
+            <input id="feedCheckIntervalOption" type="number" min="0" max="1440" step="5" inputmode="numeric" value="30" />
           </label>
-          <label class="modalCheckbox">
-            <input id="hideSuggestionsOption" type="checkbox" />
-            <span>Hide suggestion list</span>
+          <label class="modalSelectField" for="feedCheckConcurrencyOption">
+            <span>Simultaneous requests</span>
+            <input id="feedCheckConcurrencyOption" type="number" min="1" max="10" step="1" inputmode="numeric" value="4" />
           </label>
-          <p id="displayOptionsInactive" class="modalHint" hidden>Page display options apply only while the extension panel is open.</p>
+          <h4>Update channel metadata</h4>
+          <label class="modalSelectField" for="metadataCheckIntervalOption">
+            <span>Frequency (days)</span>
+            <input id="metadataCheckIntervalOption" type="number" min="1" max="30" step="1" inputmode="numeric" value="7" />
+          </label>
+        </div>
         </section>
         <div class="modalActions">
           <button id="closeYoutubeDataOptions" class="modalButton primary" type="button">Close</button>
@@ -413,5 +414,3 @@
     <script src="app.js" type="module"></script>
   </body>
 </html>
-
-

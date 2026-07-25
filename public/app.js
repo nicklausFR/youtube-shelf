@@ -103,8 +103,9 @@ const aboutLatestVersionEl = document.querySelector("#aboutLatestVersion");
 const aboutDownloadLatestEl = document.querySelector("#aboutDownloadLatest");
 const closeAboutEl = document.querySelector("#closeAbout");
 const youtubeDataOptionsPromptEl = document.querySelector("#youtubeDataOptionsPrompt");
-const sniffYoutubeOptionEl = document.querySelector("#sniffYoutubeOption");
-const channelVideoSourceOptionEl = document.querySelector("#channelVideoSourceOption");
+const feedCheckIntervalOptionEl = document.querySelector("#feedCheckIntervalOption");
+const metadataCheckIntervalOptionEl = document.querySelector("#metadataCheckIntervalOption");
+const feedCheckConcurrencyOptionEl = document.querySelector("#feedCheckConcurrencyOption");
 const closeYoutubeDataOptionsEl = document.querySelector("#closeYoutubeDataOptions");
 const webDavSyncPromptEl = document.querySelector("#webDavSyncPrompt");
 const webDavUrlEl = document.querySelector("#webDavUrl");
@@ -230,8 +231,10 @@ const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
-const SNIFF_YOUTUBE_KEY = "youtubeChannelShelfSniffYoutube";
 const CHANNEL_VIDEO_SOURCE_KEY = "youtubeChannelShelfChannelVideoSource";
+const FEED_CHECK_INTERVAL_KEY = "youtubeChannelShelfFeedCheckIntervalMinutes";
+const METADATA_CHECK_INTERVAL_KEY = "youtubeChannelShelfMetadataCheckIntervalDays";
+const FEED_CHECK_CONCURRENCY_KEY = "youtubeChannelShelfFeedCheckConcurrency";
 const YOUTUBE_TITLE_LANGUAGE_KEY = "youtubeChannelShelfTitleLanguage";
 const INTERFACE_LANGUAGE_KEY = "youtubeChannelShelfInterfaceLanguage";
 const TRANSLATION_OVERRIDES_KEY = "youtubeChannelShelfTranslationOverrides";
@@ -261,6 +264,9 @@ const FAVORITE_CATEGORY_DRAG_TYPE = "application/x-youtube-shelf-favorite-catego
 const FAVORITE_VIDEO_GROUP_DRAG_TYPE = "application/x-youtube-shelf-favorite-video";
 const FAVORITE_VIDEO_CATEGORY_DRAG_TYPE = "application/x-youtube-shelf-favorite-videos";
 const YOUTUBE_SEARCH_BATCH_SIZE = 20;
+const FEED_CHECK_INTERVAL_DEFAULT = 30;
+const METADATA_CHECK_INTERVAL_DEFAULT = 7;
+const FEED_CHECK_CONCURRENCY_DEFAULT = 4;
 const YOUTUBE_REGION_BY_LANGUAGE = {
   ar: "SA", de: "DE", en: "US", es: "ES", fr: "FR", hi: "IN", it: "IT",
   ja: "JP", ko: "KR", nl: "NL", pl: "PL", pt: "BR", ru: "RU", tr: "TR",
@@ -270,7 +276,15 @@ const youtubeOriginalTitleCache = new Map();
 const youtubeAutomaticTitleCache = new Map();
 const expandedFavoriteVideoGroups = new Set();
 const selectedFavoriteVideoIds = new Set();
-let sniffYoutubeEnabled = localStorage.getItem(SNIFF_YOUTUBE_KEY) !== "false";
+
+function storedInteger(key, fallback, minimum, maximum) {
+  const parsed = Number.parseInt(localStorage.getItem(key), 10);
+  return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
+}
+
+let feedCheckIntervalMinutes = storedInteger(FEED_CHECK_INTERVAL_KEY, FEED_CHECK_INTERVAL_DEFAULT, 0, 1440);
+let metadataCheckIntervalDays = storedInteger(METADATA_CHECK_INTERVAL_KEY, METADATA_CHECK_INTERVAL_DEFAULT, 1, 30);
+let feedCheckConcurrency = storedInteger(FEED_CHECK_CONCURRENCY_KEY, FEED_CHECK_CONCURRENCY_DEFAULT, 1, 10);
 let splitColumnWidth = Math.min(
   SPLIT_COLUMN_MAX_WIDTH,
   Math.max(SPLIT_COLUMN_MIN_WIDTH, Number.parseInt(localStorage.getItem(SPLIT_COLUMN_WIDTH_KEY), 10) || SPLIT_COLUMN_DEFAULT_WIDTH)
@@ -921,6 +935,7 @@ function syncDisplayOptionsDialog() {
 function syncAppearanceOptionsDialog() {
   if (themeOptionEl) themeOptionEl.value = globalThis.youtubeShelfTheme?.preference || "auto";
   if (splitColumnWidthOptionEl) splitColumnWidthOptionEl.value = String(splitColumnWidth);
+  syncDisplayOptionsDialog();
 }
 
 function openAppearanceOptionsDialog() {
@@ -1605,41 +1620,37 @@ async function initializeWebDavSynchronization() {
   }
 }
 
-function setSniffYoutubeEnabled(value) {
-  sniffYoutubeEnabled = Boolean(value);
-  localStorage.setItem(SNIFF_YOUTUBE_KEY, String(sniffYoutubeEnabled));
-  if (sniffYoutubeOptionEl) sniffYoutubeOptionEl.checked = sniffYoutubeEnabled;
-  if (globalThis.chrome?.storage?.local) {
-    chrome.storage.local.set({ [SNIFF_YOUTUBE_KEY]: sniffYoutubeEnabled });
-  }
-}
-
 function syncYoutubeDataOptionsDialog() {
-  if (sniffYoutubeOptionEl) sniffYoutubeOptionEl.checked = sniffYoutubeEnabled;
-  if (channelVideoSourceOptionEl) channelVideoSourceOptionEl.value = channelVideoSource;
-  syncDisplayOptionsDialog();
+  if (feedCheckIntervalOptionEl) feedCheckIntervalOptionEl.value = String(feedCheckIntervalMinutes);
+  if (metadataCheckIntervalOptionEl) metadataCheckIntervalOptionEl.value = String(metadataCheckIntervalDays);
+  if (feedCheckConcurrencyOptionEl) feedCheckConcurrencyOptionEl.value = String(feedCheckConcurrency);
 }
 
 function openYoutubeDataOptionsDialog() {
   if (!youtubeDataOptionsPromptEl) return;
   syncYoutubeDataOptionsDialog();
   youtubeDataOptionsPromptEl.hidden = false;
-  sniffYoutubeOptionEl?.focus();
+  feedCheckIntervalOptionEl?.focus();
 }
 
 function closeYoutubeDataOptionsDialog() {
   if (youtubeDataOptionsPromptEl) youtubeDataOptionsPromptEl.hidden = true;
 }
 
-function setChannelVideoSource(value) {
-  if (!["hybrid", "innertube", "rss"].includes(value)) return;
-  const changed = value !== channelVideoSource;
-  channelVideoSource = value;
-  localStorage.setItem(CHANNEL_VIDEO_SOURCE_KEY, channelVideoSource);
-  if (channelVideoSourceOptionEl) channelVideoSourceOptionEl.value = channelVideoSource;
-  if (!changed) return;
-  showInfoPopup(`Channel video list: ${channelVideoSource}.`, "info");
-  if (activeChannel?.id) loadFeed();
+function setNewVideoCheckOption(key, value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return;
+  if (key === FEED_CHECK_INTERVAL_KEY) {
+    feedCheckIntervalMinutes = Math.min(1440, Math.max(0, parsed));
+    localStorage.setItem(key, String(feedCheckIntervalMinutes));
+  } else if (key === METADATA_CHECK_INTERVAL_KEY) {
+    metadataCheckIntervalDays = Math.min(30, Math.max(1, parsed));
+    localStorage.setItem(key, String(metadataCheckIntervalDays));
+  } else if (key === FEED_CHECK_CONCURRENCY_KEY) {
+    feedCheckConcurrency = Math.min(10, Math.max(1, parsed));
+    localStorage.setItem(key, String(feedCheckConcurrency));
+  }
+  syncYoutubeDataOptionsDialog();
 }
 
 function dataContextActions() {
@@ -1656,7 +1667,7 @@ function settingsContextActions() {
       label: "Data",
       submenu: dataContextActions()
     },
-    { label: "YouTube", action: openYoutubeDataOptionsDialog },
+    { label: "Sniff YouTube", action: openYoutubeDataOptionsDialog },
     { label: "Display", action: openAppearanceOptionsDialog },
     { label: "Language", action: openLanguageOptionsDialog },
     { label: "About", action: openAboutDialog }
@@ -3084,7 +3095,6 @@ function parseChannelMetadata(html = "") {
 }
 
 async function fetchChannelMetadata(channelId) {
-  if (!sniffYoutubeEnabled) return {};
   const response = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channelId)}/about`, {
     cache: "no-store"
   });
@@ -3101,7 +3111,6 @@ async function fetchChannelSubscriberCount(channelId) {
 }
 
 async function fetchChannelVideoCount(channelId) {
-  if (!sniffYoutubeEnabled) return 0;
   const response = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channelId)}/videos`, {
     cache: "no-store"
   });
@@ -5121,7 +5130,7 @@ function createFavoriteVideoGroup(members) {
 }
 
 function channelNeedsMetadata(channel) {
-  return sniffYoutubeEnabled && channel?.id && (
+  return channel?.id && (
     !channel.description
     || !(Array.isArray(channel.tags) && channel.tags.length)
     || !Number.isFinite(channel.subscriberCount)
@@ -5171,7 +5180,7 @@ async function enrichChannelsForSearch(channels) {
 }
 
 function scheduleSearchMetadataRefresh(channels) {
-  if (!sniffYoutubeEnabled || !channelSearchQuery.trim()) return;
+  if (!channelSearchQuery.trim()) return;
   window.clearTimeout(channelSearchMetadataRefreshTimer);
   channelSearchMetadataRefreshTimer = window.setTimeout(() => {
     enrichChannelsForSearch(channels).catch(() => {});
@@ -6256,50 +6265,102 @@ async function loadFeed() {
   }
 }
 
-async function refreshChannelSummaries() {
+function channelRefreshPriority(channel, now = Date.now()) {
+  const publishedTimes = (channel?.feedVideos || [])
+    .map((video) => Date.parse(video?.published || ""))
+    .filter(Number.isFinite)
+    .sort((left, right) => right - left);
+  const latest = publishedTimes[0] || Date.parse(channel?.feedLatestPublished || "");
+  if (!Number.isFinite(latest)) return Number.NEGATIVE_INFINITY;
+
+  const gaps = publishedTimes
+    .slice(0, 8)
+    .map((time, index, values) => index ? values[index - 1] - time : 0)
+    .filter((gap) => gap > 0)
+    .sort((left, right) => left - right);
+  const fallbackCadence = 7 * 24 * 60 * 60 * 1000;
+  const cadence = gaps.length ? gaps[Math.floor(gaps.length / 2)] : fallbackCadence;
+  const inactivity = Math.max(0, now - latest - cadence);
+  return cadence + inactivity * 0.5;
+}
+
+function prioritizedChannelsForRefresh() {
+  const now = Date.now();
+  return [...allChannels].sort((left, right) => {
+    const priority = channelRefreshPriority(left, now) - channelRefreshPriority(right, now);
+    if (priority) return priority;
+    return (Date.parse(right.feedLatestPublished || "") || 0) - (Date.parse(left.feedLatestPublished || "") || 0);
+  });
+}
+
+function replaceChannelSummary(nextChannel) {
+  allChannels = allChannels.map((channel) => channel.id === nextChannel.id ? nextChannel : channel);
+  if (activeChannel?.id === nextChannel.id) activeChannel = nextChannel;
+}
+
+function feedSummaryChanged(previous, next) {
+  return next.feedLatestPublished !== previous.feedLatestPublished
+    || next.feedLatestTitle !== previous.feedLatestTitle
+    || next.feedVideoCount !== previous.feedVideoCount
+    || JSON.stringify(next.feedVideos || []) !== JSON.stringify(previous.feedVideos || []);
+}
+
+function checkIsDue(lastCheckedAt, intervalMs, now = Date.now()) {
+  const checkedAt = Date.parse(lastCheckedAt || "");
+  return !Number.isFinite(checkedAt) || now - checkedAt >= intervalMs;
+}
+
+async function runConcurrent(items, limit, worker) {
+  let nextIndex = 0;
+  async function runNext() {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex++];
+      await worker(item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
+}
+
+async function refreshChannelSummaries(options = {}) {
   if (!configLoaded || !allChannels.length) return;
+  const force = Boolean(options.force);
+  const now = Date.now();
+  const prioritizedChannels = prioritizedChannelsForRefresh();
+  const refreshQueue = prioritizedChannels.filter((channel) => force || checkIsDue(
+    channel.feedCheckedAt,
+    feedCheckIntervalMinutes * 60 * 1000,
+    now
+  ));
+  const metadataQueue = prioritizedChannels.filter((channel) => force || checkIsDue(
+    channel.metadataCheckedAt,
+    metadataCheckIntervalDays * 24 * 60 * 60 * 1000,
+    now
+  ));
+  if (!refreshQueue.length && !metadataQueue.length) return;
+
   newVideosRefreshPending = true;
   renderCategories();
   renderSidePanelPath();
-  let changed = false;
-  const updatedChannels = [];
+  let feedChanged = false;
+  let metadataChanged = false;
 
   try {
-    for (const channel of allChannels) {
+    // Refresh lightweight feeds first, in publication-cadence order, so likely
+    // new videos become visible before slower channel metadata is requested.
+    await runConcurrent(refreshQueue, feedCheckConcurrency, async (queuedChannel) => {
+      const channel = allChannels.find((item) => item.id === queuedChannel.id) || queuedChannel;
       try {
         const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channel.id)}`, {
           cache: "no-store"
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const videos = parseFeed(await response.text()).map((video) => videoWithChannel(video, channel));
-        let channelVideoCount = channel.channelVideoCount || 0;
-        let channelMetadata = {
-          description: channel.description || "",
-          tags: channel.tags || [],
-          subscriberCount: channel.subscriberCount,
-          subscriberCountText: channel.subscriberCountText || ""
-        };
-        try {
-          channelVideoCount = await fetchChannelVideoCount(channel.id) || channelVideoCount;
-        } catch {
-          // Keep the previous count when the page parser cannot read YouTube.
-        }
-        try {
-          channelMetadata = { ...channelMetadata, ...await fetchChannelMetadata(channel.id) };
-        } catch {
-          // Metadata is optional.
-        }
-        const latestPublished = videos[0]?.published || "";
         const next = {
           ...channel,
           feedVideoCount: videos.length,
-          channelVideoCount,
-          description: channelMetadata.description || channel.description || "",
-          tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
-          subscriberCount: Number.isFinite(channelMetadata.subscriberCount) ? channelMetadata.subscriberCount : channel.subscriberCount,
-          subscriberCountText: channelMetadata.subscriberCountText || channel.subscriberCountText || "",
-          feedLatestPublished: latestPublished,
+          feedLatestPublished: videos[0]?.published || "",
           feedLatestTitle: videos[0]?.title || "",
+          feedCheckedAt: new Date().toISOString(),
           feedVideos: videos.map((video) => ({
             id: video.id,
             title: video.title,
@@ -6308,27 +6369,46 @@ async function refreshChannelSummaries() {
             tags: video.tags || []
           }))
         };
-        if (
-          next.feedLatestPublished !== channel.feedLatestPublished ||
-          next.feedLatestTitle !== channel.feedLatestTitle ||
-          next.feedVideoCount !== channel.feedVideoCount ||
-          next.channelVideoCount !== channel.channelVideoCount ||
-          next.description !== channel.description ||
-          next.subscriberCount !== channel.subscriberCount ||
-          next.subscriberCountText !== channel.subscriberCountText ||
-          JSON.stringify(next.tags || []) !== JSON.stringify(channel.tags || [])
-        ) {
-          changed = true;
-        }
-        updatedChannels.push(next);
+        const summaryChanged = feedSummaryChanged(channel, next);
+        feedChanged = true;
+        replaceChannelSummary(next);
+        if (summaryChanged && activePrimarySection === "youtube" && activeView === "youtubeHome") renderNewVideos();
       } catch {
-        updatedChannels.push(channel);
+        // Keep the previous feed when YouTube or RSS is temporarily unavailable.
       }
-    }
+    });
 
-    if (!changed) return;
-    allChannels = updatedChannels.sort((a, b) => a.title.localeCompare(b.title, "fr"));
-    await saveConfig();
+    if (feedChanged) await saveConfig();
+
+    // Metadata does not affect the new-video list, so update it only after all
+    // prioritized feeds have had a chance to appear.
+    await runConcurrent(metadataQueue, feedCheckConcurrency, async (queuedChannel) => {
+      const channel = allChannels.find((item) => item.id === queuedChannel.id) || queuedChannel;
+      const [videoCountResult, metadataResult] = await Promise.allSettled([
+        fetchChannelVideoCount(channel.id),
+        fetchChannelMetadata(channel.id)
+      ]);
+      if (videoCountResult.status === "rejected" && metadataResult.status === "rejected") return;
+      const channelVideoCount = videoCountResult.status === "fulfilled" && videoCountResult.value
+        ? videoCountResult.value
+        : channel.channelVideoCount || 0;
+      const channelMetadata = metadataResult.status === "fulfilled" ? metadataResult.value : {};
+      const next = {
+        ...channel,
+        channelVideoCount,
+        description: channelMetadata.description || channel.description || "",
+        tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
+        subscriberCount: Number.isFinite(channelMetadata.subscriberCount) ? channelMetadata.subscriberCount : channel.subscriberCount,
+        subscriberCountText: channelMetadata.subscriberCountText || channel.subscriberCountText || "",
+        metadataCheckedAt: new Date().toISOString()
+      };
+      metadataChanged = true;
+      replaceChannelSummary(next);
+    });
+
+    if (metadataChanged) await saveConfig();
+    if (!feedChanged && !metadataChanged) return;
+    allChannels.sort((left, right) => left.title.localeCompare(right.title, "fr"));
     renderCategories();
     if (activePrimarySection === "youtube" && activeView === "youtubeHome") {
       renderNewVideos();
@@ -6340,6 +6420,7 @@ async function refreshChannelSummaries() {
     newVideosRefreshPending = false;
     renderCategories();
     renderSidePanelPath();
+    syncYoutubeThisWeekButton();
   }
 }
 
@@ -6357,7 +6438,7 @@ async function refreshActiveView() {
   refreshEl.disabled = true;
   setStatus("Loading...", true);
   try {
-    await refreshChannelSummaries();
+    await refreshChannelSummaries({ force: true });
     renderCategories();
     if (activeView === "newVideos" || activeView === "youtubeHome") {
       renderNewVideos();
@@ -6571,13 +6652,6 @@ async function loadChannels() {
   refreshEl.disabled = true;
 
   try {
-    if (globalThis.chrome?.storage?.local) {
-      const settings = await new Promise((resolve) => chrome.storage.local.get(SNIFF_YOUTUBE_KEY, resolve));
-      if (settings[SNIFF_YOUTUBE_KEY] !== undefined) {
-        sniffYoutubeEnabled = Boolean(settings[SNIFF_YOUTUBE_KEY]);
-        localStorage.setItem(SNIFF_YOUTUBE_KEY, String(sniffYoutubeEnabled));
-      }
-    }
     config = await loadInitialConfig();
     allCategories = config.categories || [];
     favoriteCategories = config.favoriteCategories || [];
@@ -7031,11 +7105,14 @@ hideSuggestionsOptionEl?.addEventListener("click", (event) => {
   event.preventDefault();
   toggleDisplayOption(SUGGESTIONS_MODE_KEY, true);
 });
-sniffYoutubeOptionEl?.addEventListener("change", () => {
-  setSniffYoutubeEnabled(sniffYoutubeOptionEl.checked);
+feedCheckIntervalOptionEl?.addEventListener("change", () => {
+  setNewVideoCheckOption(FEED_CHECK_INTERVAL_KEY, feedCheckIntervalOptionEl.value || FEED_CHECK_INTERVAL_DEFAULT);
 });
-channelVideoSourceOptionEl?.addEventListener("change", () => {
-  setChannelVideoSource(channelVideoSourceOptionEl.value);
+metadataCheckIntervalOptionEl?.addEventListener("change", () => {
+  setNewVideoCheckOption(METADATA_CHECK_INTERVAL_KEY, metadataCheckIntervalOptionEl.value || METADATA_CHECK_INTERVAL_DEFAULT);
+});
+feedCheckConcurrencyOptionEl?.addEventListener("change", () => {
+  setNewVideoCheckOption(FEED_CHECK_CONCURRENCY_KEY, feedCheckConcurrencyOptionEl.value || FEED_CHECK_CONCURRENCY_DEFAULT);
 });
 
 channelIconModeEl?.addEventListener("click", () => {
