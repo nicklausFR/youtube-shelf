@@ -3,7 +3,9 @@ import { searchYoutubeChannelVideos } from "./youtube-channel-search.js";
 import { fetchYoutubeChannelVideosPage } from "./youtube-channel-videos.js";
 import { createI18n } from "./i18n.js";
 import { mergeSynchronizationData, synchronizationContentChanged } from "./sync-merge.js";
+import { formatNetworkBytes, installNetworkMeter } from "./network-meter.js";
 
+const networkMeter = installNetworkMeter();
 const interfaceI18n = await createI18n(localStorage.getItem("youtubeChannelShelfInterfaceLanguage") || "auto");
 
 const toggleSidebarEl = document.querySelector("#toggleSidebar");
@@ -13,6 +15,7 @@ const openAppSessionEl = document.querySelector("#openAppSession");
 const searchFormEl = document.querySelector("#searchForm");
 const searchInputEl = document.querySelector("#searchInput");
 const globalSearchResultsEl = document.querySelector("#globalSearchResults");
+const networkSnifferEl = document.querySelector("#networkSniffer");
 const topOptionsEl = document.querySelector("#topOptions");
 const primaryTabEls = [...document.querySelectorAll(".primaryTab[data-section]")];
 const sortResultsEl = document.querySelector("#sortResults");
@@ -30,6 +33,8 @@ const channelBackEl = document.querySelector("#channelBack");
 const channelForwardEl = document.querySelector("#channelForward");
 const channelSearchInputEl = document.querySelector("#channelSearchInput");
 const channelShelfControlsEl = document.querySelector("#channelShelfControls");
+const resultsToolbarEl = document.querySelector(".resultsToolbar");
+const channelListSeparatorEl = document.querySelector("#channelListSeparator");
 const categoriesEl = document.querySelector("#categories");
 const channelsEl = document.querySelector("#channels");
 const activeChannelSeparatorEl = document.querySelector("#activeChannelSeparator");
@@ -81,6 +86,7 @@ const closeImportExportEl = document.querySelector("#closeImportExport");
 const appearanceOptionsPromptEl = document.querySelector("#appearanceOptionsPrompt");
 const themeOptionEl = document.querySelector("#themeOption");
 const splitColumnWidthOptionEl = document.querySelector("#splitColumnWidthOption");
+const youtubeTabOptionEl = document.querySelector("#youtubeTabOption");
 const hideCommentsOptionEl = document.querySelector("#hideCommentsOption");
 const hideSuggestionsOptionEl = document.querySelector("#hideSuggestionsOption");
 const closeAppearanceOptionsEl = document.querySelector("#closeAppearanceOptions");
@@ -241,6 +247,7 @@ const INTERFACE_LANGUAGE_KEY = "youtubeChannelShelfInterfaceLanguage";
 const TRANSLATION_OVERRIDES_KEY = "youtubeChannelShelfTranslationOverrides";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
 const SPLIT_COLUMN_WIDTH_KEY = "youtubeChannelShelfSplitColumnWidth";
+const YOUTUBE_TAB_HOME_KEY = "youtubeChannelShelfYoutubeTabHome";
 const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
 const CATEGORY_ZOOM_KEY = "youtubeChannelShelfCategoryZoom";
 const SORT_MODES_KEY = "youtubeChannelShelfSortModes";
@@ -296,6 +303,9 @@ let youtubeTitleLanguage = ["auto", "original"].includes(localStorage.getItem(YO
 let interfaceLanguage = ["auto", "en", "fr"].includes(localStorage.getItem(INTERFACE_LANGUAGE_KEY))
   ? localStorage.getItem(INTERFACE_LANGUAGE_KEY)
   : "auto";
+let youtubeTabHome = ["this-week", "blank"].includes(localStorage.getItem(YOUTUBE_TAB_HOME_KEY))
+  ? localStorage.getItem(YOUTUBE_TAB_HOME_KEY)
+  : "this-week";
 let translationEditorLoadId = 0;
 
 function uiText(value) {
@@ -305,6 +315,21 @@ function uiText(value) {
 function uiMessage(key, substitutions = []) {
   return interfaceI18n.getMessage(key, substitutions);
 }
+
+function renderNetworkMeter(state) {
+  if (!networkSnifferEl) return;
+  const total = formatNetworkBytes(state.totalBytes, false, interfaceI18n.locale);
+  networkSnifferEl.classList.toggle("is-active", state.active > 0);
+  const summary = uiMessage("networkMeterTooltip", [state.requests, total]);
+  networkSnifferEl.setAttribute("aria-label", summary);
+  networkSnifferEl.dataset.tooltip = summary;
+}
+
+networkMeter.subscribe(renderNetworkMeter);
+chrome.runtime?.onMessage?.addListener?.((message) => {
+  if (message?.type !== "YOUTUBE_SHELF_THUMBNAIL_NETWORK") return;
+  networkMeter.recordExternal(message);
+});
 
 function initializeInterfaceLanguage() {
   interfaceI18n.localizeTree(document);
@@ -936,6 +961,7 @@ function syncDisplayOptionsDialog() {
 function syncAppearanceOptionsDialog() {
   if (themeOptionEl) themeOptionEl.value = globalThis.youtubeShelfTheme?.preference || "auto";
   if (splitColumnWidthOptionEl) splitColumnWidthOptionEl.value = String(splitColumnWidth);
+  if (youtubeTabOptionEl) youtubeTabOptionEl.value = youtubeTabHome;
   syncDisplayOptionsDialog();
 }
 
@@ -2738,6 +2764,7 @@ function syncStackedChannelViewState() {
   const stacked = document.body.classList.contains("sidePanelVideos") && !document.body.classList.contains("useSplitColumns");
   document.body.classList.toggle("stackedChannelView", stacked);
   document.body.classList.toggle("hasActiveChannel", Boolean(activeChannel));
+  syncResultsToolbarPlacement();
   syncYoutubeThisWeekButton();
   syncAddListItemButton();
   syncSortButton();
@@ -2746,28 +2773,29 @@ function syncStackedChannelViewState() {
   }
 }
 
+function syncResultsToolbarPlacement() {
+  if (!resultsToolbarEl || !contentToolbarEl || !channelListSeparatorEl) return;
+  if (activePrimarySection === "channels" && activeChannel) {
+    contentToolbarEl.append(resultsToolbarEl);
+    return;
+  }
+  channelListSeparatorEl.before(resultsToolbarEl);
+}
+
 function syncYoutubeThisWeekButton() {
   if (!youtubeThisWeekEl) return;
-  const visible = activePrimarySection === "youtube";
+  const visible = activePrimarySection === "youtube" && youtubeTabHome !== "blank";
   youtubeThisWeekEl.hidden = !visible;
   if (!visible) return;
   const active = activeView === "youtubeHome";
   youtubeThisWeekEl.classList.toggle("is-active", active);
   if (active) youtubeThisWeekEl.setAttribute("aria-current", "page");
   else youtubeThisWeekEl.removeAttribute("aria-current");
-  const count = collectNewVideos().length;
   const label = uiMessage("thisWeekInYourChannels");
-  const countEl = document.createElement("span");
-  countEl.className = "newVideosCount";
-  countEl.textContent = String(count);
-  youtubeThisWeekEl.replaceChildren(
-    document.createTextNode(`${label} (`),
-    countEl,
-    document.createTextNode(")")
-  );
+  youtubeThisWeekEl.textContent = label;
   youtubeThisWeekEl.classList.toggle("is-loading", newVideosRefreshPending);
   youtubeThisWeekEl.title = label;
-  youtubeThisWeekEl.setAttribute("aria-label", `${label} (${count})`);
+  youtubeThisWeekEl.setAttribute("aria-label", label);
 }
 
 function syncAddListItemButton() {
@@ -2883,7 +2911,8 @@ function newVideosContextActions() {
   return [
     { label: uiMessage("resetWeeklyNew"), action: resetNewVideoCounters },
     { label: uiMessage("restoreWeeklyList"), action: restoreWeeklyVideoList },
-    { label: "Excluded channels", action: openExcludedNewVideosDialog }
+    { label: "Excluded channels", action: openExcludedNewVideosDialog },
+    { label: uiMessage("hideThisWeekInYourChannels"), action: () => setYoutubeTabHomePreference("blank") }
   ];
 }
 
@@ -3182,6 +3211,7 @@ async function openOfficialYoutube(video, options = {}) {
   currentWatchLaterStartedAt = currentWatchLaterVideoId ? Date.now() : 0;
   setActiveVideoButton();
 
+  let shouldSaveSeenVideo = false;
   if (typeof video === "object" && !currentWatchLaterVideoId) {
     seenVideos[videoId] = {
       seenAt: new Date().toISOString(),
@@ -3191,7 +3221,7 @@ async function openOfficialYoutube(video, options = {}) {
       tags: video.tags || video.keywords || video.topics || [],
       channel: video.channel || activeChannel?.title || ""
     };
-    await saveConfig().catch(() => {});
+    shouldSaveSeenVideo = true;
   }
 
   if (options.newTab) {
@@ -3200,6 +3230,7 @@ async function openOfficialYoutube(video, options = {}) {
     } else {
       window.open(youtubeUrl(videoId), "_blank", "noopener");
     }
+    if (shouldSaveSeenVideo) await saveConfig().catch(() => {});
     return;
   }
 
@@ -3211,9 +3242,11 @@ async function openOfficialYoutube(video, options = {}) {
         window.location.href = youtubeUrl(videoId);
       }
     });
+    if (shouldSaveSeenVideo) await saveConfig().catch(() => {});
     return;
   }
 
+  if (shouldSaveSeenVideo) await saveConfig().catch(() => {});
   window.location.href = youtubeUrl(videoId);
 }
 
@@ -3369,9 +3402,11 @@ function recordYoutubeSearchHistory(query) {
   const trimmed = String(query || "").trim();
   const entry = trimmed
     ? { type: "search", id: trimmed }
-    : { type: "youtubeHome", id: "youtube" };
+    : youtubeTabHome === "blank"
+      ? { type: "youtubeBlank", id: "youtube" }
+      : { type: "youtubeHome", id: "youtube" };
   const current = historyStack[historyIndex];
-  if (!suppressHistory && ["search", "youtubeHome"].includes(current?.type)) {
+  if (!suppressHistory && ["search", "youtubeHome", "youtubeBlank"].includes(current?.type)) {
     historyStack[historyIndex] = entry;
     updateHistoryButtons();
     return;
@@ -3621,6 +3656,7 @@ function highlightChannel(channelId, mode = "ok") {
 function setHeader(title = "", showActions = false) {
   channelTitleEl.textContent = title;
   channelActionsEl.hidden = !showActions;
+  syncActiveChannelActions();
   videoTitleLineEl.hidden = true;
   refreshEl.hidden = false;
   document.title = title || "YouTube";
@@ -4650,6 +4686,14 @@ function openSubscribeOnYouTube(channel) {
 }
 
 function channelContextActions(channel) {
+  const channelIsSaved = allChannels.some((item) => item.id === channel?.id);
+  if (!channelIsSaved) {
+    return [
+      { label: "Open YouTube channel", action: () => openChannelVideosOnYouTube(channel) },
+      { label: "Subscribe on YouTube", action: () => openSubscribeOnYouTube(channel) },
+      { label: uiMessage("addToMyChannels"), action: () => addChannelById(channel.id, "") }
+    ];
+  }
   const actions = [
     { label: "Open YouTube channel", action: () => openChannelVideosOnYouTube(channel) },
     { label: "Subscribe on YouTube", action: () => openSubscribeOnYouTube(channel) },
@@ -5947,16 +5991,18 @@ function setActiveChannelButton() {
     categoryList.replaceChildren();
 
     const channel = allChannels.find((item) => item.id === button.dataset.channelId);
+    const displayedChannel = channel
+      || (activeChannel?.id === button.dataset.channelId ? activeChannel : null);
     if (meta) {
       meta.replaceChildren();
-      if (channel?.subscriberCountText) {
+      if (displayedChannel?.subscriberCountText) {
         const subscriberLine = document.createElement("div");
-        subscriberLine.textContent = channel.subscriberCountText;
+        subscriberLine.textContent = displayedChannel.subscriberCountText;
         meta.append(subscriberLine);
       }
       if (isActive && document.body.classList.contains("sidePanelVideos")) {
-        const count = channel?.channelVideoCount || 0;
-        const date = channel?.feedLatestPublished ? formatDate(channel.feedLatestPublished) : "";
+        const count = displayedChannel?.channelVideoCount || 0;
+        const date = displayedChannel?.feedLatestPublished ? formatDate(displayedChannel.feedLatestPublished) : "";
         if (count) {
           const countLine = document.createElement("div");
           countLine.textContent = `${count.toLocaleString("fr-FR")} videos`;
@@ -5977,11 +6023,15 @@ function setActiveChannelButton() {
         const addButton = document.createElement("button");
         addButton.type = "button";
         addButton.className = "channelCategoryChip channelCategoryAddChip";
-        addButton.textContent = "Add category";
+        addButton.textContent = channel ? "Add category" : uiMessage("addToMyChannels");
         addButton.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          openCategoryAssignment(channel);
+          if (channel) {
+            openCategoryAssignment(channel);
+          } else if (displayedChannel?.id) {
+            addChannelById(displayedChannel.id, "").catch((error) => setStatus(error.message, true));
+          }
         });
         categoryList.append(addButton);
       }
@@ -6017,6 +6067,7 @@ function setActiveChannelButton() {
     );
   }
   syncChannelCategoryLineHeights();
+  syncActiveChannelActions();
 }
 
 function syncChannelCategoryLineHeights() {
@@ -6137,6 +6188,14 @@ async function loadChannelVideosForYoutubeOrder(sort) {
   } finally {
     if (requestId === channelVideoLoadRequestId) refreshEl.disabled = false;
   }
+}
+
+function syncActiveChannelActions() {
+  if (!assignCategoriesEl || !unsubscribeEl) return;
+  const channelIsSaved = Boolean(activeChannel?.id)
+    && allChannels.some((channel) => channel.id === activeChannel.id);
+  assignCategoriesEl.textContent = uiMessage(channelIsSaved ? "classify" : "addToMyChannels");
+  unsubscribeEl.hidden = !channelIsSaved;
 }
 
 async function loadMoreChannelVideos() {
@@ -6382,9 +6441,10 @@ async function runConcurrent(items, limit, worker) {
 async function refreshChannelSummaries(options = {}) {
   if (!configLoaded || !allChannels.length) return;
   const force = Boolean(options.force);
+  const forceFeeds = force || Boolean(options.forceFeeds);
   const now = Date.now();
   const prioritizedChannels = prioritizedChannelsForRefresh();
-  const refreshQueue = prioritizedChannels.filter((channel) => force
+  const refreshQueue = prioritizedChannels.filter((channel) => forceFeeds
     || channelFeedCacheMissing(channel)
     || checkIsDue(
       channel.feedCheckedAt,
@@ -6708,6 +6768,55 @@ async function showYoutubeSearchHome() {
   syncVideoLayoutAvailability();
 }
 
+async function showYoutubeBlank() {
+  await maybePromptSeenForWatchLater();
+  setActivePrimarySection("youtube");
+  youtubeSearchLoadObserver?.disconnect();
+  youtubeSearchLoadObserver = null;
+  youtubeSearchQuery = "";
+  activeView = "youtubeBlank";
+  activeSearchQuery = "";
+  activeChannel = null;
+  activeVideoId = "";
+  renderYoutubeBlankContent();
+}
+
+function renderYoutubeBlankContent() {
+  currentVideos = [];
+  document.body.classList.remove("sidePanelVideos");
+  document.body.classList.add("virtualVideoListView");
+  listViewEl.hidden = false;
+  playerViewEl.hidden = true;
+  videosEl.replaceChildren();
+  channelsEl.classList.add("videoListHost");
+  const message = document.createElement("p");
+  message.className = "meta youtubeBlankMessage";
+  message.textContent = uiMessage("searchYoutubeEmpty");
+  channelsEl.replaceChildren(message);
+  setHeader("", false);
+  setStatus();
+  setActiveChannelButton();
+  syncStackedChannelViewState();
+  syncVideoLayoutAvailability();
+}
+
+function showPreferredYoutubeHome() {
+  return youtubeTabHome === "blank" ? showYoutubeBlank() : showYoutubeSearchHome();
+}
+
+function setYoutubeTabHomePreference(value) {
+  youtubeTabHome = value === "blank" ? "blank" : "this-week";
+  localStorage.setItem(YOUTUBE_TAB_HOME_KEY, youtubeTabHome);
+  if (youtubeTabOptionEl) youtubeTabOptionEl.value = youtubeTabHome;
+  syncYoutubeThisWeekButton();
+  if (activePrimarySection !== "youtube" || youtubeSearchQuery) return Promise.resolve();
+  const homeEntry = youtubeTabHome === "blank"
+    ? { type: "youtubeBlank", id: "youtube" }
+    : { type: "youtubeHome", id: "youtube" };
+  pushHistory(homeEntry);
+  return showPreferredYoutubeHome();
+}
+
 async function loadChannels() {
   refreshEl.disabled = true;
 
@@ -6744,6 +6853,7 @@ async function loadChannels() {
 function applyExternalConfig(nextConfig) {
   if (!nextConfig) return;
 
+  const previousActiveChannel = activeChannel;
   const activeChannelId = activeChannel?.id || "";
   config = {
     version: 1,
@@ -6772,7 +6882,11 @@ function applyExternalConfig(nextConfig) {
     activeFavoriteCategoryId = "";
   }
 
-  activeChannel = activeChannelId ? allChannels.find((channel) => channel.id === activeChannelId) || null : null;
+  activeChannel = activeChannelId
+    ? allChannels.find((channel) => channel.id === activeChannelId)
+      || (previousActiveChannel?.id === activeChannelId ? previousActiveChannel : null)
+    : null;
+  syncResultsToolbarPlacement();
   renderCategories();
 
   if (activeView === "watchLater") {
@@ -6793,6 +6907,16 @@ function applyExternalConfig(nextConfig) {
     return;
   }
 
+  if (activeView === "youtubeBlank") {
+    setActivePrimarySection("youtube");
+    youtubeSearchQuery = "";
+    activeSearchQuery = "";
+    activeChannel = null;
+    activeVideoId = "";
+    renderYoutubeBlankContent();
+    return;
+  }
+
   if (activeView === "search") {
     setActivePrimarySection("youtube");
     document.body.classList.remove("sidePanelVideos");
@@ -6809,7 +6933,11 @@ function applyExternalConfig(nextConfig) {
     return;
   }
 
-  renderChannels(channelsForActiveCategory());
+  const activeChannelIsSaved = activeChannel
+    && allChannels.some((channel) => channel.id === activeChannel.id);
+  renderChannels(activeChannel && !activeChannelIsSaved
+    ? [activeChannel]
+    : channelsForActiveCategory());
   if (!activeChannel) {
     currentVideos = [];
     videosEl.replaceChildren();
@@ -6925,6 +7053,12 @@ async function navigateHistory(delta) {
     if (entry.type === "youtubeHome") {
       searchInputEl.value = "";
       await showYoutubeSearchHome();
+      return;
+    }
+
+    if (entry.type === "youtubeBlank") {
+      searchInputEl.value = "";
+      await showYoutubeBlank();
       return;
     }
 
@@ -7049,7 +7183,7 @@ const openYoutubeThisWeekMenu = (event) => {
   event.stopPropagation();
   showContextMenu(event, newVideosContextActions());
 };
-youtubeThisWeekEl?.addEventListener("click", (event) => {
+youtubeThisWeekEl?.addEventListener("click", async (event) => {
   event.preventDefault();
   event.stopPropagation();
   window.clearTimeout(globalSearchTimer);
@@ -7058,9 +7192,24 @@ youtubeThisWeekEl?.addEventListener("click", (event) => {
   youtubeSearchQuery = "";
   searchInputEl.value = "";
   pushHistory({ type: "youtubeHome", id: "youtube" });
-  showYoutubeSearchHome().catch((error) => setStatus(error.message, true));
+  try {
+    await showYoutubeSearchHome();
+    await refreshChannelSummaries({ forceFeeds: true });
+    if (activePrimarySection === "youtube" && activeView === "youtubeHome") renderNewVideos();
+  } catch (error) {
+    setStatus(error.message, true);
+  }
 });
 youtubeThisWeekEl?.addEventListener("contextmenu", openYoutubeThisWeekMenu);
+channelsEl.addEventListener("contextmenu", (event) => {
+  if (activePrimarySection !== "youtube" || activeView !== "youtubeBlank") return;
+  event.preventDefault();
+  event.stopPropagation();
+  showContextMenu(event, [{
+    label: uiMessage("showThisWeekInYourChannels"),
+    action: () => setYoutubeTabHomePreference("this-week")
+  }]);
+});
 document.addEventListener("click", hideContextMenu);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideContextMenu();
@@ -7113,6 +7262,10 @@ splitColumnWidthOptionEl?.addEventListener("input", () => {
 });
 splitColumnWidthOptionEl?.addEventListener("change", () => {
   setSplitColumnWidth(splitColumnWidthOptionEl.value || SPLIT_COLUMN_DEFAULT_WIDTH);
+});
+youtubeTabOptionEl?.addEventListener("change", () => {
+  setYoutubeTabHomePreference(youtubeTabOptionEl.value)
+    .catch((error) => setStatus(error.message, true));
 });
 closeLanguageOptionsEl?.addEventListener("click", closeLanguageOptionsDialog);
 youtubeTitleLanguageOptionEl?.addEventListener("change", () => setYoutubeTitleLanguage(youtubeTitleLanguageOptionEl.value));
@@ -7222,8 +7375,11 @@ for (const tab of primaryTabEls) {
         pushHistory({ type: "search", id: youtubeSearchQuery });
         await searchYoutube(youtubeSearchQuery, { skipHistory: true });
       } else {
-        pushHistory({ type: "youtubeHome", id: "youtube" });
-        await showYoutubeSearchHome();
+        const homeEntry = youtubeTabHome === "blank"
+          ? { type: "youtubeBlank", id: "youtube" }
+          : { type: "youtubeHome", id: "youtube" };
+        pushHistory(homeEntry);
+        await showPreferredYoutubeHome();
       }
       searchInputEl.focus();
       return;
@@ -7329,7 +7485,7 @@ searchInputEl.addEventListener("input", () => {
       }, 300);
     } else if (!query) {
       youtubeSearchQuery = "";
-      showYoutubeSearchHome()
+      showPreferredYoutubeHome()
         .then(() => recordYoutubeSearchHistory(""))
         .catch(() => {});
     }
@@ -7452,7 +7608,17 @@ unsubscribeEl.addEventListener("click", () => {
   });
 });
 
-assignCategoriesEl.addEventListener("click", () => openCategoryAssignment(activeChannel));
+assignCategoriesEl.addEventListener("click", () => {
+  const channelIsSaved = Boolean(activeChannel?.id)
+    && allChannels.some((channel) => channel.id === activeChannel.id);
+  if (channelIsSaved) {
+    openCategoryAssignment(activeChannel);
+    return;
+  }
+  if (activeChannel?.id) {
+    addChannelById(activeChannel.id, "").catch((error) => setStatus(error.message, true));
+  }
+});
 
 function channelIdFromDroppedText(value = "") {
   return String(value).match(/(?:\/channel\/|^)(UC[-_a-zA-Z0-9]{20,})/)?.[1] || "";
@@ -8235,7 +8401,7 @@ loadChannels().then(async () => {
   if (activePrimarySection === "youtube") {
     searchInputEl.value = youtubeSearchQuery;
     if (youtubeSearchQuery) await searchYoutube(youtubeSearchQuery, { skipHistory: true });
-    else await showYoutubeSearchHome();
+    else await showPreferredYoutubeHome();
   } else if (activePrimarySection === "watchLater") {
     setActivePrimarySection("watchLater");
     activeView = "watchLater";
