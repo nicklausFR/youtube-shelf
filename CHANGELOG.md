@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.8 - 2026-07-25
+
+- Fixed repeated WebDAV conflicts on servers that expose weak ETags.
+
 ## 3.3.7 - 2026-07-25
 
 - Improved adaptive display behavior and scoped channel search.
