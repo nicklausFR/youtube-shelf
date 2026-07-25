@@ -9,7 +9,23 @@ function normalizedSearchText(value) {
     .trim();
 }
 
-function videoMatchesQuery(video, queryWords) {
+function requiredSearchWordCount(queryWords) {
+  if (queryWords.length <= 2) return queryWords.length;
+  return Math.ceil(queryWords.length * 2 / 3);
+}
+
+function searchWordMatchCount(searchable, queryWords) {
+  return queryWords.reduce((count, word) => count + (searchable.includes(word) ? 1 : 0), 0);
+}
+
+export function searchTextMatchesQuery(value, query) {
+  const queryWords = normalizedSearchText(query).split(" ").filter(Boolean);
+  if (!queryWords.length) return false;
+  const searchable = normalizedSearchText(value);
+  return searchWordMatchCount(searchable, queryWords) >= requiredSearchWordCount(queryWords);
+}
+
+function videoSearchScore(video, queryWords) {
   const searchable = normalizedSearchText([
     video.id,
     video.title,
@@ -18,7 +34,13 @@ function videoMatchesQuery(video, queryWords) {
     video.viewCountText,
     video.live ? "live direct" : ""
   ].filter(Boolean).join(" "));
-  return queryWords.every((word) => searchable.includes(word));
+  return searchWordMatchCount(searchable, queryWords);
+}
+
+function sortedVideoMatches(videos, queryWords) {
+  return [...videos].sort((left, right) => (
+    videoSearchScore(right, queryWords) - videoSearchScore(left, queryWords)
+  ));
 }
 
 export async function searchYoutubeChannelVideos({
@@ -56,15 +78,17 @@ export async function searchYoutubeChannelVideos({
 
     pageCount += 1;
     for (const video of page.videos) {
-      if (videoMatchesQuery(video, queryWords)) matchingVideos.set(video.id, video);
+      if (videoSearchScore(video, queryWords) >= requiredSearchWordCount(queryWords)) {
+        matchingVideos.set(video.id, video);
+      }
     }
 
     continuation = page.continuation || "";
     const complete = !continuation || seenContinuations.has(continuation);
-    onPage?.({ videos: [...matchingVideos.values()], pageCount, complete });
+    onPage?.({ videos: sortedVideoMatches(matchingVideos.values(), queryWords), pageCount, complete });
     if (complete) break;
     seenContinuations.add(continuation);
   } while (continuation);
 
-  return { videos: [...matchingVideos.values()], pageCount };
+  return { videos: sortedVideoMatches(matchingVideos.values(), queryWords), pageCount };
 }
