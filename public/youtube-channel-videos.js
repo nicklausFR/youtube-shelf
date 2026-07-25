@@ -8,6 +8,7 @@ const WEB_CLIENT_ID = "1";
 const WEB_CLIENT_VERSION_FALLBACK = "2.20260120.01.00";
 const VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA";
 const VIDEO_SORTS = new Set(["latest", "popular"]);
+const YOUTUBE_PAGE_ATTEMPTS = 3;
 
 let cachedClientVersion = "";
 
@@ -157,11 +158,20 @@ function sortContinuation(response, sort) {
   if (sort === "latest") return "";
   // Follow YouTube's server-provided command, as NewPipe does for channel pagination,
   // instead of guessing an undocumented browse parameter for each sort order.
-  const chips = videosTabContent(response)?.richGridRenderer?.header?.chipBarViewModel?.chips || [];
+  const header = videosTabContent(response)?.richGridRenderer?.header;
+  const chips = header?.chipBarViewModel?.chips || [];
   const selectedChip = chips
     .map((item) => item?.chipViewModel)
     .find((chip) => String(chip?.text || chip?.accessibilityLabel || "").trim().toLocaleLowerCase() === sort);
-  return selectedChip?.tapCommand?.innertubeCommand?.continuationCommand?.token || "";
+  const modernToken = selectedChip?.tapCommand?.innertubeCommand?.continuationCommand?.token;
+  if (modernToken) return modernToken;
+
+  // YouTube still serves the legacy chip renderer to some clients.
+  const legacyChips = header?.feedFilterChipBarRenderer?.contents || [];
+  const legacyChip = legacyChips
+    .map((item) => item?.chipCloudChipRenderer)
+    .find((chip) => textFrom(chip?.text).toLocaleLowerCase() === sort);
+  return legacyChip?.navigationEndpoint?.continuationCommand?.token || "";
 }
 
 async function youtubeClientVersion(fetchImpl) {
@@ -218,7 +228,7 @@ async function postBrowse(fetchImpl, body, clientVersion) {
   return data;
 }
 
-export async function fetchYoutubeChannelVideosPage({
+async function fetchYoutubeChannelVideosPageOnce({
   channelId,
   continuation = "",
   sort = "latest",
@@ -262,4 +272,23 @@ export async function fetchYoutubeChannelVideosPage({
     resolvedChannelId,
     sort: normalizedSort
   };
+}
+
+export async function fetchYoutubeChannelVideosPage(options = {}) {
+  const normalizedId = String(options.channelId || "").trim();
+  if (!options.continuation && !/^UC[-_a-zA-Z0-9]{20,}$/.test(normalizedId)) {
+    throw new Error("A valid YouTube UC channel identifier is required");
+  }
+
+  let lastError;
+  for (let attempt = 1; attempt <= YOUTUBE_PAGE_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchYoutubeChannelVideosPageOnce(options);
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = error;
+      if (attempt < YOUTUBE_PAGE_ATTEMPTS) cachedClientVersion = "";
+    }
+  }
+  throw lastError;
 }
