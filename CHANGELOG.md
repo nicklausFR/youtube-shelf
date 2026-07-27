@@ -1,5 +1,8 @@
 # Changelog
 
+- Kept video sorting independent between the YouTube weekly view, New videos, and each individual channel.
+- Made the YouTube network meter count only reliably measured incoming bytes and exclude thumbnails served from Chrome's disk cache.
+
 ## 3.3.13 - 2026-07-25
 
 - Added progressive YouTube-powered searches within channels, with immediate local title matches and duplicate-free result merging.

@@ -38,7 +38,9 @@ export function installNetworkMeter() {
   const originalFetch = globalThis.fetch.bind(globalThis);
   const listeners = new Set();
   const storage = globalThis.chrome?.storage?.session;
-  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV2";
+  // Version changes intentionally start a fresh session when the accounting
+  // rules change, so previously over-counted cached bytes are not retained.
+  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV3";
   let persistenceReady = !storage;
   let persistenceTimer = 0;
   const state = {
@@ -100,13 +102,6 @@ export function installNetworkMeter() {
       if (Number.isFinite(contentLength) && contentLength >= 0) {
         state.receivedBytes += contentLength;
         notify();
-      } else {
-        response.clone().arrayBuffer()
-          .then((buffer) => {
-            state.receivedBytes += buffer.byteLength;
-            notify();
-          })
-          .catch(() => {});
       }
       return response;
     } catch (error) {

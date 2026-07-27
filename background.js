@@ -39,9 +39,15 @@ chrome.webRequest.onHeadersReceived.addListener((details) => {
 
 chrome.webRequest.onCompleted.addListener((details) => {
   if (!isExtensionThumbnailRequest(details)) return;
-  const receivedBytes = thumbnailResponseBytes.get(details.requestId) || 0;
+  const receivedBytes = details.fromCache
+    ? 0
+    : thumbnailResponseBytes.get(details.requestId) || 0;
   thumbnailResponseBytes.delete(details.requestId);
-  reportThumbnailNetwork({ requests: 1, activeDelta: -1, receivedBytes });
+  reportThumbnailNetwork({
+    requests: details.fromCache ? 0 : 1,
+    activeDelta: -1,
+    receivedBytes
+  });
 }, { urls: THUMBNAIL_URLS, types: ["image"] });
 
 chrome.webRequest.onErrorOccurred.addListener((details) => {
