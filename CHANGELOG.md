@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.14 - 2026-07-27
+
+- Excluded cached YouTube thumbnails from estimated transferred-data totals and reset previously inflated session metrics.
+- Clarified that the network meter reports an estimate based on response sizes.
+
 ## 3.3.13 - 2026-07-25
 
 - Added progressive YouTube-powered searches within channels, with immediate local title matches and duplicate-free result merging.

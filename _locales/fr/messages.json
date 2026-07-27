@@ -221,7 +221,7 @@
   "searching": { "message": "Recherche en cours…" },
   "noChannelFound": { "message": "Aucune chaîne trouvée." },
   "networkMeterLabel": { "message": "Activité des données YouTube" },
-  "networkMeterTooltip": { "message": "$1 requêtes, $2" },
+  "networkMeterTooltip": { "message": "$1 requêtes, environ $2 transférés" },
   "youtubeTab": { "message": "Onglet YouTube" },
   "blank": { "message": "Blank" }
 }
