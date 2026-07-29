@@ -34,7 +34,10 @@ chrome.webRequest.onHeadersReceived.addListener((details) => {
   const contentLength = details.responseHeaders
     ?.find((header) => header.name.toLowerCase() === "content-length")
     ?.value;
-  thumbnailResponseBytes.set(details.requestId, Math.max(0, Number.parseInt(contentLength || "0", 10) || 0));
+  const receivedBytes = details.fromCache
+    ? 0
+    : Math.max(0, Number.parseInt(contentLength || "0", 10) || 0);
+  thumbnailResponseBytes.set(details.requestId, receivedBytes);
 }, { urls: THUMBNAIL_URLS, types: ["image"] }, ["responseHeaders"]);
 
 chrome.webRequest.onCompleted.addListener((details) => {
