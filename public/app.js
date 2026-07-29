@@ -342,19 +342,23 @@ let sortModes = (() => {
     return {
       youtube: "default",
       channels: "default",
-      channelVideos: "date-desc",
+      youtubeHome: "date-desc",
+      newVideos: "date-desc",
       watchLater: "date-desc",
       favorites: "date-desc",
       ...JSON.parse(localStorage.getItem(SORT_MODES_KEY) || "{}")
     };
   } catch {
-    return { youtube: "default", channels: "default", channelVideos: "date-desc", watchLater: "date-desc", favorites: "date-desc" };
+    return {
+      youtube: "default",
+      channels: "default",
+      youtubeHome: "date-desc",
+      newVideos: "date-desc",
+      watchLater: "date-desc",
+      favorites: "date-desc"
+    };
   }
 })();
-if (sortModes.channelVideos === "added-desc") {
-  sortModes = { ...sortModes, channelVideos: "date-desc" };
-  localStorage.setItem(SORT_MODES_KEY, JSON.stringify(sortModes));
-}
 
 function setActivePrimarySection(section) {
   if (!["youtube", "channels", "watchLater", "favorites"].includes(section)) return;
@@ -391,6 +395,22 @@ function currentSortScope() {
   return activePrimarySection;
 }
 
+function currentSortKey() {
+  if (activePrimarySection === "channels" && activeChannel?.id) {
+    return `channelVideos:${activeChannel.id}`;
+  }
+  if (activeView === "youtubeHome") return "youtubeHome";
+  if (activeView === "newVideos") return "newVideos";
+  return currentSortScope();
+}
+
+function currentSortMode() {
+  const mode = sortModes[currentSortKey()];
+  if (mode === "added-desc" && currentSortScope() === "channelVideos") return "date-desc";
+  if (typeof mode === "string") return mode;
+  return ["youtube", "channels"].includes(currentSortScope()) ? "default" : "date-desc";
+}
+
 function sortModeLabel(mode, scope = currentSortScope()) {
   const labels = {
     default: scope === "youtube" ? "sortRelevance" : "sortDefaultOrder",
@@ -409,6 +429,8 @@ function sortModeLabel(mode, scope = currentSortScope()) {
 
 function sortOptionsForCurrentScope() {
   const scope = currentSortScope();
+  const key = currentSortKey();
+  const selectedMode = currentSortMode();
   const modes = scope === "channels"
     ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "subscribers-desc", "subscribers-asc"]
     : scope === "channelVideos" && activeChannel
@@ -418,24 +440,24 @@ function sortOptionsForCurrentScope() {
         : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
   return modes.map((mode) => ({
     label: sortModeLabel(mode, scope),
-    highlighted: sortModes[scope] === mode,
-    action: () => setSortMode(scope, mode)
+    highlighted: selectedMode === mode,
+    action: () => setSortMode(scope, key, mode)
   }));
 }
 
 function syncSortButton() {
   if (!sortResultsEl) return;
   const scope = currentSortScope();
-  const mode = sortModes[scope] || "default";
+  const mode = currentSortMode();
   const label = uiMessage("sortBy", [sortModeLabel(mode, scope)]);
   sortResultsEl.title = label;
   sortResultsEl.setAttribute("aria-label", label);
   sortResultsEl.classList.toggle("is-active", mode !== "default");
 }
 
-function setSortMode(scope, mode) {
-  const previousMode = sortModes[scope] || "default";
-  sortModes = { ...sortModes, [scope]: mode };
+function setSortMode(scope, key, mode) {
+  const previousMode = sortModes[key] || currentSortMode();
+  sortModes = { ...sortModes, [key]: mode };
   localStorage.setItem(SORT_MODES_KEY, JSON.stringify(sortModes));
   syncSortButton();
   const channelYoutubeOrderChanged = scope === "channelVideos"
@@ -517,7 +539,7 @@ function keepFavoriteVideoGroupsTogether(videos) {
 }
 
 function sortVideosForDisplay(videos) {
-  const mode = sortModes[currentSortScope()] || "default";
+  const mode = currentSortMode();
   const sorted = [...videos];
   if (mode.startsWith("title-")) {
     sorted.sort((left, right) => compareTitles(left, right, mode.endsWith("desc") ? "desc" : "asc"));
@@ -3436,6 +3458,7 @@ function showChannelListState(categoryId = "") {
 }
 
 function renderNewVideos() {
+  applyListLayout();
   currentVideos = collectNewVideos();
   videosEl.replaceChildren();
   const newVideoList = document.createElement("div");
@@ -6181,7 +6204,7 @@ function youtubeOrderForChannelMode(mode) {
 }
 
 function requestedChannelVideosYoutubeSort() {
-  return youtubeOrderForChannelMode(sortModes.channelVideos) || "latest";
+  return youtubeOrderForChannelMode(currentSortMode()) || "latest";
 }
 
 async function loadChannelVideosForYoutubeOrder(sort) {
@@ -6391,7 +6414,7 @@ async function loadFeed() {
   }
 
   const channel = activeChannel;
-  const requestedYoutubeOrder = youtubeOrderForChannelMode(sortModes.channelVideos);
+  const requestedYoutubeOrder = youtubeOrderForChannelMode(currentSortMode());
   const requestedYoutubeSort = requestedChannelVideosYoutubeSort();
   const requestId = ++channelVideoLoadRequestId;
   channelVideosContinuation = "";

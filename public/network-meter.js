@@ -38,7 +38,8 @@ export function installNetworkMeter() {
   const originalFetch = globalThis.fetch.bind(globalThis);
   const listeners = new Set();
   const storage = globalThis.chrome?.storage?.session;
-  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV2";
+  // V3 drops totals produced before cached thumbnails were excluded.
+  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV3";
   let persistenceReady = !storage;
   let persistenceTimer = 0;
   const state = {
