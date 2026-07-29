@@ -221,7 +221,7 @@
   "searching": { "message": "Searching…" },
   "noChannelFound": { "message": "No channel found." },
   "networkMeterLabel": { "message": "YouTube data activity" },
-  "networkMeterTooltip": { "message": "$1 requests, $2" },
+  "networkMeterTooltip": { "message": "$1 requests, about $2 transferred" },
   "youtubeTab": { "message": "YouTube tab" },
   "blank": { "message": "Blank" }
 }
