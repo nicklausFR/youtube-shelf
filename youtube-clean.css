@@ -55,3 +55,53 @@ html.yt-companion-focus-player ytd-watch-flexy #player-container,
 html.yt-companion-focus-player ytd-watch-flexy #player-container-outer {
   margin-top: 0 !important;
 }
+
+/* In side-panel mode, the document owns native full screen instead of the
+   YouTube player. Escape then works whether playback is running or paused. */
+html.yt-companion-focus-player:fullscreen,
+html.yt-companion-focus-player:fullscreen body {
+  background: #000 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  width: 100% !important;
+}
+
+html.yt-companion-focus-player:fullscreen ytd-app,
+html.yt-companion-focus-player:fullscreen ytd-watch-flexy,
+html.yt-companion-focus-player:fullscreen #full-bleed-container,
+html.yt-companion-focus-player:fullscreen #player-theater-container,
+html.yt-companion-focus-player:fullscreen #player-container-outer,
+html.yt-companion-focus-player:fullscreen #player-container-inner,
+html.yt-companion-focus-player:fullscreen #player-container,
+html.yt-companion-focus-player:fullscreen #movie_player {
+  height: 100% !important;
+  inset: 0 !important;
+  margin: 0 !important;
+  max-height: none !important;
+  max-width: none !important;
+  position: fixed !important;
+  width: 100% !important;
+}
+
+html.yt-companion-focus-player:fullscreen #movie_player {
+  z-index: 2147483647 !important;
+}
+
+.youtubeShelfFullscreenHint {
+  background: rgb(20 20 20 / 92%) !important;
+  border: 1px solid rgb(255 255 255 / 28%) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 45%) !important;
+  color: #fff !important;
+  font: 600 16px/1.35 Arial, sans-serif !important;
+  left: 50% !important;
+  max-width: min(520px, calc(100vw - 40px)) !important;
+  padding: 12px 18px !important;
+  pointer-events: none !important;
+  position: fixed !important;
+  text-align: center !important;
+  top: 54px !important;
+  transform: translateX(-50%) !important;
+  width: max-content !important;
+  z-index: 2147483647 !important;
+}

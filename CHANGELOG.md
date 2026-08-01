@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+- Restored video sort order within and between grouped channels in the weekly YouTube view; grouping is used only by full-detail layouts.
+- Reverted unsupported attempts to transfer keyboard focus between Chrome's Side Panel and the tab, preserving the panel instance and its vertical navigation.
+- Added a full-screen hint in side-panel mode telling the user to click the video before pressing Escape; the hint disappears after the click.
+- Delayed the extension full-screen hint until Brave/YouTube's native full-screen notification has disappeared.
+
+- Added a top-toolbar toggle between side-panel and full-page modes; in full-page mode, video playback occupies the entire area below the primary tabs, including videos already open on YouTube.
+- Replaced the implicit left-click refresh on the weekly YouTube label with a dedicated refresh button before the zoom controls.
+- Added a relative last-refresh tooltip to the weekly label and its refresh button.
+- Moved the weekly refresh action to the first toolbar position and reduced its icon size, using only a disabled gray state while refreshing.
+- Added a YouTube-tab context action that only restores the weekly channel view when it is hidden.
+- Kept settings context menus above the fixed toolbar, tabs, and player in full-page mode.
+- Prevented overlapping back/forward restorations and blank views from stale beta history entries.
+- Excluded embedded-player and video-stream resources from the network request and incoming-data meter in full-page mode.
+- Restored the page-mode clean-view button as native video full screen, with Escape returning to the Shelf page and its tabs.
+- Prevented the originating channel video list from flashing or racing the transferred player when entering full-page mode from a YouTube watch page.
+- Made the page/side-panel toggle reliably open the side panel from the original click gesture.
+- Made channel names open their video lists from YouTube and Favorites cards in both side-panel and full-page modes.
+- Prevented repeated page/side-panel clicks from starting overlapping mode switches.
+- Restored normal YouTube when returning to the side panel so Comments and Suggested videos follow their Display settings instead of remaining hidden by Focus player.
+- Reused the original YouTube tab for normal, clean page, and full-screen modes instead of creating or deleting an additional tab.
+- Made the clean-view button independently cycle normal YouTube, video-only, and native full screen while leaving the page/side-panel control unchanged.
+- Allowed page/side-panel switching without a playing video by temporarily reusing and later restoring the active browser tab.
+- Made Escape return page-mode full screen to Clean, with the next clean-view click restoring Normal instead of reopening full screen.
+- Kept Normal-with-comments independent from the side panel and added the three-state view control directly to the original YouTube player's controls.
+- Made Escape leave clean-view full screen in side-panel mode even when playback is paused.
+- Removed Normal-with-comments from full-page mode because YouTube cannot embed that complete view without replacing the Shelf page; it remains available in side-panel mode.
+
 ## 3.3.14 - 2026-07-29
 
 - Excluded cached YouTube thumbnails from estimated transferred-data totals and reset previously inflated session metrics.

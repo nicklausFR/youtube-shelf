@@ -4,6 +4,7 @@ globalThis.__youtubeChannelShelfLiveInjected = true;
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
+const FOCUS_FULLSCREEN_EXITED_KEY = "youtubeChannelShelfFocusFullscreenExited";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const VIDEO_PROGRESS_KEY = "youtubeChannelShelfVideoProgress";
@@ -13,10 +14,12 @@ const VIDEO_PROGRESS_MINIMUM_SECONDS = 5;
 const VIDEO_PROGRESS_FINISHED_SECONDS = 15;
 const VIDEO_PROGRESS_MAX_ENTRIES = 500;
 const VIDEO_PROGRESS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const FULLSCREEN_HINT_ID = "youtubeShelfFullscreenHint";
 
 let commentsModeEnabled = false;
 let suggestionsModeEnabled = true;
 let focusPlayerModeEnabled = false;
+let shelfFullscreenActive = false;
 let panelOpen = false;
 let panelHeartbeat = 0;
 let videoProgress = {};
@@ -24,6 +27,7 @@ let trackedVideo = null;
 let trackedVideoId = "";
 let lastSavedVideoSecond = -1;
 let restoreAttempted = false;
+let fullscreenHintTimer = 0;
 
 const videoProgressReady = new Promise((resolve) => {
   chrome.storage.local.get(VIDEO_PROGRESS_KEY, (result) => {
@@ -186,11 +190,51 @@ function isPanelActuallyVisible() {
 }
 
 function applyDisplayOptions() {
-  const active = isPanelActuallyVisible();
+  const active = isPanelActuallyVisible() || shelfFullscreenActive;
   document.documentElement.classList.toggle("yt-companion-panel-open", active);
   document.documentElement.classList.toggle("yt-companion-hide-comments", active && commentsModeEnabled);
   document.documentElement.classList.toggle("yt-companion-hide-suggestions", active && suggestionsModeEnabled);
   document.documentElement.classList.toggle("yt-companion-focus-player", active && focusPlayerModeEnabled);
+}
+
+function focusFullscreenKeyboardTarget() {
+  window.focus();
+  const target = document.querySelector("#movie_player")
+    || document.querySelector("video")
+    || document.body;
+  if (!(target instanceof HTMLElement)) return;
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  try {
+    target.focus({ preventScroll: true });
+  } catch {
+    target.focus();
+  }
+}
+
+function hideFullscreenEscapeHint() {
+  if (fullscreenHintTimer) {
+    window.clearTimeout(fullscreenHintTimer);
+    fullscreenHintTimer = 0;
+  }
+  document.getElementById(FULLSCREEN_HINT_ID)?.remove();
+}
+
+function showFullscreenEscapeHint() {
+  hideFullscreenEscapeHint();
+  const hint = document.createElement("div");
+  hint.id = FULLSCREEN_HINT_ID;
+  hint.className = "youtubeShelfFullscreenHint";
+  hint.textContent = chrome.i18n.getMessage("fullscreenEscapeClickHint")
+    || "Click the video, then press Escape to exit full screen.";
+  (document.querySelector("#movie_player") || document.body || document.documentElement).append(hint);
+}
+
+function scheduleFullscreenEscapeHint() {
+  hideFullscreenEscapeHint();
+  fullscreenHintTimer = window.setTimeout(() => {
+    fullscreenHintTimer = 0;
+    if (document.fullscreenElement) showFullscreenEscapeHint();
+  }, 3500);
 }
 
 chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY, PANEL_OPEN_KEY, PANEL_HEARTBEAT_KEY], (result) => {
@@ -226,7 +270,27 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   applyDisplayOptions();
 });
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "YOUTUBE_SHELF_PAUSE_VIDEO") {
+    document.querySelector("video")?.pause();
+    return;
+  }
+  if (message?.type === "YOUTUBE_SHELF_ENTER_FULLSCREEN") {
+    focusFullscreenKeyboardTarget();
+    Promise.resolve(document.documentElement.requestFullscreen())
+      .then(() => {
+        shelfFullscreenActive = true;
+        chrome.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: false });
+        focusFullscreenKeyboardTarget();
+        requestAnimationFrame(focusFullscreenKeyboardTarget);
+        window.setTimeout(focusFullscreenKeyboardTarget, 100);
+        window.setTimeout(focusFullscreenKeyboardTarget, 300);
+        scheduleFullscreenEscapeHint();
+        sendResponse({ ok: true });
+      })
+      .catch((error) => sendResponse({ ok: false, error: error.message || "Full screen unavailable" }));
+    return true;
+  }
   if (message?.type !== "youtubeChannelShelfDisplayOptions") return;
   commentsModeEnabled = Boolean(message.hideComments);
   suggestionsModeEnabled = message.hideSuggestions === undefined ? true : Boolean(message.hideSuggestions);
@@ -239,6 +303,27 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   applyDisplayOptions();
 });
+
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement) return;
+  hideFullscreenEscapeHint();
+  if (!shelfFullscreenActive) return;
+  shelfFullscreenActive = false;
+  chrome.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: true });
+  applyDisplayOptions();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !document.fullscreenElement) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  document.exitFullscreen().catch(() => {});
+}, true);
+
+document.addEventListener("pointerdown", () => {
+  if (!document.fullscreenElement) return;
+  window.setTimeout(hideFullscreenEscapeHint, 0);
+}, true);
 
 window.setInterval(applyDisplayOptions, 1000);
 window.setInterval(trackCurrentVideo, 1000);

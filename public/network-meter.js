@@ -12,7 +12,8 @@ function countedYouTubeRequest(input) {
     const rawUrl = input instanceof Request ? input.url : String(input);
     const url = new URL(rawUrl, globalThis.location?.href);
     return (url.protocol === "https:" || url.protocol === "http:")
-      && (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com"));
+      && (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com"))
+      && !/^\/(?:embed|videoplayback)(?:\/|$)/.test(url.pathname);
   } catch {
     return false;
   }
@@ -38,8 +39,8 @@ export function installNetworkMeter() {
   const originalFetch = globalThis.fetch.bind(globalThis);
   const listeners = new Set();
   const storage = globalThis.chrome?.storage?.session;
-  // V3 drops totals produced before cached thumbnails were excluded.
-  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV3";
+  // V4 drops totals produced before embedded-player resources were excluded.
+  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV4";
   let persistenceReady = !storage;
   let persistenceTimer = 0;
   const state = {

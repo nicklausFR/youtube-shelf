@@ -1,6 +1,7 @@
 ﻿const openWindows = new Set();
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
+const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
@@ -12,9 +13,42 @@ const THUMBNAIL_URLS = [
 ];
 const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
 const thumbnailResponseBytes = new Map();
+const YOUTUBE_EMBED_REFERER_RULE_ID = 1001;
+const fullPageTabsByWindow = new Map();
+
+function configureYoutubeEmbedRefererRule() {
+  return chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [YOUTUBE_EMBED_REFERER_RULE_ID],
+    addRules: [{
+      id: YOUTUBE_EMBED_REFERER_RULE_ID,
+      priority: 2,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{
+          header: "Referer",
+          operation: "set",
+          value: chrome.runtime.id
+        }]
+      },
+      condition: {
+        initiatorDomains: [chrome.runtime.id],
+        requestDomains: ["www.youtube.com"],
+        resourceTypes: ["sub_frame"]
+      }
+    }]
+  }).catch(() => {});
+}
+
+configureYoutubeEmbedRefererRule();
 
 function isExtensionThumbnailRequest(details) {
-  return details.initiator === extensionOrigin || String(details.documentUrl || "").startsWith(extensionOrigin);
+  // Thumbnails rendered by the extension live in its top-level document.
+  // Resources loaded by the embedded YouTube player live in a child frame and
+  // must not be reported as application traffic, particularly in page mode.
+  if (Number(details.frameId) > 0) return false;
+  const documentUrl = String(details.documentUrl || "");
+  if (/^https:\/\/(?:www\.)?youtube\.com\/embed\//.test(documentUrl)) return false;
+  return details.initiator === extensionOrigin || documentUrl.startsWith(extensionOrigin);
 }
 
 function reportThumbnailNetwork(value) {
@@ -122,16 +156,74 @@ chrome.sidePanel?.onClosed?.addListener?.((info) => {
   if (info.windowId !== undefined) openWindows.delete(info.windowId);
 });
 
+function isFullPageTab(tab) {
+  try {
+    const url = new URL(tab?.url || "");
+    return url.origin === extensionOrigin
+      && url.pathname.endsWith("/public/index.html")
+      && url.searchParams.get("mode") === "page";
+  } catch {
+    return false;
+  }
+}
+
+function trackFullPageTab(tab) {
+  if (tab?.id === undefined || tab.windowId === undefined) return;
+  for (const [windowId, tabIds] of fullPageTabsByWindow) {
+    tabIds.delete(tab.id);
+    if (!tabIds.size) fullPageTabsByWindow.delete(windowId);
+  }
+  if (!isFullPageTab(tab)) return;
+  if (!fullPageTabsByWindow.has(tab.windowId)) fullPageTabsByWindow.set(tab.windowId, new Set());
+  fullPageTabsByWindow.get(tab.windowId).add(tab.id);
+}
+
+chrome.tabs.query({}).then((tabs) => tabs.forEach(trackFullPageTab)).catch(() => {});
+chrome.tabs.onCreated.addListener(trackFullPageTab);
+chrome.tabs.onUpdated.addListener((_tabId, _changeInfo, tab) => trackFullPageTab(tab));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  for (const [windowId, tabIds] of fullPageTabsByWindow) {
+    tabIds.delete(tabId);
+    if (!tabIds.size) fullPageTabsByWindow.delete(windowId);
+  }
+});
+
 chrome.action.onClicked.addListener(async (tab) => {
   const windowId = tab.windowId || chrome.windows.WINDOW_ID_CURRENT;
+  if (isFullPageTab(tab) && tab.id !== undefined) {
+    let returnUrl = "https://www.youtube.com/";
+    try {
+      const pageUrl = new URL(tab.url || "");
+      const sourceUrl = pageUrl.searchParams.get("sourceUrl") || "";
+      const videoId = pageUrl.searchParams.get("video") || "";
+      returnUrl = videoId
+        ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`
+        : /^https?:\/\//.test(sourceUrl) ? sourceUrl : returnUrl;
+    } catch {
+      // Fall back to the YouTube home page.
+    }
+    const opening = chrome.sidePanel.open({ windowId });
+    const normalYoutubeView = chrome.storage.local.set({ [FOCUS_PLAYER_MODE_KEY]: false });
+    await Promise.all([opening, normalYoutubeView]);
+    openWindows.add(windowId);
+    await chrome.tabs.update(tab.id, { active: true, url: returnUrl });
+    return;
+  }
+
+  const existingFullPageTabId = [...(fullPageTabsByWindow.get(windowId) || [])][0];
+  if (existingFullPageTabId !== undefined) {
+    await chrome.tabs.update(existingFullPageTabId, { active: true });
+    return;
+  }
 
   if (openWindows.has(windowId) && chrome.sidePanel.close) {
-    await chrome.sidePanel.close({ windowId });
+    await chrome.sidePanel.close({ windowId }).catch(() => {});
     openWindows.delete(windowId);
     return;
   }
 
-  await chrome.sidePanel.open({ windowId });
+  const opening = chrome.sidePanel.open({ windowId });
+  await opening;
   openWindows.add(windowId);
 });
 
@@ -174,8 +266,14 @@ function createContextMenus() {
   });
 }
 
-chrome.runtime.onInstalled.addListener(createContextMenus);
-chrome.runtime.onStartup?.addListener?.(createContextMenus);
+chrome.runtime.onInstalled.addListener(() => {
+  createContextMenus();
+  configureYoutubeEmbedRefererRule();
+});
+chrome.runtime.onStartup?.addListener?.(() => {
+  createContextMenus();
+  configureYoutubeEmbedRefererRule();
+});
 
 async function openDataPopup(command) {
   const current = await chrome.windows.getCurrent().catch(() => null);
