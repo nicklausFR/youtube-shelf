@@ -93,7 +93,7 @@ svg {
   border-bottom: 0;
   display: grid;
   gap: 6px;
-  grid-template-columns: 30px 30px 26px 26px minmax(0, 1fr) 26px;
+  grid-template-columns: 30px 30px 30px 26px 26px minmax(0, 1fr) 26px;
   height: var(--global-search-bar-height);
   justify-content: stretch;
   padding: 8px 14px;
@@ -403,7 +403,7 @@ svg {
 @media (max-width: 420px) {
   .globalYoutubeSearch.channelSearch {
     gap: 3px;
-    grid-template-columns: 30px 30px 26px 26px minmax(0, 1fr) 26px;
+    grid-template-columns: 30px 30px 30px 26px 26px minmax(0, 1fr) 26px;
     padding-inline: 8px;
   }
 
@@ -594,19 +594,16 @@ svg {
 }
 
 .thisWeekToolbarButton {
+  align-items: center;
   background: transparent;
   border: 1px solid var(--soft-line);
   border-radius: 6px;
   color: var(--text);
-  cursor: pointer;
+  display: inline-flex;
   font-size: 13px;
   margin-right: auto;
   min-height: 28px;
   padding: 0 10px;
-}
-
-.thisWeekToolbarButton:hover {
-  border-color: light-dark(#949ba5, #555);
 }
 
 .thisWeekToolbarButton.is-active {
@@ -675,6 +672,11 @@ svg {
 .channelZoomButton:disabled {
   cursor: default;
   opacity: 0.42;
+}
+
+.weeklyRefreshButton svg {
+  height: 14px;
+  width: 14px;
 }
 
 .channelNavButton {
@@ -1119,6 +1121,61 @@ p,
   height: 100%;
   position: absolute;
   width: 100%;
+}
+
+.playerError {
+  align-items: center;
+  background: light-dark(#eef0f3, #242424);
+  color: var(--text);
+  display: flex;
+  gap: 22px;
+  inset: 0;
+  justify-content: center;
+  padding: 32px;
+  position: absolute;
+  z-index: 4;
+}
+
+.playerErrorIcon {
+  align-items: center;
+  border: 8px solid var(--muted);
+  border-radius: 50%;
+  color: var(--muted);
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 58px;
+  font-weight: 700;
+  height: 96px;
+  justify-content: center;
+  line-height: 1;
+  width: 96px;
+}
+
+.playerErrorContent {
+  max-width: 620px;
+}
+
+.playerErrorContent strong {
+  display: block;
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+
+.playerErrorContent p {
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+.playerErrorContent button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  color: var(--on-accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  min-height: 38px;
+  padding: 0 16px;
 }
 
 .listView,
@@ -2348,6 +2405,15 @@ body.sidePanelVideos .favoriteButton {
   accent-color: var(--accent);
 }
 
+.weeklyCategoryAllItem {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+#weeklyCategoryList .categoryAssignItem.is-subcategory {
+  margin-left: 24px;
+}
+
 .categoryAddLine {
   align-items: center;
   display: grid;
@@ -2411,6 +2477,11 @@ body.sidePanelVideos .favoriteButton {
 
 .contextMenu button.is-active:hover {
   background: light-dark(#ffe3e0, #432320);
+}
+
+.contextSubmenu {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 
 body.isChannelDropTarget::after {
@@ -4100,6 +4171,72 @@ body.virtualVideoListView .sidebar {
   pointer-events: auto;
 }
 
+.weeklyChannelVideoGroup {
+  align-self: start;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  position: relative;
+}
+
+.weeklyChannelVideoGroupMembers {
+  background: light-dark(#ffffff, #151515);
+  border: 1px solid light-dark(#d8d8d8, #353535);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  display: none;
+  gap: 6px;
+  left: 0;
+  margin: 0;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+}
+
+.weeklyChannelVideoGroup.is-expanded {
+  z-index: 40;
+}
+
+.weeklyChannelVideoGroup.is-expanded > .is-weekly-channel-group-summary {
+  visibility: hidden;
+}
+
+.weeklyChannelVideoGroup.is-expanded .weeklyChannelVideoGroupMembers {
+  display: grid;
+  top: 0;
+}
+
+.videos:has(> .weeklyChannelVideoGroup.is-expanded) > :not(.weeklyChannelVideoGroup.is-expanded) {
+  filter: grayscale(35%);
+  opacity: 0.52;
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+
+.weeklyChannelGroupToggle {
+  background: light-dark(#fff4c7, #5b4c1d);
+  border: 1px solid light-dark(#d8af38, #a98724);
+  border-radius: 999px;
+  color: light-dark(#6d5200, #fff3b0);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  padding: 3px 7px;
+  position: absolute;
+  right: 8px;
+  top: 32px;
+  z-index: 3;
+}
+
+.weeklyChannelGroupToggle:hover,
+.weeklyChannelGroupToggle[aria-expanded="true"] {
+  background: light-dark(#ffe99a, #725e20);
+  color: light-dark(#4e3b00, #fff8d3);
+}
+
 .favoriteGroupToggle {
   background: light-dark(#f5dadd, #5b3037);
   border: 1px solid light-dark(#8e4650, #a65e68);
@@ -4628,4 +4765,148 @@ body.virtualVideoListView .sidebar > .channels {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   order: 5;
+}
+
+/* Player mode keeps the top navigation available and reserves everything below it for video. */
+.appModeToggleButton.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+html:has(body.pageMode.isPlayerMode),
+body.pageMode.isPlayerMode {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.pageMode.isPlayerMode .globalYoutubeSearch.channelSearch {
+  display: grid !important;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  visibility: visible;
+  z-index: 2147483647;
+}
+
+body.pageMode.isPlayerMode .primaryTabs {
+  display: grid !important;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: var(--global-search-bar-height);
+  visibility: visible;
+  z-index: 2147483646;
+}
+
+/* Context menus are appended to body. Keep them above the fixed page-mode
+   toolbar, tabs and player instead of letting those layers clip the menu. */
+body.pageMode.isPlayerMode .contextMenu {
+  z-index: 2147483647;
+}
+
+body.pageMode.isPlayerMode .mainbar,
+body.pageMode.isPlayerMode .sidebar,
+body.pageMode.isPlayerMode .contentToolbar,
+body.pageMode.isPlayerMode .channelHeader,
+body.pageMode.isPlayerMode .resultsToolbar,
+body.pageMode.isPlayerMode .channelShelfControls,
+body.pageMode.isPlayerMode .sidePanelPath,
+body.pageMode.isPlayerMode .channels,
+body.pageMode.isPlayerMode .categoryResizeHandle {
+  display: none !important;
+}
+
+/* The lower page is exclusively the player. These structural selectors also
+   cover channel elements that may be moved or re-rendered asynchronously. */
+body.pageMode.isPlayerMode .app > :not(.content),
+body.pageMode.isPlayerMode .content > :not(.playerView) {
+  display: none !important;
+}
+
+body.pageMode.isPlayerMode .app {
+  bottom: 0;
+  display: block !important;
+  height: auto;
+  left: 0;
+  min-height: 0 !important;
+  position: fixed;
+  right: 0;
+  top: var(--global-search-height);
+  z-index: 0;
+}
+
+body.pageMode.isPlayerMode .content {
+  display: block !important;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  position: relative;
+}
+
+body.pageMode.isPlayerMode .playerView {
+  background: #000;
+  bottom: 0;
+  display: block !important;
+  height: auto;
+  left: 0;
+  min-height: 0;
+  position: fixed;
+  right: 0;
+  top: var(--global-search-height);
+  width: auto;
+  z-index: 2147483645;
+}
+
+body.pageMode.isPlayerMode .playerPanel {
+  aspect-ratio: auto;
+  background: #000;
+  border: 0;
+  height: auto;
+  inset: 0;
+  max-height: none;
+  position: absolute;
+  width: auto;
+}
+
+body.pageMode.isPlayerMode .player {
+  display: block !important;
+  height: 100% !important;
+  inset: 0 !important;
+  opacity: 1 !important;
+  position: absolute !important;
+  visibility: visible !important;
+  width: 100% !important;
+  z-index: 2;
+}
+
+/* Native full screen is the third page-mode level: video only, without the
+   YouTube Shelf toolbar or the browser-content offsets used by page mode. */
+body.pageMode .playerView:fullscreen {
+  background: #000;
+  height: 100% !important;
+  inset: 0 !important;
+  width: 100% !important;
+}
+
+body.pageMode .playerView:fullscreen .playerPanel {
+  height: 100% !important;
+  inset: 0 !important;
+  width: 100% !important;
+}
+
+/* Full screen belongs to the extension document rather than the cross-origin
+   YouTube iframe, so Escape reliably returns to the page view. */
+html:fullscreen body.pageMode.isPlayerMode .globalYoutubeSearch.channelSearch,
+html:fullscreen body.pageMode.isPlayerMode .primaryTabs {
+  display: none !important;
+}
+
+html:fullscreen body.pageMode.isPlayerMode .app,
+html:fullscreen body.pageMode.isPlayerMode .playerView {
+  height: 100% !important;
+  inset: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
 }

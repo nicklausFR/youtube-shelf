@@ -12,6 +12,7 @@ const toggleSidebarEl = document.querySelector("#toggleSidebar");
 const backEl = document.querySelector("#back");
 const forwardEl = document.querySelector("#forward");
 const openAppSessionEl = document.querySelector("#openAppSession");
+const toggleAppModeEl = document.querySelector("#toggleAppMode");
 const searchFormEl = document.querySelector("#searchForm");
 const searchInputEl = document.querySelector("#searchInput");
 const globalSearchResultsEl = document.querySelector("#globalSearchResults");
@@ -20,7 +21,10 @@ const topOptionsEl = document.querySelector("#topOptions");
 const primaryTabEls = [...document.querySelectorAll(".primaryTab[data-section]")];
 const sortResultsEl = document.querySelector("#sortResults");
 const youtubeThisWeekEl = document.querySelector("#youtubeThisWeek");
+const youtubeThisWeekRefreshEl = document.querySelector("#youtubeThisWeekRefresh");
 const contentToolbarEl = document.querySelector(".contentToolbar");
+const sidebarEl = document.querySelector(".sidebar");
+const channelHeaderEl = document.querySelector(".channelHeader");
 const addChannelEl = document.querySelector("#addChannel");
 const addCategoryEl = document.querySelector("#addCategory");
 const sidePanelPathEl = document.querySelector("#sidePanelPath");
@@ -52,6 +56,10 @@ const videosEl = document.querySelector("#videos");
 const statusEl = document.querySelector("#status");
 const playerEl = document.querySelector("#player");
 const playerPanelEl = document.querySelector(".playerPanel");
+const playerErrorEl = document.querySelector("#playerError");
+const playerErrorTitleEl = document.querySelector("#playerErrorTitle");
+const playerErrorMessageEl = document.querySelector("#playerErrorMessage");
+const playerErrorOpenYoutubeEl = document.querySelector("#playerErrorOpenYoutube");
 const refreshEl = document.querySelector("#refresh");
 const playerWatchLaterEl = document.querySelector("#playerWatchLater");
 const seenPromptEl = document.querySelector("#seenPrompt");
@@ -77,6 +85,10 @@ const excludedNewVideosPromptEl = document.querySelector("#excludedNewVideosProm
 const excludedNewVideosListEl = document.querySelector("#excludedNewVideosList");
 const cancelExcludedNewVideosEl = document.querySelector("#cancelExcludedNewVideos");
 const saveExcludedNewVideosEl = document.querySelector("#saveExcludedNewVideos");
+const weeklyCategoryPromptEl = document.querySelector("#weeklyCategoryPrompt");
+const weeklyCategoryListEl = document.querySelector("#weeklyCategoryList");
+const cancelWeeklyCategoryEl = document.querySelector("#cancelWeeklyCategory");
+const saveWeeklyCategoryEl = document.querySelector("#saveWeeklyCategory");
 const importExportPromptEl = document.querySelector("#importExportPrompt");
 const exportNativeConfigEl = document.querySelector("#exportNativeConfig");
 const exportNewPipeConfigEl = document.querySelector("#exportNewPipeConfig");
@@ -140,8 +152,23 @@ const addCategoryParentFieldEl = document.querySelector("#addCategoryParentField
 const addCategoryParentEl = document.querySelector("#addCategoryParent");
 const addCategoryNameEl = document.querySelector("#addCategoryName");
 const closeAddCategoryEl = document.querySelector("#closeAddCategory");
+const APP_PAGE_MODE = new URLSearchParams(window.location.search).get("mode") === "page";
+const PAGE_MODE_TAB = APP_PAGE_MODE && globalThis.chrome?.tabs?.getCurrent
+  ? await chrome.tabs.getCurrent().catch(() => null)
+  : null;
+
+document.body.classList.toggle("pageMode", APP_PAGE_MODE);
+toggleAppModeEl.classList.toggle("is-active", APP_PAGE_MODE);
+toggleAppModeEl.title = interfaceI18n.translateText(APP_PAGE_MODE ? "Return to side panel" : "Open full-page mode");
+toggleAppModeEl.setAttribute("aria-label", toggleAppModeEl.title);
+if (APP_PAGE_MODE) {
+  openAppSessionEl.title = interfaceI18n.translateText("Enter full screen");
+  openAppSessionEl.setAttribute("aria-label", openAppSessionEl.title);
+}
 
 let activeVideoId = "";
+let appModeSwitchPending = false;
+let initialTransferredVideoCancelled = false;
 let activeChannel = null;
 let activeSearchQuery = "";
 let youtubeSearchQuery = "";
@@ -172,6 +199,7 @@ let favorites = {};
 let seenVideos = {};
 let watchLater = {};
 let currentWatchLaterVideoId = "";
+let playerEventHandshakeTimer = 0;
 let pendingAddChannelCategoryId = "";
 let channelSearchMetadataRefreshTimer = 0;
 let channelSearchMetadataRefreshInFlight = false;
@@ -235,10 +263,12 @@ let draggedFavoriteVideoId = "";
 const STORAGE_KEY = "youtubeChannelShelfConfig";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
+const MODE_HANDOFF_KEY = "youtubeChannelShelfModeHandoff";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
 const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
+const FOCUS_FULLSCREEN_EXITED_KEY = "youtubeChannelShelfFocusFullscreenExited";
 const CHANNEL_VIDEO_SOURCE_KEY = "youtubeChannelShelfChannelVideoSource";
 const FEED_CHECK_INTERVAL_KEY = "youtubeChannelShelfFeedCheckIntervalMinutes";
 const METADATA_CHECK_INTERVAL_KEY = "youtubeChannelShelfMetadataCheckIntervalDays";
@@ -249,6 +279,8 @@ const TRANSLATION_OVERRIDES_KEY = "youtubeChannelShelfTranslationOverrides";
 const LIST_ZOOM_KEY = "youtubeChannelShelfListZoom";
 const SPLIT_COLUMN_WIDTH_KEY = "youtubeChannelShelfSplitColumnWidth";
 const YOUTUBE_TAB_HOME_KEY = "youtubeChannelShelfYoutubeTabHome";
+const YOUTUBE_WEEKLY_CATEGORY_EXCLUSIONS_KEY = "youtubeChannelShelfWeeklyCategoryExclusions";
+const YOUTUBE_WEEKLY_GROUP_BY_CHANNEL_KEY = "youtubeChannelShelfWeeklyGroupByChannel";
 const CATEGORY_PANEL_HEIGHT_KEY = "youtubeChannelShelfCategoryPanelHeight";
 const CATEGORY_ZOOM_KEY = "youtubeChannelShelfCategoryZoom";
 const SORT_MODES_KEY = "youtubeChannelShelfSortModes";
@@ -307,6 +339,15 @@ let interfaceLanguage = ["auto", "en", "fr"].includes(localStorage.getItem(INTER
 let youtubeTabHome = ["this-week", "blank"].includes(localStorage.getItem(YOUTUBE_TAB_HOME_KEY))
   ? localStorage.getItem(YOUTUBE_TAB_HOME_KEY)
   : "this-week";
+let weeklyCategoryExclusions = (() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(YOUTUBE_WEEKLY_CATEGORY_EXCLUSIONS_KEY) || "[]");
+    return new Set(Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+})();
+let weeklyGroupByChannel = localStorage.getItem(YOUTUBE_WEEKLY_GROUP_BY_CHANNEL_KEY) !== "false";
 let translationEditorLoadId = 0;
 
 function uiText(value) {
@@ -682,7 +723,14 @@ function setPanelOpenState(open, options = {}) {
 }
 
 function isExtensionPanelActive() {
-  return document.visibilityState === "visible";
+  // A full-page extension tab is also an active companion session. Keeping
+  // this heartbeat alive lets the configured clean-display options apply to
+  // the original YouTube tab when the user switches to it.
+  return APP_PAGE_MODE || document.visibilityState === "visible";
+}
+
+function displayOptionsAreAvailable() {
+  return isExtensionPanelActive();
 }
 
 function syncPanelVisibilityState(options = {}) {
@@ -945,27 +993,81 @@ function setDisplayOption(key, value) {
   broadcastDisplayOptions(overrides);
 }
 
-function toggleDisplayOption(key, fallback = false) {
+function toggleDisplayOption(key, fallback = false, onChanged = null) {
   if (!globalThis.chrome?.storage?.local) return;
   chrome.storage.local.get(key, (result) => {
     const current = result[key] === undefined ? fallback : Boolean(result[key]);
-    setDisplayOption(key, !current);
+    const next = !current;
+    setDisplayOption(key, next);
+    onChanged?.(next);
   });
+}
+
+async function cycleYoutubeViewMode() {
+  if (!globalThis.chrome?.storage?.local) return;
+  const state = await chrome.storage.local.get([
+    FOCUS_PLAYER_MODE_KEY,
+    FOCUS_FULLSCREEN_EXITED_KEY
+  ]);
+  const clean = Boolean(state[FOCUS_PLAYER_MODE_KEY]);
+  const returnedFromFullscreen = Boolean(state[FOCUS_FULLSCREEN_EXITED_KEY]);
+
+  if (!clean) {
+    await chrome.storage.local.set({
+      [FOCUS_PLAYER_MODE_KEY]: true,
+      [FOCUS_FULLSCREEN_EXITED_KEY]: false
+    });
+    document.querySelectorAll(".pathFocusButton").forEach((button) => button.classList.add("is-active"));
+    await broadcastDisplayOptions({ focusPlayer: true });
+    return;
+  }
+
+  if (returnedFromFullscreen) {
+    await chrome.storage.local.set({
+      [FOCUS_PLAYER_MODE_KEY]: false,
+      [FOCUS_FULLSCREEN_EXITED_KEY]: false
+    });
+    document.querySelectorAll(".pathFocusButton").forEach((button) => button.classList.remove("is-active"));
+    await broadcastDisplayOptions({ focusPlayer: false });
+    return;
+  }
+
+  const [youtubeTab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+    url: ["*://www.youtube.com/*", "*://youtube.com/*"]
+  });
+  if (youtubeTab?.id === undefined) {
+    setStatus("The normal YouTube tab must be active to enter full screen.", true);
+    return;
+  }
+  await ensureYoutubeCompanion(youtubeTab.id);
+  const response = await chrome.tabs.sendMessage(youtubeTab.id, {
+    type: "YOUTUBE_SHELF_ENTER_FULLSCREEN"
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || "YouTube refused full screen.");
+  }
 }
 
 function syncFocusPlayerButtonState() {
   const buttons = document.querySelectorAll(".pathFocusButton");
   if (!buttons.length) return;
-  const active = isExtensionPanelActive();
+  const active = displayOptionsAreAvailable();
   buttons.forEach((button) => button.toggleAttribute("disabled", !active));
+  if (APP_PAGE_MODE) {
+    buttons.forEach((button) => button.classList.remove("is-active"));
+    return;
+  }
   if (!globalThis.chrome?.storage?.local) return;
   chrome.storage.local.get(FOCUS_PLAYER_MODE_KEY, (result) => {
-    buttons.forEach((button) => button.classList.toggle("is-active", Boolean(result[FOCUS_PLAYER_MODE_KEY])));
+    const enabled = Boolean(result[FOCUS_PLAYER_MODE_KEY]);
+    buttons.forEach((button) => button.classList.toggle("is-active", enabled));
   });
 }
 
 function syncDisplayOptionsAvailability() {
-  const active = isExtensionPanelActive();
+  const active = displayOptionsAreAvailable();
   hideCommentsOptionEl?.toggleAttribute("disabled", !active);
   hideSuggestionsOptionEl?.toggleAttribute("disabled", !active);
   syncFocusPlayerButtonState();
@@ -2057,7 +2159,9 @@ function contextMenuButtons(actions) {
     const button = document.createElement("button");
     const hasSubmenu = Array.isArray(item.submenu);
     button.type = "button";
-    button.textContent = item.checked ? "[x] " + uiText(item.label) : uiText(item.label);
+    button.textContent = item.checkable
+      ? `${item.checked ? "[x]" : "[ ]"} ${uiText(item.label)}`
+      : item.checked ? "[x] " + uiText(item.label) : uiText(item.label);
     if (item.danger) button.classList.add("is-danger");
     if (item.highlighted) button.classList.add("is-active");
     button.addEventListener("click", async (clickEvent) => {
@@ -2805,20 +2909,57 @@ function syncResultsToolbarPlacement() {
   channelListSeparatorEl.before(resultsToolbarEl);
 }
 
+function latestWeeklyRefreshAt() {
+  return Math.max(0, ...allChannels.map((channel) => Date.parse(channel.feedCheckedAt || "") || 0));
+}
+
+function weeklyRefreshStatusText() {
+  const refreshedAt = latestWeeklyRefreshAt();
+  if (!refreshedAt) return uiMessage("weeklyFeedNeverRefreshed");
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - refreshedAt) / 1000));
+  let amount = elapsedSeconds;
+  let unit = "second";
+  if (elapsedSeconds >= 24 * 60 * 60) {
+    amount = Math.floor(elapsedSeconds / (24 * 60 * 60));
+    unit = "day";
+  } else if (elapsedSeconds >= 60 * 60) {
+    amount = Math.floor(elapsedSeconds / (60 * 60));
+    unit = "hour";
+  } else if (elapsedSeconds >= 60) {
+    amount = Math.floor(elapsedSeconds / 60);
+    unit = "minute";
+  }
+  const relative = new Intl.RelativeTimeFormat(interfaceI18n.locale, { numeric: "always" })
+    .format(-amount, unit);
+  return `${uiMessage("lastWeeklyRefresh")} ${relative}`;
+}
+
+function syncWeeklyRefreshTooltips() {
+  const status = weeklyRefreshStatusText();
+  if (youtubeThisWeekEl) youtubeThisWeekEl.title = status;
+  if (youtubeThisWeekRefreshEl) youtubeThisWeekRefreshEl.title = status;
+}
+
 function syncYoutubeThisWeekButton() {
   if (!youtubeThisWeekEl) return;
   const visible = activePrimarySection === "youtube" && youtubeTabHome !== "blank";
   youtubeThisWeekEl.hidden = !visible;
-  if (!visible) return;
   const active = activeView === "youtubeHome";
+  if (youtubeThisWeekRefreshEl) {
+    const refreshLabel = uiMessage("refreshThisWeek");
+    youtubeThisWeekRefreshEl.hidden = !visible || !active;
+    youtubeThisWeekRefreshEl.disabled = newVideosRefreshPending;
+    youtubeThisWeekRefreshEl.classList.toggle("is-loading", newVideosRefreshPending);
+    youtubeThisWeekRefreshEl.setAttribute("aria-label", refreshLabel);
+  }
+  if (!visible) return;
   youtubeThisWeekEl.classList.toggle("is-active", active);
   if (active) youtubeThisWeekEl.setAttribute("aria-current", "page");
   else youtubeThisWeekEl.removeAttribute("aria-current");
   const label = uiMessage("thisWeekInYourChannels");
   youtubeThisWeekEl.textContent = label;
-  youtubeThisWeekEl.classList.toggle("is-loading", newVideosRefreshPending);
-  youtubeThisWeekEl.title = label;
   youtubeThisWeekEl.setAttribute("aria-label", label);
+  syncWeeklyRefreshTooltips();
 }
 
 function syncAddListItemButton() {
@@ -2932,19 +3073,137 @@ function isWithinNewVideosRange(video) {
 
 function newVideosContextActions() {
   return [
+    { label: uiMessage("hideThisWeekInYourChannels"), action: () => setYoutubeTabHomePreference("blank") },
     { label: uiMessage("resetWeeklyNew"), action: resetNewVideoCounters },
     { label: uiMessage("restoreWeeklyList"), action: restoreWeeklyVideoList },
     { label: "Excluded channels", action: openExcludedNewVideosDialog },
-    { label: uiMessage("hideThisWeekInYourChannels"), action: () => setYoutubeTabHomePreference("blank") }
+    {
+      label: uiMessage("weeklyChannelCategories"),
+      action: openWeeklyCategoryDialog
+    },
+    {
+      label: uiMessage(weeklyGroupByChannel ? "ungroupWeeklyVideosByChannel" : "groupWeeklyVideosByChannel"),
+      action: toggleWeeklyGroupByChannel
+    }
   ];
 }
 
+function weeklyCategoryChoices() {
+  return [
+    ...sortedManualCategories().map((category) => ({
+      id: category.id,
+      name: category.name,
+      isSubcategory: Boolean(category.parentId)
+    })),
+    { id: UNCATEGORIZED_CATEGORY_ID, name: uiMessage("uncategorized") }
+  ];
+}
+
+function saveWeeklyCategoryExclusions() {
+  localStorage.setItem(YOUTUBE_WEEKLY_CATEGORY_EXCLUSIONS_KEY, JSON.stringify([...weeklyCategoryExclusions]));
+  if (activeView === "youtubeHome" || activeView === "newVideos") renderNewVideos();
+}
+
+function renderWeeklyCategoryList() {
+  if (!weeklyCategoryListEl) return;
+  const choices = weeklyCategoryChoices();
+  const allLabel = document.createElement("label");
+  allLabel.className = "categoryAssignItem weeklyCategoryAllItem";
+  const allCheckbox = document.createElement("input");
+  allCheckbox.type = "checkbox";
+  allCheckbox.value = "__all_categories";
+  const allName = document.createElement("span");
+  allName.textContent = uiMessage("allCategories");
+  allLabel.append(allCheckbox, allName);
+
+  const choiceLabels = choices.map((category) => {
+    const label = document.createElement("label");
+    label.className = "categoryAssignItem";
+    label.classList.toggle("is-subcategory", Boolean(category.isSubcategory));
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = category.id;
+    checkbox.checked = !weeklyCategoryExclusions.has(category.id);
+    const name = document.createElement("span");
+    name.textContent = category.name;
+    label.append(checkbox, name);
+    return label;
+  });
+
+  const syncAllCheckbox = () => {
+    const checkboxes = choiceLabels.map((label) => label.querySelector("input"));
+    const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+    allCheckbox.checked = checkedCount === checkboxes.length;
+    allCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+  };
+  allCheckbox.addEventListener("change", () => {
+    for (const label of choiceLabels) label.querySelector("input").checked = allCheckbox.checked;
+    allCheckbox.indeterminate = false;
+  });
+  for (const label of choiceLabels) label.querySelector("input").addEventListener("change", syncAllCheckbox);
+  syncAllCheckbox();
+  weeklyCategoryListEl.replaceChildren(allLabel, ...choiceLabels);
+}
+
+function openWeeklyCategoryDialog() {
+  if (!weeklyCategoryPromptEl) return;
+  renderWeeklyCategoryList();
+  weeklyCategoryPromptEl.hidden = false;
+}
+
+function closeWeeklyCategoryDialog() {
+  if (weeklyCategoryPromptEl) weeklyCategoryPromptEl.hidden = true;
+}
+
+function saveWeeklyCategoryDialog() {
+  if (!weeklyCategoryListEl) return;
+  weeklyCategoryExclusions = new Set(
+    [...weeklyCategoryListEl.querySelectorAll('input[type="checkbox"]:not([value="__all_categories"]):not(:checked)')]
+      .map((checkbox) => checkbox.value)
+  );
+  saveWeeklyCategoryExclusions();
+  closeWeeklyCategoryDialog();
+}
+
+function channelMatchesWeeklyCategories(channel) {
+  const validCategoryIds = new Set(allCategories.map((category) => category.id));
+  const categoryIds = (channel.categories || []).filter((categoryId) => validCategoryIds.has(categoryId));
+  if (!categoryIds.length) return !weeklyCategoryExclusions.has(UNCATEGORIZED_CATEGORY_ID);
+  return categoryIds.some((categoryId) => !weeklyCategoryExclusions.has(categoryId));
+}
+
+function toggleWeeklyGroupByChannel() {
+  weeklyGroupByChannel = !weeklyGroupByChannel;
+  localStorage.setItem(YOUTUBE_WEEKLY_GROUP_BY_CHANNEL_KEY, String(weeklyGroupByChannel));
+  if (activeView === "youtubeHome" || activeView === "newVideos") renderNewVideos();
+}
+
+function shouldGroupWeeklyVideos() {
+  // Only the full video cards expose metadata beyond the title. Compact and
+  // title-only layouts should keep every video visible independently.
+  return weeklyGroupByChannel && ["columns", "single"].includes(listModeForScope("newVideos"));
+}
+
 function collectNewVideos() {
-  return allChannels
+  const videos = allChannels
+    .filter(channelMatchesWeeklyCategories)
     .flatMap((channel) => (channel.feedVideos || [])
       .filter((video) => isVideoNewForChannel(video, channel))
       .map((video) => videoWithChannel(video, channel)))
     .sort((a, b) => new Date(b.published || 0).getTime() - new Date(a.published || 0).getTime());
+  if (!shouldGroupWeeklyVideos()) return videos;
+
+  const groups = new Map();
+  for (const video of videos) {
+    const groupId = video.channelId || video.channel || "";
+    if (!groups.has(groupId)) groups.set(groupId, []);
+    groups.get(groupId).push(video);
+  }
+  return [...groups.values()].flatMap((members) => members.map((video, index) => ({
+    ...video,
+    weeklyChannelGroupOrder: index + 1,
+    weeklyChannelGroupSize: members.length
+  })));
 }
 
 async function resetNewVideoCounters() {
@@ -3221,6 +3480,37 @@ function youtubeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
+async function openYoutubeCleanView(videoId = activeVideoId, options = {}) {
+  if (!globalThis.chrome?.tabs) return;
+
+  const sourceTabId = Number.parseInt(
+    new URLSearchParams(window.location.search).get("sourceTab") || "",
+    10
+  );
+  const sourceTab = Number.isInteger(sourceTabId)
+    ? await chrome.tabs.get(sourceTabId).catch(() => null)
+    : null;
+  const currentTab = await chrome.tabs.getCurrent().catch(() => null);
+  const youtubeTabs = await chrome.tabs.query({
+    windowId: currentTab?.windowId,
+    url: ["*://www.youtube.com/*", "*://youtube.com/*"]
+  });
+  const targetTab = (sourceTab && isYoutubeTabUrl(sourceTab.url || "") ? sourceTab : null)
+    || youtubeTabs.find((tab) => tab.active)
+    || [...youtubeTabs].sort((left, right) => Number(right.lastAccessed || 0) - Number(left.lastAccessed || 0))[0]
+    || null;
+  const targetUrl = videoId ? youtubeUrl(videoId) : targetTab?.url || "https://www.youtube.com/";
+
+  if (targetTab?.id !== undefined) {
+    await chrome.tabs.update(targetTab.id, { active: true, url: targetUrl });
+    return;
+  }
+  if (options.existingOnly) {
+    throw new Error("The original YouTube tab is no longer available.");
+  }
+  await chrome.tabs.create({ url: targetUrl });
+}
+
 async function openOfficialYoutube(video, options = {}) {
   const videoId = typeof video === "string" ? video : video.id;
   if (!videoId) return;
@@ -3392,6 +3682,169 @@ function currentShelfBaseHistoryEntry() {
   return null;
 }
 
+function currentModeHandoffEntry() {
+  // The initial channel load seeds history with a channel-list entry before
+  // the preferred YouTube view is rendered. Use the visible YouTube state
+  // directly so switching modes cannot restore that stale Channels entry.
+  if (activePrimarySection === "youtube") {
+    if (activeView === "search" && youtubeSearchQuery.trim()) {
+      return { type: "search", id: youtubeSearchQuery.trim() };
+    }
+    if (activeView === "youtubeBlank") {
+      return { type: "youtubeBlank", id: "youtube" };
+    }
+    return youtubeTabHome === "blank"
+      ? { type: "youtubeBlank", id: "youtube" }
+      : { type: "youtubeHome", id: "youtube" };
+  }
+
+  const current = historyStack[historyIndex];
+  if (current?.type === "video") {
+    return historyStack[historyIndex - 1] || currentShelfBaseHistoryEntry();
+  }
+  return current || currentShelfBaseHistoryEntry();
+}
+
+async function writeModeHandoff(target, options = {}) {
+  await chrome.storage.local.set({
+    [MODE_HANDOFF_KEY]: {
+      target,
+      createdAt: Date.now(),
+      entry: currentModeHandoffEntry(),
+      videoId: options.videoId || "",
+      videoStart: Number(options.videoStart) || 0,
+      videoTitle: options.videoTitle || ""
+    }
+  });
+}
+
+async function consumeModeHandoff() {
+  const expectedTarget = APP_PAGE_MODE ? "page" : "panel";
+  const result = await chrome.storage.local.get(MODE_HANDOFF_KEY);
+  const handoff = result[MODE_HANDOFF_KEY];
+  if (!handoff || handoff.target !== expectedTarget || Date.now() - Number(handoff.createdAt || 0) > 10000) {
+    return null;
+  }
+  await chrome.storage.local.remove(MODE_HANDOFF_KEY);
+  return handoff;
+}
+
+function isYoutubeTabUrl(value = "") {
+  return /^https:\/\/(?:www\.)?youtube\.com\//.test(value);
+}
+
+async function readYoutubeVideoFromTab(tabId) {
+  if (tabId === undefined || tabId === null) return null;
+  const injection = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const url = new URL(window.location.href);
+      const videoId = url.pathname === "/watch"
+        ? (url.searchParams.get("v") || "").trim()
+        : url.pathname.match(/^\/(?:shorts|live)\/([^/?#]+)/)?.[1] || "";
+      const video = document.querySelector("video.html5-main-video, video");
+      const videoTitle = (
+        document.querySelector("ytd-watch-metadata h1 yt-formatted-string")?.textContent
+        || document.querySelector("h1.title yt-formatted-string")?.textContent
+        || document.title.replace(/\s+-\s+YouTube$/, "")
+      ).trim();
+      const videoStart = Number.isFinite(video?.currentTime) ? Math.floor(video.currentTime) : 0;
+      video?.pause();
+      return { videoId, videoStart, videoTitle };
+    }
+  }).catch(() => []);
+  return injection?.[0]?.result || null;
+}
+
+async function switchAppMode() {
+  if (APP_PAGE_MODE) {
+    const currentTab = PAGE_MODE_TAB || await chrome.tabs.getCurrent();
+    const windowId = currentTab?.windowId;
+    if (windowId === undefined) throw new Error("Unable to identify the browser window");
+    const pageParameters = new URLSearchParams(window.location.search);
+    const originalYoutubeUrl = pageParameters.get("sourceUrl") || "";
+    const returnUrl = activeVideoId
+      ? youtubeUrl(activeVideoId)
+      : /^https?:\/\//.test(originalYoutubeUrl) ? originalYoutubeUrl : "https://www.youtube.com/";
+    // Opening the side panel must be the first extension API called from the
+    // click gesture or Chrome may reject it and strand the page-mode tab.
+    const opening = chrome.sidePanel.open({ windowId });
+    // Page mode is the video-only Shelf view. Returning to the side panel must
+    // restore normal YouTube; comments and suggestions then follow only their
+    // explicit settings in Options > Display.
+    document.querySelectorAll(".pathFocusButton").forEach((button) => button.classList.remove("is-active"));
+    const normalYoutubeView = chrome.storage.local
+      .set({ [FOCUS_PLAYER_MODE_KEY]: false })
+      .then(() => broadcastDisplayOptions({ focusPlayer: false }));
+    const handoff = writeModeHandoff("panel");
+    await Promise.all([handoff, normalYoutubeView, opening]);
+    if (currentTab?.id !== undefined) {
+      await chrome.tabs.update(currentTab.id, { active: true, url: returnUrl });
+    }
+    return;
+  }
+
+  const windowTabs = await chrome.tabs.query({ currentWindow: true });
+  const youtubeTabs = windowTabs.filter((tab) => isYoutubeTabUrl(tab.url || ""));
+  const activeBrowserTab = windowTabs.find((tab) => tab.active) || null;
+  const activeTab = youtubeTabs.find((tab) => tab.active)
+    || youtubeTabs.find((tab) => tab.audible)
+    || [...youtubeTabs].sort((left, right) => Number(right.lastAccessed || 0) - Number(left.lastAccessed || 0))[0]
+    || activeBrowserTab;
+  const activeYoutubeVideo = isYoutubeTabUrl(activeTab?.url || "")
+    ? await readYoutubeVideoFromTab(activeTab?.id)
+    : null;
+  const videoId = activeYoutubeVideo?.videoId
+    || (isYoutubeTabUrl(activeTab?.url || "") ? videoIdFromInput(activeTab?.url || "") : "");
+  await writeModeHandoff("page", {
+    videoId,
+    videoStart: activeYoutubeVideo?.videoStart || 0,
+    videoTitle: activeYoutubeVideo?.videoTitle || ""
+  });
+  const pageUrl = new URL(chrome.runtime.getURL("public/index.html"));
+  pageUrl.searchParams.set("mode", "page");
+  if (activeTab?.id !== undefined) {
+    pageUrl.searchParams.set("sourceTab", String(activeTab.id));
+    pageUrl.searchParams.set("sourceUrl", activeTab.url || (videoId ? youtubeUrl(videoId) : "https://www.youtube.com/"));
+  }
+  if (videoId) {
+    pageUrl.searchParams.set("video", videoId);
+    if (activeYoutubeVideo?.videoStart) {
+      pageUrl.searchParams.set("start", String(activeYoutubeVideo.videoStart));
+    }
+    if (activeYoutubeVideo?.videoTitle) {
+      pageUrl.searchParams.set("title", activeYoutubeVideo.videoTitle);
+    }
+  }
+  const existingPageTabs = windowTabs.filter((tab) => {
+    try {
+      const url = new URL(tab.url || "");
+      return url.origin === pageUrl.origin
+        && url.pathname === pageUrl.pathname
+        && url.searchParams.get("mode") === "page";
+    } catch {
+      return false;
+    }
+  });
+  const existingPageTab = existingPageTabs.find((tab) => tab.active)
+    || [...existingPageTabs].sort((left, right) => Number(right.lastAccessed || 0) - Number(left.lastAccessed || 0))[0];
+  const reusableTabId = activeTab?.id ?? existingPageTab?.id;
+  const duplicatePageTabIds = existingPageTabs
+    .filter((tab) => tab.id !== reusableTabId && tab.id !== undefined)
+    .map((tab) => tab.id);
+  if (duplicatePageTabIds.length) await chrome.tabs.remove(duplicatePageTabIds);
+  if (reusableTabId === undefined) {
+    throw new Error("No active browser tab is available for page mode.");
+  }
+  const pageTab = await chrome.tabs.update(reusableTabId, {
+    active: true,
+    url: pageUrl.toString()
+  });
+  if (pageTab.windowId !== undefined && chrome.sidePanel.close) {
+    await chrome.sidePanel.close({ windowId: pageTab.windowId });
+  }
+}
+
 function channelSearchHistoryEntry() {
   const query = channelSearchQuery.trim();
   if (!query) return currentShelfBaseHistoryEntry();
@@ -3457,6 +3910,73 @@ function showChannelListState(categoryId = "") {
   setStatus();
 }
 
+function createWeeklyChannelVideoGroup(members) {
+  if (members.length < 2) return createVideoCard(members[0]);
+  const group = document.createElement("div");
+  group.className = "weeklyChannelVideoGroup";
+  group.dataset.channelId = members[0].channelId || "";
+
+  const summary = createVideoCard(members[0]);
+  summary.classList.add("is-weekly-channel-group-summary");
+  summary.querySelector(".favoriteGroupBadge")?.remove();
+
+  const toggle = document.createElement("button");
+  toggle.className = "weeklyChannelGroupToggle";
+  toggle.type = "button";
+  toggle.textContent = `+${members.length - 1}`;
+  toggle.title = uiMessage("showWeeklyChannelVideos", [members.length]);
+  toggle.setAttribute("aria-label", toggle.title);
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const expand = !group.classList.contains("is-expanded");
+    closeWeeklyChannelVideoGroups(group);
+    group.classList.toggle("is-expanded", expand);
+    toggle.setAttribute("aria-expanded", String(expand));
+    toggle.title = uiMessage(expand ? "hideWeeklyChannelVideos" : "showWeeklyChannelVideos", [members.length]);
+    toggle.setAttribute("aria-label", toggle.title);
+  });
+  summary.append(toggle);
+
+  const memberList = document.createElement("div");
+  memberList.className = "weeklyChannelVideoGroupMembers";
+  memberList.append(...members.map(createVideoCard));
+  for (const thumbnail of [summary, memberList].flatMap((element) => [...element.querySelectorAll("img.thumb")])) {
+    thumbnail.loading = "eager";
+  }
+  group.append(summary, memberList);
+  return group;
+}
+
+function closeWeeklyChannelVideoGroups(except = null) {
+  document.querySelectorAll(".weeklyChannelVideoGroup.is-expanded").forEach((group) => {
+    if (group === except) return;
+    group.classList.remove("is-expanded");
+    const toggle = group.querySelector(".weeklyChannelGroupToggle");
+    const videoCount = group.querySelectorAll(".weeklyChannelVideoGroupMembers .video").length;
+    toggle?.setAttribute("aria-expanded", "false");
+    if (toggle) {
+      toggle.title = uiMessage("showWeeklyChannelVideos", [videoCount]);
+      toggle.setAttribute("aria-label", toggle.title);
+    }
+  });
+}
+
+function renderWeeklyGroupedVideos(videos, target) {
+  const groups = new Map();
+  // Grouping must not bypass the active video ordering. Iterating the sorted
+  // list also makes each group's summary its highest-ranked video.
+  for (const video of sortVideosForDisplay(videos)) {
+    const groupId = video.channelId || video.channel || video.id;
+    if (!groups.has(groupId)) groups.set(groupId, []);
+    groups.get(groupId).push(video);
+  }
+  target.replaceChildren(...[...groups.values()].map(createWeeklyChannelVideoGroup));
+  setActiveVideoButton();
+  syncVideoLayoutAvailability();
+}
+
 function renderNewVideos() {
   applyListLayout();
   currentVideos = collectNewVideos();
@@ -3465,7 +3985,8 @@ function renderNewVideos() {
   newVideoList.className = "videos newVideos";
   channelsEl.classList.add("videoListHost");
   channelsEl.replaceChildren(newVideoList);
-  renderVideos(currentVideos, newVideoList);
+  if (shouldGroupWeeklyVideos()) renderWeeklyGroupedVideos(currentVideos, newVideoList);
+  else renderVideos(currentVideos, newVideoList);
   syncYoutubeThisWeekButton();
   syncVideoLayoutAvailability();
   setStatus(currentVideos.length ? "" : "No new videos.", !currentVideos.length);
@@ -3576,11 +4097,14 @@ function closeSeenPrompt(value) {
 function showListView() {
   listViewEl.hidden = false;
   playerViewEl.hidden = true;
+  sidebarEl.hidden = false;
+  channelHeaderEl.hidden = false;
   contentToolbarEl.hidden = false;
   document.querySelector(".channelHeader").style.width = "";
   document.body.classList.remove("isPlayerMode");
   refreshEl.hidden = false;
   playerEl.removeAttribute("src");
+  hidePlayerError();
   activeVideoId = "";
   setActiveVideoButton();
 }
@@ -3689,11 +4213,70 @@ function setHeader(title = "", showActions = false) {
 function showPlayerView() {
   listViewEl.hidden = true;
   playerViewEl.hidden = false;
+  sidebarEl.hidden = APP_PAGE_MODE;
+  channelHeaderEl.hidden = APP_PAGE_MODE;
   contentToolbarEl.hidden = true;
   document.body.classList.add("isPlayerMode");
   refreshEl.hidden = true;
   requestAnimationFrame(syncHeaderToPlayerWidth);
 }
+
+function hidePlayerError() {
+  if (playerErrorEl) playerErrorEl.hidden = true;
+}
+
+function showPlayerError(errorCode = 0) {
+  if (!playerErrorEl) return;
+  const embeddingBlocked = errorCode === 101 || errorCode === 150;
+  playerErrorTitleEl.textContent = uiMessage("embeddedVideoUnavailable");
+  playerErrorMessageEl.textContent = uiMessage(
+    embeddingBlocked ? "embeddedVideoBlockedByOwner" : "embeddedVideoYoutubeOnly"
+  );
+  playerErrorOpenYoutubeEl.textContent = uiMessage("openInCleanYoutubeView");
+  playerErrorEl.hidden = false;
+}
+
+function sendPlayerEventCommand(payload) {
+  playerEl.contentWindow?.postMessage(JSON.stringify({
+    id: playerEl.id,
+    ...payload
+  }), "https://www.youtube.com");
+}
+
+function subscribeToPlayerEvents() {
+  window.clearInterval(playerEventHandshakeTimer);
+  let attempts = 0;
+  const subscribe = () => {
+    attempts += 1;
+    sendPlayerEventCommand({ event: "listening" });
+    sendPlayerEventCommand({ event: "command", func: "addEventListener", args: ["onError"] });
+    sendPlayerEventCommand({ event: "command", func: "addEventListener", args: ["onStateChange"] });
+    if (attempts >= 20) window.clearInterval(playerEventHandshakeTimer);
+  };
+  subscribe();
+  playerEventHandshakeTimer = window.setInterval(subscribe, 250);
+}
+
+playerEl.addEventListener("load", subscribeToPlayerEvents);
+window.addEventListener("message", (event) => {
+  if (event.source !== playerEl.contentWindow || event.origin !== "https://www.youtube.com") return;
+  let payload = event.data;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return;
+    }
+  }
+  if (!payload || typeof payload !== "object") return;
+  if (payload.event === "onError") {
+    window.clearInterval(playerEventHandshakeTimer);
+    showPlayerError(Number(payload.info));
+  } else if (payload.event === "onStateChange" && Number(payload.info) === 1) {
+    window.clearInterval(playerEventHandshakeTimer);
+    hidePlayerError();
+  }
+});
 
 function syncHeaderToPlayerWidth() {
   if (playerViewEl.hidden) return;
@@ -3708,16 +4291,18 @@ function play(videoId, options = {}) {
   currentWatchLaterVideoId = activeView === "watchLater" && watchLater[videoId] ? videoId : "";
   currentWatchLaterStartedAt = currentWatchLaterVideoId ? Date.now() : 0;
   const video = currentVideos.find((item) => item.id === videoId);
-  const videoTitle = video?.title || videoId;
+  const videoTitle = video?.title || options.videoTitle || videoId;
   channelTitleEl.textContent = videoTitle;
   currentVideoTitleEl.textContent = "";
   document.title = videoTitle;
   videoTitleLineEl.hidden = false;
+  hidePlayerError();
   showPlayerView();
-  const origin = encodeURIComponent(window.location.origin);
-  playerEl.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&enablejsapi=1&origin=${origin}`;
+  const start = Math.max(0, Math.floor(Number(options.startSeconds) || 0));
+  const widgetReferrer = encodeURIComponent("https://www.youtube.com/");
+  playerEl.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&widget_referrer=${widgetReferrer}${start ? `&start=${start}` : ""}`;
   setActiveVideoButton();
-  if (!currentWatchLaterVideoId) {
+  if (!currentWatchLaterVideoId && !options.skipSeen) {
     markVideoSeen(videoId);
   }
 
@@ -3823,13 +4408,15 @@ function createVideoCard(video) {
         if (interactive && interactive !== card) return;
         event.preventDefault();
         event.stopPropagation();
-        openOfficialYoutube(video);
+        if (APP_PAGE_MODE) play(video.id);
+        else openOfficialYoutube(video);
       });
       card.addEventListener("keydown", (event) => {
         if (event.target !== card) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          openOfficialYoutube(video);
+          if (APP_PAGE_MODE) play(video.id);
+          else openOfficialYoutube(video);
         }
       });
       card.addEventListener("contextmenu", (event) => {
@@ -3854,11 +4441,19 @@ function createVideoCard(video) {
       title.className = "videoTitle";
       title.textContent = video.title;
       restorePreferredYoutubeTitle(video, title);
-      if (activePrimarySection === "favorites" && Number(video.videoGroupSize || 0) > 1) {
+      const favoriteGroupSize = activePrimarySection === "favorites" ? Number(video.videoGroupSize || 0) : 0;
+      const weeklyGroupSize = (activeView === "youtubeHome" || activeView === "newVideos")
+        ? Number(video.weeklyChannelGroupSize || 0)
+        : 0;
+      const visibleGroupSize = favoriteGroupSize || weeklyGroupSize;
+      if (visibleGroupSize > 1) {
+        const visibleGroupOrder = favoriteGroupSize
+          ? Number(video.videoGroupOrder || 0)
+          : Number(video.weeklyChannelGroupOrder || 0);
         const groupBadge = document.createElement("span");
         groupBadge.className = "favoriteGroupBadge";
-        groupBadge.textContent = `${video.videoGroupOrder}/${video.videoGroupSize}`;
-        groupBadge.title = uiMessage("favoriteGroupPosition", [video.videoGroupOrder, video.videoGroupSize]);
+        groupBadge.textContent = `${visibleGroupOrder}/${visibleGroupSize}`;
+        groupBadge.title = uiMessage(favoriteGroupSize ? "favoriteGroupPosition" : "weeklyChannelGroupPosition", [visibleGroupOrder, visibleGroupSize]);
         card.append(groupBadge);
       }
       const channelForVideo = allChannels.find((channel) => channel.id === video.channelId) || activeChannel;
@@ -3875,7 +4470,9 @@ function createVideoCard(video) {
       const meta = document.createElement("div");
       meta.className = "meta";
       const channelTitle = videoChannelTitle(video);
-      const channelMeta = document.createElement(video.channelId && channelTitle ? "button" : "div");
+      const channelMeta = document.createElement(
+        video.channelId && channelTitle ? "button" : "div"
+      );
       channelMeta.className = "videoChannelMeta";
       channelMeta.textContent = channelTitle;
       if (channelMeta instanceof HTMLButtonElement) {
@@ -4002,7 +4599,8 @@ function createWatchMoreCard(channel, options = {}) {
 }
 
 function renderVideos(videos, target = videosEl, options = {}) {
-  const items = sortVideosForDisplay(videos).map(createVideoCard);
+  const displayVideos = options.preserveOrder ? videos : sortVideosForDisplay(videos);
+  const items = displayVideos.map(createVideoCard);
   if (options.watchMoreChannel?.id) {
     items.push(createWatchMoreCard(options.watchMoreChannel, { loadMore: options.loadMore }));
   }
@@ -7020,6 +7618,8 @@ async function loadChannels() {
 function applyExternalConfig(nextConfig) {
   if (!nextConfig) return;
 
+  const preservePlayerView = !playerViewEl.hidden
+    && document.body.classList.contains("isPlayerMode");
   const previousActiveChannel = activeChannel;
   const activeChannelId = activeChannel?.id || "";
   config = {
@@ -7054,6 +7654,15 @@ function applyExternalConfig(nextConfig) {
       || (previousActiveChannel?.id === activeChannelId ? previousActiveChannel : null)
     : null;
   syncResultsToolbarPlacement();
+
+  // Playing a video marks it as seen and saves the configuration. That storage
+  // update must refresh the data without rendering the underlying list over the
+  // player (notably from Channels, Favorites and Watch later).
+  if (preservePlayerView) {
+    setActiveVideoButton();
+    return;
+  }
+
   renderCategories();
 
   if (activeView === "watchLater") {
@@ -7120,17 +7729,27 @@ function applyExternalConfig(nextConfig) {
 }
 async function navigateHistory(delta) {
   if (applyingHistory) return;
-  await maybePromptSeenForWatchLater();
-  const nextIndex = historyIndex + delta;
-  const entry = historyStack[nextIndex];
-  if (!entry) return;
-
   applyingHistory = true;
-  historyIndex = nextIndex;
   updateHistoryButtons();
-  suppressHistory = true;
 
   try {
+    // Lock before awaiting the optional prompt. Otherwise two quick clicks can
+    // start concurrent restorations and leave page mode without a rendered view.
+    await maybePromptSeenForWatchLater();
+    const nextIndex = historyIndex + delta;
+    const entry = historyStack[nextIndex];
+    if (!entry) return;
+
+    historyIndex = nextIndex;
+    suppressHistory = true;
+
+    // A history entry describing a list/search/channel must first leave the
+    // player layout. Otherwise the page-mode CSS intentionally keeps the player
+    // above the restored view.
+    if (entry.type !== "video" && !playerViewEl.hidden) {
+      showListView();
+    }
+
     if (entry.type === "channelList") {
       clearChannelSearch();
       showChannelListState(entry.id || "");
@@ -7146,11 +7765,16 @@ async function navigateHistory(delta) {
 
     if (entry.type === "channel") {
       const channel = allChannels.find((item) => item.id === entry.id);
-        if (channel) {
-          await selectChannel(channel, { skipHistory: true });
-          searchInputEl.value = "";
-          return;
+      if (channel) {
+        await selectChannel(channel, { skipHistory: true });
+        searchInputEl.value = "";
+        return;
       }
+      // A synchronized configuration may have removed a channel that is still
+      // present in this session's history. Restore a valid list instead.
+      showChannelListState("");
+      searchInputEl.value = "";
+      return;
     }
 
     if (entry.type === "channelSearch") {
@@ -7196,14 +7820,13 @@ async function navigateHistory(delta) {
           renderSearchResults();
           return;
         }
-      } else {
-        showChannelListState(state.categoryId || "");
-        channelSearchQuery = state.query || "";
-        if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
-        searchInputEl.value = channelSearchQuery;
-        renderSearchResults();
-        return;
       }
+      showChannelListState(state.categoryId || "");
+      channelSearchQuery = state.query || "";
+      if (channelSearchInputEl) channelSearchInputEl.value = channelSearchQuery;
+      searchInputEl.value = channelSearchQuery;
+      renderSearchResults();
+      return;
     }
 
     if (entry.type === "video") {
@@ -7247,7 +7870,13 @@ async function navigateHistory(delta) {
       clearChannelSearch();
       searchInputEl.value = "";
       renderFavoritesHome();
+      return;
     }
+
+    // Unknown entries can survive upgrades from a beta history schema. Never
+    // leave page mode with the player hidden and no replacement view rendered.
+    searchInputEl.value = "";
+    await showPreferredYoutubeHome();
   } finally {
     suppressHistory = false;
     applyingHistory = false;
@@ -7291,6 +7920,11 @@ playerWatchLaterEl.addEventListener("click", async () => {
     channelId: activeChannel?.id || ""
   };
   await toggleWatchLater(video);
+});
+
+playerErrorOpenYoutubeEl?.addEventListener("click", () => {
+  setDisplayOption(FOCUS_PLAYER_MODE_KEY, true);
+  openYoutubeCleanView(activeVideoId).catch((error) => setStatus(error.message, true));
 });
 
 
@@ -7350,17 +7984,15 @@ const openYoutubeThisWeekMenu = (event) => {
   event.stopPropagation();
   showContextMenu(event, newVideosContextActions());
 };
-youtubeThisWeekEl?.addEventListener("click", async (event) => {
+[youtubeThisWeekEl, youtubeThisWeekRefreshEl].forEach((element) => {
+  element?.addEventListener("mouseenter", syncWeeklyRefreshTooltips);
+  element?.addEventListener("focus", syncWeeklyRefreshTooltips);
+});
+youtubeThisWeekRefreshEl?.addEventListener("click", async (event) => {
   event.preventDefault();
   event.stopPropagation();
-  window.clearTimeout(globalSearchTimer);
-  globalSearchController?.abort();
-  hideGlobalSearchSuggestions();
-  youtubeSearchQuery = "";
-  searchInputEl.value = "";
-  pushHistory({ type: "youtubeHome", id: "youtube" });
+  if (newVideosRefreshPending || activePrimarySection !== "youtube" || activeView !== "youtubeHome") return;
   try {
-    await showYoutubeSearchHome();
     await refreshChannelSummaries({ forceFeeds: true });
     if (activePrimarySection === "youtube" && activeView === "youtubeHome") renderNewVideos();
   } catch (error) {
@@ -7377,9 +8009,17 @@ channelsEl.addEventListener("contextmenu", (event) => {
     action: () => setYoutubeTabHomePreference("this-week")
   }]);
 });
-document.addEventListener("click", hideContextMenu);
+document.addEventListener("click", (event) => {
+  hideContextMenu();
+  if (!(event.target instanceof Element) || !event.target.closest(".weeklyChannelVideoGroup")) {
+    closeWeeklyChannelVideoGroups();
+  }
+});
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") hideContextMenu();
+  if (event.key === "Escape") {
+    hideContextMenu();
+    closeWeeklyChannelVideoGroups();
+  }
 });
 markSeenEl.addEventListener("click", () => closeSeenPrompt(true));
 keepWatchLaterEl.addEventListener("click", () => closeSeenPrompt(false));
@@ -7414,6 +8054,8 @@ cancelExcludedNewVideosEl?.addEventListener("click", closeExcludedNewVideosDialo
 saveExcludedNewVideosEl?.addEventListener("click", () => {
   saveExcludedNewVideosDialog().catch((error) => setStatus(`Save error: ${error.message}`, true));
 });
+cancelWeeklyCategoryEl?.addEventListener("click", closeWeeklyCategoryDialog);
+saveWeeklyCategoryEl?.addEventListener("click", saveWeeklyCategoryDialog);
 closeImportExportEl.addEventListener("click", closeImportExportDialog);
 exportNativeConfigEl.addEventListener("click", exportNativeConfig);
 exportNewPipeConfigEl?.addEventListener("click", exportNewPipeConfig);
@@ -7505,6 +8147,9 @@ channelIconModeEl?.addEventListener("click", () => {
   const nextMode = availableModes[(currentIndex + 1) % availableModes.length];
   setListModeForScope(scope, nextMode);
   applyListLayout();
+  if (scope === "newVideos" && (activeView === "youtubeHome" || activeView === "newVideos")) {
+    renderNewVideos();
+  }
 });
 
 channelZoomOutEl?.addEventListener("click", () => changeListZoom(-LIST_ZOOM_STEP));
@@ -7525,11 +8170,51 @@ channelSearchInputEl?.addEventListener("search", () => {
 window.addEventListener("resize", syncHeaderToPlayerWidth);
 
 openAppSessionEl.addEventListener("click", () => {
-  toggleDisplayOption(FOCUS_PLAYER_MODE_KEY, false);
+  if (APP_PAGE_MODE) {
+    if (playerViewEl.hidden || !activeVideoId) {
+      setStatus("Open a video before entering full screen.", true);
+      return;
+    }
+    document.documentElement.requestFullscreen()
+      .catch((error) => setStatus(error.message, true));
+    return;
+  }
+  cycleYoutubeViewMode().catch((error) => setStatus(error.message, true));
 });
+
+toggleAppModeEl?.addEventListener("click", () => {
+  if (appModeSwitchPending) return;
+  appModeSwitchPending = true;
+  toggleAppModeEl.disabled = true;
+  switchAppMode()
+    .catch((error) => setStatus(error.message, true))
+    .finally(() => {
+      appModeSwitchPending = false;
+      toggleAppModeEl.disabled = false;
+    });
+});
+
+document.addEventListener("fullscreenchange", () => {
+  if (!APP_PAGE_MODE) return;
+  const fullscreen = Boolean(document.fullscreenElement);
+  openAppSessionEl.classList.toggle("is-active", fullscreen);
+  openAppSessionEl.title = interfaceI18n.translateText(
+    fullscreen ? "Full screen - press Escape to exit" : "Enter full screen"
+  );
+  openAppSessionEl.setAttribute("aria-label", openAppSessionEl.title);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !document.fullscreenElement) return;
+  document.exitFullscreen().catch(() => {});
+}, true);
 
 for (const tab of primaryTabEls) {
   tab.addEventListener("click", async () => {
+    if (!playerViewEl.hidden || document.body.classList.contains("isPlayerMode")) {
+      initialTransferredVideoCancelled = true;
+      showListView();
+    }
     const section = tab.dataset.section;
     const isReselectedSection = activePrimarySection === section;
     hideGlobalSearchSuggestions();
@@ -7587,6 +8272,17 @@ for (const tab of primaryTabEls) {
     searchInputEl.focus();
   });
 }
+
+const youtubeTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "youtube");
+youtubeTabEl?.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (youtubeTabHome !== "blank") return;
+  showContextMenu(event, [{
+    label: uiMessage("showThisWeekInYourChannels"),
+    action: () => setYoutubeTabHomePreference("this-week")
+  }]);
+});
 
 function clearVideoDropIndicators() {
   draggedFavoriteVideoId = "";
@@ -8197,7 +8893,8 @@ function renderGlobalSearchSuggestions(results, message = "") {
       if (result.type === "channel") {
         selectChannel({ ...result, categories: [] }).catch((error) => setStatus(`Unable to load channel: ${error.message}`, true));
       } else {
-        openOfficialYoutube(result);
+        if (APP_PAGE_MODE) play(result.id);
+        else openOfficialYoutube(result);
       }
     });
     return button;
@@ -8564,9 +9261,38 @@ window.setInterval(() => {
 window.addEventListener("pagehide", () => setPanelOpenState(false));
 window.addEventListener("beforeunload", () => setPanelOpenState(false));
 
+const initialPageParameters = new URLSearchParams(window.location.search);
+const initialSourceTabId = Number.parseInt(initialPageParameters.get("sourceTab") || "", 10);
+const initialSourceVideo = APP_PAGE_MODE && Number.isInteger(initialSourceTabId)
+  ? await readYoutubeVideoFromTab(initialSourceTabId)
+  : null;
+const initialModeHandoff = await consumeModeHandoff();
+const expectedVideoId = videoIdFromInput(
+  initialPageParameters.get("video")
+  || initialSourceVideo?.videoId
+  || initialModeHandoff?.videoId
+  || ""
+);
+const expectsTransferredVideo = APP_PAGE_MODE && Boolean(expectedVideoId);
+if (expectsTransferredVideo) {
+  showPlayerView();
+}
 
 loadChannels().then(async () => {
-  if (activePrimarySection === "youtube") {
+  const modeHandoff = initialModeHandoff;
+  if (modeHandoff?.entry) {
+    historyStack = [modeHandoff.entry];
+    if (expectsTransferredVideo) {
+      // The transferred video is already being presented by showPlayerView().
+      // Seed its previous history entry without rendering that channel/list
+      // first, which otherwise causes a visible flash and competing async load.
+      historyIndex = 0;
+      updateHistoryButtons();
+    } else {
+      historyIndex = -1;
+      await navigateHistory(1);
+    }
+  } else if (activePrimarySection === "youtube") {
     searchInputEl.value = youtubeSearchQuery;
     if (youtubeSearchQuery) await searchYoutube(youtubeSearchQuery, { skipHistory: true });
     else await showPreferredYoutubeHome();
@@ -8585,13 +9311,21 @@ loadChannels().then(async () => {
   } else {
     setActivePrimarySection("channels");
   }
+  const initialVideoId = videoIdFromInput(
+    initialPageParameters.get("video")
+    || initialSourceVideo?.videoId
+    || modeHandoff?.videoId
+    || ""
+  );
+  if (APP_PAGE_MODE && initialVideoId && !initialTransferredVideoCancelled) {
+    play(initialVideoId, {
+      startSeconds: initialPageParameters.get("start") || initialSourceVideo?.videoStart || modeHandoff?.videoStart,
+      videoTitle: initialPageParameters.get("title") || initialSourceVideo?.videoTitle || modeHandoff?.videoTitle
+    });
+  }
   if ((sortModes.channels || "").startsWith("subscribers-")) {
     refreshMissingSubscriberCounts().catch(() => {});
   }
   initializeWebDavSynchronization().catch((error) => setWebDavStatus(`Synchronization error: ${error.message}`, true));
   handlePendingDataCommand().catch(() => {});
-  const initialVideoId = videoIdFromInput(new URLSearchParams(window.location.search).get("video") || "");
-  if (initialVideoId) {
-    openOfficialYoutube(initialVideoId);
-  }
 });

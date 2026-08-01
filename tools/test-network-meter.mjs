@@ -29,6 +29,10 @@ meter.recordExternal({ activeDelta: -1 });
 assert.equal(latest.active, 0);
 await globalThis.fetch("https://nextcloud.example.test/data", { method: "PUT", body: "ignored" });
 assert.equal(latest.requests, 3);
+await globalThis.fetch("https://www.youtube.com/embed/abcdefghijk");
+await globalThis.fetch("https://www.youtube.com/videoplayback?id=abcdefghijk");
+await globalThis.fetch("https://rr1---sn.example.googlevideo.com/videoplayback?id=abcdefghijk");
+assert.equal(latest.requests, 3);
 globalThis.fetch = originalFetch;
 
 console.log("network meter tests passed");
