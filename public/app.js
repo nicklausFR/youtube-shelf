@@ -460,6 +460,7 @@ function sortModeLabel(mode, scope = currentSortScope()) {
     "date-desc": scope === "channels" ? "sortLatestVideoFirst" : "sortNewestFirst",
     "date-asc": scope === "channels" ? "sortOldestLatestVideoFirst" : "sortOldestFirst",
     "added-desc": "sortDateAdded",
+    "consulted-desc": "sortMostConsulted",
     "views-desc": "sortMostViewed",
     "views-asc": "sortLeastViewed",
     "subscribers-desc": "sortMostSubscribers",
@@ -473,11 +474,11 @@ function sortOptionsForCurrentScope() {
   const key = currentSortKey();
   const selectedMode = currentSortMode();
   const modes = scope === "channels"
-    ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "subscribers-desc", "subscribers-asc"]
+    ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "subscribers-desc", "subscribers-asc", "consulted-desc"]
     : scope === "channelVideos" && activeChannel
       ? ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
       : scope === "favorites" || scope === "watchLater"
-        ? ["default", "added-desc", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"]
+        ? ["default", "added-desc", "title-asc", "title-desc", "date-desc", "date-asc", "views-asc", "views-desc", ...(scope === "favorites" ? ["consulted-desc"] : [])]
         : ["default", "title-asc", "title-desc", "date-desc", "date-asc", "views-desc", "views-asc"];
   return modes.map((mode) => ({
     label: sortModeLabel(mode, scope),
@@ -582,7 +583,11 @@ function keepFavoriteVideoGroupsTogether(videos) {
 function sortVideosForDisplay(videos) {
   const mode = currentSortMode();
   const sorted = [...videos];
-  if (mode.startsWith("title-")) {
+  if (mode === "consulted-desc") {
+    sorted.sort((left, right) => Number(right.consultationCount || 0) - Number(left.consultationCount || 0)
+      || String(right.lastConsultedAt || "").localeCompare(String(left.lastConsultedAt || ""))
+      || compareTitles(left, right));
+  } else if (mode.startsWith("title-")) {
     sorted.sort((left, right) => compareTitles(left, right, mode.endsWith("desc") ? "desc" : "asc"));
   } else if (mode === "added-desc" && !(activeChannel && channelVideosLoadedSort === "latest")) {
     sorted.sort((left, right) => compareOptionalNumbers(
@@ -613,6 +618,11 @@ function sortChannelsForDisplay(channels) {
   const mode = sortModes.channels || "default";
   const sorted = [...channels];
   if (mode === "default") return sorted;
+  if (mode === "consulted-desc") {
+    return sorted.sort((left, right) => Number(right.consultationCount || 0) - Number(left.consultationCount || 0)
+      || String(right.lastConsultedAt || "").localeCompare(String(left.lastConsultedAt || ""))
+      || compareTitles(left, right));
+  }
   if (mode.startsWith("title-")) return sorted.sort((left, right) => compareTitles(left, right, mode.endsWith("desc") ? "desc" : "asc"));
   if (mode.startsWith("date-")) {
     return sorted.sort((left, right) => compareOptionalNumbers(
@@ -3515,6 +3525,8 @@ async function openOfficialYoutube(video, options = {}) {
   const videoId = typeof video === "string" ? video : video.id;
   if (!videoId) return;
 
+  if (activePrimarySection === "favorites") recordFavoriteConsultation(videoId);
+
   if (currentWatchLaterVideoId && currentWatchLaterVideoId !== videoId) {
     await maybePromptSeenForWatchLater();
   }
@@ -4288,6 +4300,7 @@ function syncHeaderToPlayerWidth() {
 
 function play(videoId, options = {}) {
   activeVideoId = videoId;
+  if (activePrimarySection === "favorites") recordFavoriteConsultation(videoId);
   currentWatchLaterVideoId = activeView === "watchLater" && watchLater[videoId] ? videoId : "";
   currentWatchLaterStartedAt = currentWatchLaterVideoId ? Date.now() : 0;
   const video = currentVideos.find((item) => item.id === videoId);
@@ -6461,6 +6474,8 @@ function renderFavoritesHome() {
       tags: item.tags || item.keywords || item.topics || [],
       thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
       categories: item.categories || [],
+      consultationCount: Number(item.consultationCount || 0),
+      lastConsultedAt: item.lastConsultedAt || "",
       videoGroupId: item.videoGroupId || "",
       videoGroupOrder: Number(item.videoGroupOrder || 0),
       videoGroupSize: favoriteVideoGroupSizes.get(item.videoGroupId) || 0
@@ -6731,6 +6746,36 @@ function syncChannelCategoryLineHeights() {
   });
 }
 
+function saveConsultation() {
+  saveConfig().catch((error) => {
+    setStatus(`Consultation save error: ${error.message}`, true);
+  });
+}
+
+function recordChannelConsultation(channelId) {
+  if (!channelId || !configLoaded) return;
+  const consultedAt = new Date().toISOString();
+  allChannels = allChannels.map((channel) => channel.id === channelId ? {
+    ...channel,
+    consultationCount: Number(channel.consultationCount || 0) + 1,
+    lastConsultedAt: consultedAt
+  } : channel);
+  if (activeChannel?.id === channelId) {
+    activeChannel = allChannels.find((channel) => channel.id === channelId) || activeChannel;
+  }
+  saveConsultation();
+}
+
+function recordFavoriteConsultation(videoId) {
+  if (!videoId || !configLoaded || !favorites[videoId]) return;
+  favorites[videoId] = {
+    ...favorites[videoId],
+    consultationCount: Number(favorites[videoId].consultationCount || 0) + 1,
+    lastConsultedAt: new Date().toISOString()
+  };
+  saveConsultation();
+}
+
 async function selectChannel(channel, options = {}) {
   if (currentWatchLaterVideoId && watchLater[currentWatchLaterVideoId]) {
     await maybePromptSeenForWatchLater();
@@ -6740,6 +6785,7 @@ async function selectChannel(channel, options = {}) {
   clearChannelSearch();
   activeView = "channels";
   activeChannel = fullChannel;
+  recordChannelConsultation(fullChannel.id);
   activeSearchQuery = "";
   document.body.classList.remove("virtualVideoListView");
   document.body.classList.add("sidePanelVideos");
