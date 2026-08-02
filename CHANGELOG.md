@@ -29,6 +29,11 @@
 - Made Escape leave clean-view full screen in side-panel mode even when playback is paused.
 - Removed Normal-with-comments from full-page mode because YouTube cannot embed that complete view without replacing the Shelf page; it remains available in side-panel mode.
 
+## 3.3.15 - 2026-08-02
+
+### Changed
+- Published the current local extension build.
+
 ## 3.3.14 - 2026-07-29
 
 - Excluded cached YouTube thumbnails from estimated transferred-data totals and reset previously inflated session metrics.
