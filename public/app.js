@@ -134,6 +134,7 @@ const webDavStatusEl = document.querySelector("#webDavStatus");
 const testWebDavEl = document.querySelector("#testWebDav");
 const enableWebDavSyncEl = document.querySelector("#enableWebDavSync");
 const syncWebDavNowEl = document.querySelector("#syncWebDavNow");
+const forceWebDavRecoveryEl = document.querySelector("#forceWebDavRecovery");
 const disconnectWebDavEl = document.querySelector("#disconnectWebDav");
 const closeWebDavSyncEl = document.querySelector("#closeWebDavSync");
 const addChannelPromptEl = document.querySelector("#addChannelPrompt");
@@ -289,6 +290,7 @@ const WEBDAV_DEFAULT_URL = "";
 const WEBDAV_SYNC_WRITE_DELAY_MS = 10000;
 const WEBDAV_SYNC_POLL_INTERVAL_MS = 60000;
 const WEBDAV_REQUEST_TIMEOUT_MS = 15000;
+const WEBDAV_UPLOAD_TIMEOUT_MS = 120000;
 const LIST_ZOOM_MIN = 0.7;
 const LIST_ZOOM_MAX = 1.5;
 const LIST_ZOOM_STEP = 0.1;
@@ -718,6 +720,7 @@ let webDavSyncSettings = null;
 let webDavSyncWriteTimer = 0;
 let webDavSyncInProgress = false;
 let webDavSyncIgnoreUpdatedAt = "";
+let webDavSyncRecoveryRequired = false;
 
 function setPanelOpenState(open, options = {}) {
   if (!globalThis.chrome?.storage?.local) return;
@@ -1403,7 +1406,8 @@ async function webDavFetch(url, options = {}, settings = webDavSyncSettings) {
   if (!await ensureWebDavHostPermission(settings)) throw new Error("Server access permission is required");
   const method = options.method || "GET";
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), WEBDAV_REQUEST_TIMEOUT_MS);
+  const timeoutMs = method === "PUT" ? WEBDAV_UPLOAD_TIMEOUT_MS : WEBDAV_REQUEST_TIMEOUT_MS;
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
       cache: "no-store",
@@ -1418,7 +1422,7 @@ async function webDavFetch(url, options = {}, settings = webDavSyncSettings) {
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      const timeoutError = new Error(`The WebDAV ${method} request did not respond within 15 seconds`);
+      const timeoutError = new Error(`The WebDAV ${method} request did not respond within ${Math.round(timeoutMs / 1000)} seconds`);
       timeoutError.code = "WEBDAV_TIMEOUT";
       timeoutError.method = method;
       throw timeoutError;
@@ -1463,10 +1467,10 @@ async function testWebDavConnection(settings, options = {}) {
 
 function refreshWebDavDialog() {
   const enabled = Boolean(webDavSyncSettings?.enabled && webDavSyncSettings?.password);
-  testWebDavEl?.toggleAttribute("disabled", webDavSyncInProgress);
-  enableWebDavSyncEl?.toggleAttribute("disabled", webDavSyncInProgress);
-  syncWebDavNowEl?.toggleAttribute("disabled", !enabled || webDavSyncInProgress);
-  disconnectWebDavEl?.toggleAttribute("disabled", !enabled || webDavSyncInProgress);
+  syncWebDavNowEl?.toggleAttribute("disabled", !enabled);
+  forceWebDavRecoveryEl?.toggleAttribute("hidden", !webDavSyncRecoveryRequired);
+  forceWebDavRecoveryEl?.toggleAttribute("disabled", !enabled);
+  disconnectWebDavEl?.toggleAttribute("disabled", !enabled);
 }
 
 function populateWebDavDialog() {
@@ -1493,7 +1497,16 @@ async function readSynchronizationEnvelope(settings = webDavSyncSettings) {
   const response = await webDavFetch(settings.url, { method: "GET" }, settings);
   if (response.status === 404) return { envelope: null, etag: "", lastModified: "", exists: false };
   if (!response.ok) throw await webDavError(response, "Unable to read the synchronization file");
-  const parsed = await response.json();
+  const body = await response.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    const sizeKilobytes = Math.max(1, Math.round(new Blob([body]).size / 1024));
+    const invalidFileError = new Error(`The WebDAV synchronization file is incomplete or invalid (${sizeKilobytes} KB). Use the recovery action to replace it with this device's data.`);
+    invalidFileError.code = "WEBDAV_INVALID_FILE";
+    throw invalidFileError;
+  }
   if (!parsed || parsed.formatVersion !== 1 || !parsed.current?.data || !Array.isArray(parsed.current.data.channels)) {
     throw new Error("The WebDAV synchronization file is invalid");
   }
@@ -1528,20 +1541,31 @@ function sameSynchronizationSnapshot(left, right) {
     && String(left.updatedAt || "") === String(right.updatedAt || "");
 }
 
+function webDavTemporaryUrl(settings = webDavSyncSettings) {
+  const temporaryUrl = new URL(settings.url);
+  const slash = temporaryUrl.pathname.lastIndexOf("/");
+  const filename = temporaryUrl.pathname.slice(slash + 1) || "youtube-shelf-synchronized-data.json";
+  temporaryUrl.pathname = `${temporaryUrl.pathname.slice(0, slash + 1)}.${filename}.${randomSyncId()}.uploading`;
+  temporaryUrl.search = "";
+  temporaryUrl.hash = "";
+  return temporaryUrl.toString();
+}
+
 async function writeSynchronizationEnvelope(envelope, options = {}, settings = webDavSyncSettings) {
-  const { exists = false } = options;
+  const { exists = false, skipVerification = false } = options;
   // A number of WebDAV gateways reject conditional PUT requests even when the
   // resource has not changed. Verify the remote state immediately before the
   // write instead, then send a plain PUT that these servers accept.
-  const verification = await readSynchronizationEnvelope(settings);
-  if (verification.exists !== exists
-    || (exists
-      && !sameSynchronizationSnapshot(options.envelope?.current, verification.envelope?.current))) {
-    throw webDavConflictError();
+  if (!skipVerification) {
+    const verification = await readSynchronizationEnvelope(settings);
+    if (verification.exists !== exists || (exists && !sameSynchronizationSnapshot(options.envelope?.current, verification.envelope?.current))) {
+      throw webDavConflictError();
+    }
   }
+  const temporaryUrl = webDavTemporaryUrl(settings);
   let response;
   try {
-    response = await webDavFetch(settings.url, {
+    response = await webDavFetch(temporaryUrl, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
@@ -1550,23 +1574,32 @@ async function writeSynchronizationEnvelope(envelope, options = {}, settings = w
     }, settings);
   } catch (error) {
     if (error?.code !== "WEBDAV_TIMEOUT" || error.method !== "PUT") throw error;
-    setWebDavStatus("Write response delayed - verifying remote file...");
+    setWebDavStatus("Write response delayed - checking the uploaded file...");
     await new Promise((resolve) => window.setTimeout(resolve, 1200));
     try {
-      const verification = await readSynchronizationEnvelope(settings);
+      const verification = await readSynchronizationEnvelope({ ...settings, url: temporaryUrl });
       if (verification.envelope?.current?.changeId === envelope.current?.changeId) {
-        return verification.etag;
+        response = { ok: true, status: 204, headers: new Headers() };
+      } else {
+        throw error;
       }
     } catch {
       // Preserve the original PUT timeout when verification is inconclusive.
+      throw error;
     }
-    throw error;
   }
   if (response.status === 412) {
     throw webDavConflictError();
   }
   if (!response.ok && response.status !== 201 && response.status !== 204) {
     throw await webDavError(response, "Unable to write the synchronization file");
+  }
+  response = await webDavFetch(temporaryUrl, {
+    method: "MOVE",
+    headers: { Destination: settings.url, Overwrite: "T" }
+  }, settings);
+  if (!response.ok && response.status !== 201 && response.status !== 204) {
+    throw await webDavError(response, "Unable to publish the synchronization file");
   }
   return response.headers.get("ETag") || "";
 }
@@ -1635,7 +1668,14 @@ async function synchronizeWebDavConfig(options = {}) {
     }
 
     setWebDavStatus("Checking remote file...");
-    const remoteState = await readSynchronizationEnvelope();
+    let remoteState;
+    try {
+      remoteState = await readSynchronizationEnvelope();
+      webDavSyncRecoveryRequired = false;
+    } catch (error) {
+      if (!options.forceReplaceInvalidRemote || error?.code !== "WEBDAV_INVALID_FILE") throw error;
+      remoteState = { envelope: null, etag: "", lastModified: "", exists: true, requiresCompaction: false };
+    }
     const remoteEnvelope = remoteState.envelope;
     const remoteSnapshot = remoteEnvelope?.current || null;
     const localConfig = config;
@@ -1732,7 +1772,10 @@ async function synchronizeWebDavConfig(options = {}) {
     };
     const payloadKilobytes = Math.max(1, Math.round(new Blob([JSON.stringify(nextEnvelope)]).size / 1024));
     setWebDavStatus(`Uploading local configuration (${payloadKilobytes} KB)...`);
-    const etag = await writeSynchronizationEnvelope(nextEnvelope, remoteState);
+    const etag = await writeSynchronizationEnvelope(nextEnvelope, {
+      ...remoteState,
+      skipVerification: Boolean(options.forceReplaceInvalidRemote)
+    });
     const { data: _snapshotData, ...snapshotMeta } = snapshot;
     if (synchronizedChecksum !== localChecksum) {
       await applySynchronizedConfig(snapshot, etag);
@@ -1746,6 +1789,7 @@ async function synchronizeWebDavConfig(options = {}) {
       setWebDavStatus("Remote file changed - retrying", true);
       webDavSyncWriteTimer = window.setTimeout(() => synchronizeWebDavConfig(), 1000);
     } else {
+      webDavSyncRecoveryRequired = error?.code === "WEBDAV_INVALID_FILE";
       setWebDavStatus(`Synchronization error: ${error.message}`, true);
     }
   } finally {
@@ -8147,6 +8191,11 @@ closeYoutubeDataOptionsEl?.addEventListener("click", closeYoutubeDataOptionsDial
 testWebDavEl?.addEventListener("click", testWebDavFromDialog);
 enableWebDavSyncEl?.addEventListener("click", saveAndEnableWebDavSync);
 syncWebDavNowEl?.addEventListener("click", () => synchronizeWebDavConfig({ requestPermission: true }));
+forceWebDavRecoveryEl?.addEventListener("click", () => {
+  if (window.confirm("Replace the unreadable remote file with this device's data?")) {
+    synchronizeWebDavConfig({ requestPermission: true, forceReplaceInvalidRemote: true });
+  }
+});
 disconnectWebDavEl?.addEventListener("click", () => {
   disconnectWebDavSynchronization().catch((error) => setWebDavStatus(`Disconnect error: ${error.message}`, true));
 });

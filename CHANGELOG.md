@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Made WebDAV uploads atomic and recoverable after a delayed server response.
+- Added damaged-file recovery and extended the upload timeout without blocking the synchronization panel.
 - Restored video sort order within and between grouped channels in the weekly YouTube view; grouping is used only by full-detail layouts.
 - Reverted unsupported attempts to transfer keyboard focus between Chrome's Side Panel and the tab, preserving the panel instance and its vertical navigation.
 - Added a full-screen hint in side-panel mode telling the user to click the video before pressing Escape; the hint disappears after the click.
