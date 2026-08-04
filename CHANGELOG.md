@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.3.16 - 2026-08-04
+
 - Made WebDAV uploads atomic and recoverable after a delayed server response.
 - Added damaged-file recovery and extended the upload timeout without blocking the synchronization panel.
 - Restored video sort order within and between grouped channels in the weekly YouTube view; grouping is used only by full-detail layouts.
