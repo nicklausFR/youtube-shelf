@@ -1,61 +1,164 @@
 # YouTube Shelf
 
-Browser extension for managing YouTube channels and favorite videos from the side panel.
+<p align="center">
+  <img src="icons/icon-128.png" width="96" height="96" alt="YouTube Shelf icon">
+</p>
 
-Current version: `3.3.15`.
+<p align="center">
+  A private, local-first YouTube organizer for Chromium side panels.
+</p>
 
-## Main Features
+<p align="center">
+  <strong>Version 3.3.16</strong> · English and French · GPL-3.0-or-later
+</p>
 
-- Navigate channels, recent videos, favorites, and other views through tabs.
-- Search YouTube in the detected query language while keeping original video titles, and add channels from the results.
-- Save favorite videos, organize them into categories, group episodes or parts of a series in sequence (`1/X`, `2/X`, etc.), and use multiple selection for bulk actions.
-- Translate the interface automatically into English or French, with locally editable translation catalogs.
-- Add personal comments to favorite and `Watch later` videos.
-- Organize channels into categories and browse their latest videos.
-- Sort channels alphabetically, by latest-video date or subscriber count, and sort videos alphabetically, by publication date, view count, or date added.
-- Automatically resume YouTube videos from their last locally saved position for up to seven days.
-- Synchronize content between browsers through a WebDAV server such as Nextcloud.
+YouTube Shelf keeps channels, recent uploads, favorite videos, and a personal watch-later list within reach while you browse YouTube. It runs as a narrow side panel or as a full-page workspace and does not require an account or a build step.
 
-## Local Installation
+> The screenshots below use fictional English-language channels and videos. They are rendered from the extension's real interface and styles. The YouTube page in contextual captures is deliberately blurred.
 
-This extension currently targets Chrome-based browsers, such as Chrome, Brave, and Edge.
+## Preview
 
-Firefox compatibility is planned for a later version.
+The extension remains a compact **420 px side panel** beside the current YouTube video.
 
-### Chrome-based Browsers
+![YouTube Shelf displayed as a narrow side panel beside a blurred YouTube video](docs/screenshots/youtube-shelf-side-panel-context.png)
 
-1. Open the browser extension management page.
-2. Enable developer mode.
-3. Load this repository folder as an unpacked extension.
+## Highlights
 
-## Local Data
+- Browse recent uploads by week, channel, or category.
+- Search YouTube without leaving the extension and add channels from the results.
+- Organize channels and favorites with ordered categories and subcategories.
+- Save favorite videos, add personal notes, and group multi-part series in sequence.
+- Maintain a separate `Watch later` list.
+- Switch between thumbnails, columns, cards, titles, and compact-title layouts.
+- Sort channels and videos by name, date, subscribers, views, or date added.
+- Select multiple favorites for bulk category assignment or deletion.
+- Resume YouTube playback from locally saved positions for up to seven days.
+- Focus the YouTube player by hiding comments or suggestions.
+- Use the interface in English or French.
+- Export backups, import YouTube Shelf or FreeTube data, and export subscriptions for NewPipe.
+- Optionally synchronize content between browsers through WebDAV or Nextcloud.
 
-The extension stores channels, categories, watched state, `Watch later`, and video playback positions in browser local storage.
+## Interface
 
-Use the extension import/export actions to back up or transfer your configuration.
+### Full-page workspace
+
+The toolbar button switches between the browser side panel and a larger workspace. Video playback remains available inside full-page mode.
+
+![YouTube Shelf full-page workspace](docs/screenshots/youtube-shelf-full-page.png)
+
+### Video display modes
+
+Each list can use the presentation best suited to the available panel width.
+
+| Thumbnails | Adaptive columns |
+| --- | --- |
+| <img src="docs/screenshots/youtube-shelf-panel-icons.png" alt="Thumbnail-only video layout"> | <img src="docs/screenshots/youtube-shelf-panel-columns.png" alt="Adaptive-column video layout"> |
+
+| Single column | Titles only |
+| --- | --- |
+| <img src="docs/screenshots/youtube-shelf-panel-single.png" alt="Single-column video layout"> | <img src="docs/screenshots/youtube-shelf-panel-titles.png" alt="Title-only video layout"> |
+
+#### Compact titles with small thumbnails
+
+![Compact video titles with small thumbnails](docs/screenshots/youtube-shelf-panel-compact-titles.png)
+
+### Main sections
+
+| Channels | Favorites | Watch later |
+| --- | --- | --- |
+| <img src="docs/screenshots/youtube-shelf-panel-channels.png" alt="Channels tab"> | <img src="docs/screenshots/youtube-shelf-panel-favorites.png" alt="Favorites tab with Music categories and subcategories"> | <img src="docs/screenshots/youtube-shelf-panel-watch-later.png" alt="Watch later tab"> |
+
+Favorites support large, ordered category trees. In this example, **Music** contains **Live sessions**, **Albums**, **Production**, and **Music theory**.
+
+### Responsive layouts
+
+YouTube Shelf adapts from a narrow browser panel to a wide split view.
+
+<p align="center">
+  <img src="docs/screenshots/youtube-shelf-wide.png" width="62%" alt="YouTube Shelf wide split layout">
+  <img src="docs/screenshots/youtube-shelf-narrow.png" width="28%" alt="YouTube Shelf narrow side-panel layout">
+</p>
+
+## Installation
+
+YouTube Shelf currently supports Chromium-based browsers. Firefox compatibility is planned.
+
+1. Download or clone this repository.
+2. Open the extension management page for your browser:
+   - Brave: `brave://extensions`
+   - Chrome: `chrome://extensions`
+   - Edge: `edge://extensions`
+3. Enable **Developer mode**.
+4. Select **Load unpacked**.
+5. Choose the repository folder containing `manifest.json`.
+6. Pin YouTube Shelf if you want quick access, then click its toolbar icon to open the side panel.
+
+Updates installed from this repository are manual: replace the files, then use **Reload** on the browser's extension management page.
+
+## Quick start
+
+1. Open YouTube Shelf from the browser toolbar.
+2. Search for a channel or paste a supported YouTube channel URL.
+3. Add the channel and optionally assign one or more categories.
+4. Open **YouTube** to browse recent videos.
+5. Use the star action to save a video under **Favorites**, or add it to **Watch later**.
+6. Use the display and sorting controls above each list to tailor the view.
+
+The back and forward buttons navigate within the extension. The expand button opens full-page mode; the adjacent focus control changes how much of the surrounding YouTube page remains visible.
+
+## Data and interoperability
+
+### Local storage
+
+Channels, categories, favorites, watched state, `Watch later`, preferences, and recent playback positions are stored in the browser's local extension storage.
+
+The import/export dialog can:
+
+- create a complete YouTube Shelf JSON backup;
+- restore or merge a YouTube Shelf backup;
+- import subscriptions from FreeTube;
+- export subscriptions in NewPipe-compatible JSON.
+
+Keep exported backups private if they contain personal notes or viewing organization.
 
 ### WebDAV synchronization
 
-Open `Settings > WebDAV synchronization`, then enter the full URL of the synchronization file, your Nextcloud username, and a dedicated application password. The default file name is:
+Open **Settings → WebDAV synchronization**, then enter the full URL of the synchronization file, your Nextcloud username, and a dedicated application password. The default filename is:
 
-`youtube-shelf-synchronized-data.json`
+```text
+youtube-shelf-synchronized-data.json
+```
 
-Use `Test connection` before enabling synchronization. The browser asks for access only to the WebDAV server origin. Credentials remain in the extension's local browser storage and are never included in the synchronized file or exports. `Disconnect` forgets the application password.
+Use **Test connection** before enabling synchronization. Credentials remain in the extension's local browser storage and are never included in synchronized data or exports. **Disconnect** removes the stored application password.
 
-Only content data is synchronized: categories, channels, seen videos, and `Watch later`. Appearance, layout, zoom, display preferences, and regenerable YouTube feed caches remain local to each browser. Seen-video entries are reduced to their identifier, date, channel, and title to keep the WebDAV file small.
+Synchronization includes content data—categories, channels, favorites, seen videos, and `Watch later`. Appearance, zoom, layout preferences, and regenerable YouTube feed caches remain local to each browser.
 
-The newest configuration wins, using its update timestamp, revision, and device identifier. Local changes are grouped for 10 seconds to reduce network traffic. Conditional WebDAV writes use ETags to avoid overwriting a file changed by another browser during synchronization.
+The newest configuration wins using its update timestamp, revision, and device identifier. Local changes are grouped for 10 seconds, remote changes are checked every 60 seconds while the panel is open, and conditional WebDAV writes use ETags to reduce overwrite conflicts.
 
-Synchronization runs while the extension panel is open and checks for remote changes every 60 seconds. WebDAV requests stop with an explicit error if the server does not respond within 15 seconds.
+## Privacy and permissions
 
-The file format reserves a `history` collection for future restore points. Version history and rollback controls are not implemented yet.
+YouTube Shelf has no analytics and no mandatory remote account. Its regular network access is limited to the resources needed to read YouTube pages, channel feeds, thumbnails, and release information. Optional WebDAV access is requested only for the server origin chosen by the user.
+
+The extension permissions are used to:
+
+- store configuration and playback state locally;
+- open and coordinate the side panel, full-page view, and YouTube tabs;
+- adjust the YouTube page for focus and playback integration;
+- add toolbar context-menu actions;
+- access YouTube content and thumbnails;
+- check GitHub release metadata;
+- connect to an explicitly configured HTTPS WebDAV server.
 
 ## Development
 
-No build step is required.
+No compilation or bundling is required. Edit the source files, then reload the unpacked extension from the browser's extension management page.
+
+The deterministic screenshot harness in `tools/snapshot-server.mjs` loads the real extension interface with fictional local data. It exists only for documentation captures and is not part of the installed extension runtime.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
-Copyright (C) 2026 nicklausFR
+Copyright © 2026 nicklausFR
 
-GPL-3.0-or-later. See `LICENSE`.
+Licensed under [GPL-3.0-or-later](LICENSE).
