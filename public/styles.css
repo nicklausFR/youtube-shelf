@@ -245,6 +245,7 @@ svg {
   color: var(--text);
 }
 
+.primaryTab.is-channel-drop-target,
 .primaryTab.is-watch-later-drop-target,
 .primaryTab.is-favorite-drop-target {
   background: rgba(111, 168, 120, 0.2);
