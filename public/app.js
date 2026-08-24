@@ -200,6 +200,8 @@ let favorites = {};
 let seenVideos = {};
 let watchLater = {};
 let currentWatchLaterVideoId = "";
+let currentWatchLaterPlaybackContext = "";
+let currentWatchLaterTabId = null;
 let playerEventHandshakeTimer = 0;
 let pendingAddChannelCategoryId = "";
 let channelSearchMetadataRefreshTimer = 0;
@@ -3572,12 +3574,14 @@ async function openOfficialYoutube(video, options = {}) {
   if (activePrimarySection === "favorites") recordFavoriteConsultation(videoId);
 
   if (currentWatchLaterVideoId && currentWatchLaterVideoId !== videoId) {
-    await maybePromptSeenForWatchLater();
+    await maybePromptSeenForWatchLater({ force: true });
   }
 
   activeVideoId = videoId;
   currentWatchLaterVideoId = activeView === "watchLater" && watchLater[videoId] ? videoId : "";
   currentWatchLaterStartedAt = currentWatchLaterVideoId ? Date.now() : 0;
+  currentWatchLaterPlaybackContext = currentWatchLaterVideoId ? "youtube-tab" : "";
+  currentWatchLaterTabId = null;
   setActiveVideoButton();
 
   let shouldSaveSeenVideo = false;
@@ -3595,7 +3599,8 @@ async function openOfficialYoutube(video, options = {}) {
 
   if (options.newTab) {
     if (globalThis.chrome?.tabs) {
-      chrome.tabs.create({ url: youtubeUrl(videoId) });
+      const tab = await chrome.tabs.create({ url: youtubeUrl(videoId) });
+      if (currentWatchLaterVideoId === videoId) currentWatchLaterTabId = tab?.id ?? null;
     } else {
       window.open(youtubeUrl(videoId), "_blank", "noopener");
     }
@@ -3604,13 +3609,13 @@ async function openOfficialYoutube(video, options = {}) {
   }
 
   if (globalThis.chrome?.tabs) {
-    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-      if (tab?.id) {
-        chrome.tabs.update(tab.id, { url: youtubeUrl(videoId) });
-      } else {
-        window.location.href = youtubeUrl(videoId);
-      }
-    });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id !== undefined) {
+      if (currentWatchLaterVideoId === videoId) currentWatchLaterTabId = tab.id;
+      await chrome.tabs.update(tab.id, { url: youtubeUrl(videoId) });
+    } else {
+      window.location.href = youtubeUrl(videoId);
+    }
     if (shouldSaveSeenVideo) await saveConfig().catch(() => {});
     return;
   }
@@ -4094,12 +4099,15 @@ function markVideoSeen(videoId) {
   });
 }
 
-async function maybePromptSeenForWatchLater() {
+async function maybePromptSeenForWatchLater(options = {}) {
   if (!currentWatchLaterVideoId || !watchLater[currentWatchLaterVideoId]) return;
+  if (currentWatchLaterPlaybackContext === "youtube-tab" && !options.force) return;
 
   const videoId = currentWatchLaterVideoId;
   currentWatchLaterVideoId = "";
   currentWatchLaterStartedAt = 0;
+  currentWatchLaterPlaybackContext = "";
+  currentWatchLaterTabId = null;
   const shouldMarkSeen = await askMarkSeen();
   if (!shouldMarkSeen) return;
 
@@ -4121,15 +4129,25 @@ async function maybePromptSeenForWatchLater() {
 }
 
 async function checkCurrentWatchLaterVisibility() {
-  if (!currentWatchLaterVideoId || !globalThis.chrome?.tabs || seenPromptResolve) return;
+  if (
+    !currentWatchLaterVideoId
+    || currentWatchLaterPlaybackContext !== "youtube-tab"
+    || !Number.isInteger(currentWatchLaterTabId)
+    || !globalThis.chrome?.tabs
+    || seenPromptResolve
+  ) return;
   if (Date.now() - currentWatchLaterStartedAt < 2500) return;
 
-  const tab = await new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, ([activeTab]) => resolve(activeTab || null));
-  });
-  const visibleVideoId = videoIdFromInput(tab?.url || "");
-  if (visibleVideoId !== currentWatchLaterVideoId) {
-    await maybePromptSeenForWatchLater();
+  const trackedVideoId = currentWatchLaterVideoId;
+  const trackedTabId = currentWatchLaterTabId;
+  const tab = await chrome.tabs.get(trackedTabId).catch(() => null);
+  if (
+    currentWatchLaterVideoId !== trackedVideoId
+    || currentWatchLaterTabId !== trackedTabId
+    || currentWatchLaterPlaybackContext !== "youtube-tab"
+  ) return;
+  if (videoIdFromInput(tab?.url || "") !== trackedVideoId) {
+    await maybePromptSeenForWatchLater({ force: true });
   }
 }
 
@@ -4328,9 +4346,18 @@ window.addEventListener("message", (event) => {
   if (payload.event === "onError") {
     window.clearInterval(playerEventHandshakeTimer);
     showPlayerError(Number(payload.info));
-  } else if (payload.event === "onStateChange" && Number(payload.info) === 1) {
-    window.clearInterval(playerEventHandshakeTimer);
-    hidePlayerError();
+  } else if (payload.event === "onStateChange") {
+    const playerState = Number(payload.info);
+    if (playerState === 1) {
+      window.clearInterval(playerEventHandshakeTimer);
+      hidePlayerError();
+    } else if (
+      playerState === 0
+      && currentWatchLaterPlaybackContext === "embedded"
+      && currentWatchLaterVideoId === activeVideoId
+    ) {
+      maybePromptSeenForWatchLater({ force: true }).catch(() => {});
+    }
   }
 });
 
@@ -4347,6 +4374,8 @@ function play(videoId, options = {}) {
   if (activePrimarySection === "favorites") recordFavoriteConsultation(videoId);
   currentWatchLaterVideoId = activeView === "watchLater" && watchLater[videoId] ? videoId : "";
   currentWatchLaterStartedAt = currentWatchLaterVideoId ? Date.now() : 0;
+  currentWatchLaterPlaybackContext = currentWatchLaterVideoId ? "embedded" : "";
+  currentWatchLaterTabId = null;
   const video = currentVideos.find((item) => item.id === videoId);
   const videoTitle = video?.title || options.videoTitle || videoId;
   channelTitleEl.textContent = videoTitle;
@@ -5362,10 +5391,17 @@ async function unsubscribeChannel(channel) {
   renderSidePanelPath();
 }
 
-function openChannelVideosOnYouTube(channel) {
+async function openChannelVideosOnYouTube(channel) {
   if (!channel?.id) return;
   const url = `https://www.youtube.com/channel/${encodeURIComponent(channel.id)}/videos`;
-  chrome.tabs?.create?.({ url });
+  if (globalThis.chrome?.tabs) {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id !== undefined) {
+      await chrome.tabs.update(tab.id, { url });
+      return;
+    }
+  }
+  window.location.href = url;
 }
 function openSubscribeOnYouTube(channel) {
   if (!channel?.id) return;
@@ -6473,15 +6509,21 @@ function droppedVideoFromDataTransfer(dataTransfer) {
       // Fall back to the URL payload.
     }
   }
-  const value = dataTransfer?.getData("text/uri-list") || dataTransfer?.getData("text/plain") || "";
-  const id = videoIdFromInput(value.split(/\r?\n/).find((line) => line && !line.startsWith("#")) || value);
+  const html = dataTransfer?.getData("text/html") || "";
+  const doc = html ? new DOMParser().parseFromString(html, "text/html") : null;
+  const value = droppedTextFromDataTransfer(dataTransfer);
+  const textVideoId = videoIdFromInput(value);
+  const matchingLink = doc
+    ? (textVideoId
+      ? [...doc.querySelectorAll("a[href]")].find((link) => videoIdFromInput(link.href) === textVideoId)
+      : null)
+      || [...doc.querySelectorAll("a[href]")].find((link) => videoIdFromInput(link.href))
+    : null;
+  const id = textVideoId || videoIdFromInput(matchingLink?.href || "");
   if (!id) return null;
 
   let title = "";
-  const html = dataTransfer?.getData("text/html") || "";
   if (html) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const matchingLink = [...doc.querySelectorAll("a[href]")].find((link) => videoIdFromInput(link.href) === id);
     const titleCandidates = [
       matchingLink?.getAttribute("title"),
       matchingLink?.getAttribute("aria-label"),
@@ -6594,6 +6636,7 @@ function renderChannels(channels) {
       button.type = "button";
       button.title = channel.title;
       button.dataset.channelId = channel.id;
+      button.dataset.channelTitle = channel.title;
       button.draggable = true;
       button.addEventListener("dragstart", (event) => {
         event.dataTransfer?.setData("application/x-youtube-channel-shelf-channel", channel.id);
@@ -6605,7 +6648,13 @@ function renderChannels(channels) {
         button.classList.remove("is-dragging");
         document.querySelectorAll(".is-category-drop-target").forEach((item) => item.classList.remove("is-category-drop-target"));
       });
-      button.addEventListener("click", () => selectChannel(channel));
+      button.addEventListener("click", () => {
+        if (button.classList.contains("is-active") && document.body.classList.contains("sidePanelVideos")) {
+          openChannelVideosOnYouTube(channel).catch((error) => setStatus(`Unable to open YouTube channel: ${error.message}`, true));
+          return;
+        }
+        selectChannel(channel);
+      });
       button.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -6689,6 +6738,8 @@ function setActiveChannelButton() {
   for (const button of channelsEl.querySelectorAll(".channel")) {
     const isActive = button.dataset.channelId === activeChannel?.id;
     button.classList.toggle("is-active", isActive);
+    const channelCardOpensYoutube = isActive && document.body.classList.contains("sidePanelVideos");
+    button.title = channelCardOpensYoutube ? "Open channel on YouTube" : button.dataset.channelTitle || button.title;
 
     const categoryList = button.querySelector(".channelCategoryList");
     const meta = button.querySelector(".channelMeta");
@@ -8386,16 +8437,37 @@ function clearVideoDropIndicators() {
     item.classList.remove("is-favorite-group-drop-target");
     delete item.dataset.favoriteDropPlacement;
   });
+  document.querySelectorAll(".is-category-drop-target").forEach((item) => item.classList.remove("is-category-drop-target"));
+  document.querySelectorAll(".is-channel-drop-target").forEach((item) => item.classList.remove("is-channel-drop-target"));
   document.querySelectorAll(".is-watch-later-drop-target").forEach((item) => item.classList.remove("is-watch-later-drop-target"));
   document.querySelectorAll(".is-favorite-drop-target").forEach((item) => item.classList.remove("is-favorite-drop-target"));
 }
+
+const channelsTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "channels");
+channelsTabEl?.addEventListener("dragover", (event) => {
+  if (!hasChannelDropType(event.dataTransfer)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  channelsTabEl.classList.add("is-channel-drop-target");
+});
+channelsTabEl?.addEventListener("dragleave", () => channelsTabEl.classList.remove("is-channel-drop-target"));
+channelsTabEl?.addEventListener("drop", async (event) => {
+  if (!hasChannelDropType(event.dataTransfer)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const value = droppedChannelValueFromDataTransfer(event.dataTransfer);
+  clearVideoDropIndicators();
+  if (value) await addDroppedChannel(value, "");
+});
 
 const watchLaterTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "watchLater");
 watchLaterTabEl?.addEventListener("dragover", (event) => {
   if (!hasVideoDropType(event.dataTransfer)) return;
   event.preventDefault();
   event.stopPropagation();
-  document.body.classList.remove("isChannelDropTarget");
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
   if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
   watchLaterTabEl.classList.add("is-watch-later-drop-target");
 });
@@ -8403,12 +8475,12 @@ watchLaterTabEl?.addEventListener("dragleave", () => {
   watchLaterTabEl.classList.remove("is-watch-later-drop-target");
 });
 watchLaterTabEl?.addEventListener("drop", async (event) => {
-  const video = droppedVideoFromDataTransfer(event.dataTransfer);
-  if (!video) return;
+  if (!hasVideoDropType(event.dataTransfer)) return;
   event.preventDefault();
   event.stopPropagation();
+  const video = droppedVideoFromDataTransfer(event.dataTransfer);
   clearVideoDropIndicators();
-  await addVideoToWatchLater(video);
+  if (video) await addVideoToWatchLater(video);
 });
 
 const favoritesTabEl = [...primaryTabEls].find((tab) => tab.dataset.section === "favorites");
@@ -8416,18 +8488,18 @@ favoritesTabEl?.addEventListener("dragover", (event) => {
   if (!hasVideoDropType(event.dataTransfer)) return;
   event.preventDefault();
   event.stopPropagation();
-  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget");
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
   if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
   favoritesTabEl.classList.add("is-favorite-drop-target");
 });
 favoritesTabEl?.addEventListener("dragleave", () => favoritesTabEl.classList.remove("is-favorite-drop-target"));
 favoritesTabEl?.addEventListener("drop", async (event) => {
-  const video = droppedVideoFromDataTransfer(event.dataTransfer);
-  if (!video) return;
+  if (!hasVideoDropType(event.dataTransfer)) return;
   event.preventDefault();
   event.stopPropagation();
+  const video = droppedVideoFromDataTransfer(event.dataTransfer);
   clearVideoDropIndicators();
-  await addVideoToFavorites(video);
+  if (video) await addVideoToFavorites(video);
 });
 
 searchInputEl.addEventListener("input", () => {
@@ -8519,7 +8591,7 @@ document.addEventListener("dragover", (event) => {
   if (activePrimarySection !== "channels") return;
   if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-video")) return;
   if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-channel")) return;
-  if (![...event.dataTransfer?.types || []].some((type) => ["text/uri-list", "text/plain"].includes(type))) return;
+  if (![...event.dataTransfer?.types || []].some((type) => ["text/uri-list", "text/plain", "text/html"].includes(type))) return;
   event.preventDefault();
   document.body.classList.add("isChannelDropTarget");
 });
@@ -8532,23 +8604,25 @@ document.addEventListener("dragleave", (event) => {
 document.addEventListener("drop", async (event) => {
   clearVideoDropIndicators();
   if (activePrimarySection === "favorites") {
+    if (!hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
     const video = droppedVideoFromDataTransfer(event.dataTransfer);
     if (!video) return;
-    event.preventDefault();
     await addVideoToFavorites(video, activeFavoriteCategoryId);
     return;
   }
   if (activePrimarySection === "watchLater") {
+    if (!hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
     const video = droppedVideoFromDataTransfer(event.dataTransfer);
     if (!video) return;
-    event.preventDefault();
     await addVideoToWatchLater(video);
     return;
   }
   if (activePrimarySection !== "channels") return;
   if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-video")) return;
   if (event.dataTransfer?.types?.includes("application/x-youtube-channel-shelf-channel")) return;
-  const data = event.dataTransfer?.getData("text/uri-list") || event.dataTransfer?.getData("text/plain") || "";
+  const data = droppedChannelValueFromDataTransfer(event.dataTransfer);
   if (!data) return;
   event.preventDefault();
   await addDroppedChannel(data);
@@ -8592,6 +8666,49 @@ function youtubeUrlFromDroppedText(value = "") {
   const text = String(value).trim();
   const url = text.match(/https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\/[^\s]+/)?.[0] || "";
   return url ? url.replace(/&amp;/g, "&") : "";
+}
+
+function droppedTextFromDataTransfer(dataTransfer) {
+  const uriList = dataTransfer?.getData("text/uri-list") || "";
+  const uri = uriList.split(/\r?\n/).find((line) => line.trim() && !line.trim().startsWith("#")) || "";
+  if (uri) return uri.trim();
+
+  const plainText = dataTransfer?.getData("text/plain") || "";
+  if (plainText.trim()) return plainText.trim();
+
+  const html = dataTransfer?.getData("text/html") || "";
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return [...doc.querySelectorAll("a[href]")]
+    .map((link) => link.href)
+    .find((href) => youtubeUrlFromDroppedText(href)) || "";
+}
+
+function droppedChannelValueFromDataTransfer(dataTransfer) {
+  const channelId = dataTransfer?.getData("application/x-youtube-channel-shelf-channel") || "";
+  if (channelId) return channelId;
+
+  const videoPayload = dataTransfer?.getData("application/x-youtube-channel-shelf-video") || "";
+  if (videoPayload) {
+    try {
+      const video = JSON.parse(videoPayload);
+      if (channelIdFromDroppedText(video.channelId || "")) return video.channelId;
+    } catch {
+      // Fall back to the URL payload.
+    }
+  }
+  return droppedTextFromDataTransfer(dataTransfer);
+}
+
+function hasChannelDropType(dataTransfer) {
+  const types = [...dataTransfer?.types || []];
+  return types.some((type) => [
+    "application/x-youtube-channel-shelf-channel",
+    "application/x-youtube-channel-shelf-video",
+    "text/uri-list",
+    "text/plain",
+    "text/html"
+  ].includes(type));
 }
 
 function channelIdFromYoutubeHtml(html = "") {
@@ -8682,7 +8799,7 @@ async function addChannelById(channelId, categoryId = activeCategoryId) {
   }
 }
 
-async function addDroppedChannel(value) {
+async function addDroppedChannel(value, categoryId = activeCategoryId) {
   let channelId = "";
   try {
     channelId = await resolveDroppedChannelId(value);
@@ -8694,7 +8811,7 @@ async function addDroppedChannel(value) {
     showInfoPopup("This URL is not supported. Drop a YouTube channel URL, @handle URL, or video URL.", "error");
     return;
   }
-  await addChannelById(channelId);
+  await addChannelById(channelId, categoryId);
 }
 
 function extractJsonObjectAfter(text, marker) {
@@ -8751,7 +8868,7 @@ function channelResultFromRenderer(renderer) {
 function hasVideoDropType(dataTransfer) {
   const types = [...dataTransfer?.types || []];
   if (types.includes("application/x-youtube-channel-shelf-channel")) return false;
-  return types.some((type) => ["application/x-youtube-channel-shelf-video", "text/uri-list", "text/plain"].includes(type));
+  return types.some((type) => ["application/x-youtube-channel-shelf-video", "text/uri-list", "text/plain", "text/html"].includes(type));
 }
 
 function collectGlobalSearchRenderers(node, results = []) {
