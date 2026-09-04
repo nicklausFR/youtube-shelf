@@ -7,7 +7,7 @@ const WEB_CLIENT_NAME = "WEB";
 const WEB_CLIENT_ID = "1";
 const WEB_CLIENT_VERSION_FALLBACK = "2.20260120.01.00";
 const VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA";
-const VIDEO_SORTS = new Set(["latest", "popular"]);
+const VIDEO_SORTS = new Set(["latest", "popular", "oldest"]);
 const YOUTUBE_PAGE_ATTEMPTS = 3;
 
 let cachedClientVersion = "";

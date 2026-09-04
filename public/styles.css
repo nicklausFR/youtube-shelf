@@ -53,7 +53,10 @@ body.sidePanelVideos .content {
 html,
 body {
   max-width: 100%;
-  overflow-x: hidden;
+  /* Unlike hidden, clip does not turn the document into a scrolling
+     ancestor. The sticky search bar and tabs therefore keep tracking the
+     viewport when a channel's video list makes the document scroll. */
+  overflow-x: clip;
 }
 
 html::-webkit-scrollbar,
@@ -4910,4 +4913,52 @@ html:fullscreen body.pageMode.isPlayerMode .playerView {
   inset: 0 !important;
   top: 0 !important;
   width: 100% !important;
+}
+
+/* Selected-channel view: the category strip, active channel card and video
+   controls form one fixed shelf. Only the video list below them scrolls. */
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) {
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) .app {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: calc(100vh - 56px - var(--global-search-height));
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) .sidebar {
+  grid-row: 1;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) .content {
+  display: grid !important;
+  grid-row: 2;
+  height: auto;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) .listView {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) .listView::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching):not(.isPlayerMode) .app {
+    height: calc(100vh - var(--global-search-height));
+  }
 }

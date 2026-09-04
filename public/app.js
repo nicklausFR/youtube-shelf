@@ -6939,6 +6939,7 @@ function mergeChannelVideoLists(current, additional) {
 
 function youtubeOrderForChannelMode(mode) {
   if (mode === "views-desc") return "popular";
+  if (mode === "date-asc") return "oldest";
   return "";
 }
 
