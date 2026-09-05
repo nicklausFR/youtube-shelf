@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Version 3.3.16</strong> · English and French · GPL-3.0-or-later
+  <strong>Version 3.3.17</strong> · English and French · GPL-3.0-or-later
 </p>
 
 YouTube Shelf keeps channels, recent uploads, favorite videos, and a personal watch-later list within reach while you browse YouTube. It runs as a narrow side panel or as a full-page workspace and does not require an account or a build step.

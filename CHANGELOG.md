@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 3.3.17 - 2026-09-05
+
+- Normalize video view counts across all video lists and global search using compact labels such as 13k views and 1.2M views, accepting raw counts and English or French metadata.
 
 - Check weekly feeds periodically while visible and on return or reconnection, respecting the configured interval and sharing concurrent refreshes.
 - Retrieve weekly uploads from YouTube channel pages as well as RSS, including forced refreshes; paginate recent uploads and retain discoveries when a source lags or fails.

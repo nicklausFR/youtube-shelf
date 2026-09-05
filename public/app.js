@@ -3420,7 +3420,7 @@ function metricCountValue(value = "") {
   const text = String(value || "").trim().toLocaleLowerCase().replace(/[\u00a0\u202f]/g, " ");
   if (!text) return null;
   if (/\bno (?:views?|subscribers?)\b|\baucun(?:e)?s? (?:vues?|abonnés?)\b/u.test(text)) return 0;
-  const match = text.match(/(\d[\d\s.,]*)(?:\s*)(k|m|b|thousand|million|billion|millier|milliard)?/i);
+  const match = text.match(/(\d[\d\s.,]*)(?:\s*)(thousand|million|billion|millier|milliard|k|m|b)?/i);
   if (!match) return null;
   const suffix = String(match[2] || "").toLocaleLowerCase();
   let amount;
@@ -3436,6 +3436,24 @@ function metricCountValue(value = "") {
       ? 1_000_000
       : ["b", "billion", "milliard"].includes(suffix) ? 1_000_000_000 : 1;
   return Math.round(amount * multiplier);
+}
+
+function videoViewsText(video = {}) {
+  const value = [video.views, video.viewCountText]
+    .find((candidate) => candidate != null && String(candidate).trim() !== "");
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  // Concurrent viewers and unavailable counts are not total video views.
+  if (!/^(?:\d[\d\s.,]*(?:(?:thousand|million|billion|millier|milliard)s?|[kmb])?(?:\s*(?:views?|vues?))?|no views?|aucun(?:e)?s? vues?)$/iu.test(text)) {
+    return text;
+  }
+  const count = metricCountValue(text);
+  if (count === null) return text;
+  const compact = new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(count).replace("K", "k");
+  return `${compact} views`;
 }
 
 function parseChannelSubscriberCount(html = "") {
@@ -4592,7 +4610,7 @@ function createVideoCard(video) {
       const dateMeta = document.createElement("div");
       dateMeta.className = "videoDateMeta";
       const dateText = videoDateText(video);
-      dateMeta.textContent = video.views ? [dateText, video.views].filter(Boolean).join(" - ") : dateText;
+      dateMeta.textContent = [dateText, videoViewsText(video)].filter(Boolean).join(" - ");
       meta.append(channelMeta, dateMeta);
 
       const note = document.createElement("div");
@@ -9141,7 +9159,7 @@ function renderGlobalSearchSuggestions(results, message = "") {
     meta.className = "globalSearchResultMeta";
     meta.textContent = result.type === "channel"
       ? [uiMessage("channel"), result.handle].filter(Boolean).join(" · ")
-      : [result.channel, result.duration, result.views].filter(Boolean).join(" · ");
+      : [result.channel, result.duration, videoViewsText(result)].filter(Boolean).join(" · ");
     text.append(title, meta);
     button.append(thumbnail, text);
     button.addEventListener("click", () => {
