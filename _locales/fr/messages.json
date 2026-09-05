@@ -134,6 +134,7 @@
   "thisWeek": { "message": "Cette semaine" },
   "thisWeekInYourChannels": { "message": "Cette semaine dans vos chaînes" },
   "refreshThisWeek": { "message": "Actualiser cette semaine" },
+  "weeklyFeedRefreshFailed": { "message": "Actualisation incomplète : $1 chaîne(s) n’ont pas pu être vérifiées. Les vidéos enregistrées restent affichées ; une nouvelle tentative sera automatique." },
   "lastWeeklyRefresh": { "message": "Dernière actualisation" },
   "weeklyFeedNeverRefreshed": { "message": "Le flux hebdomadaire n’a pas encore été actualisé" },
   "hideThisWeekInYourChannels": { "message": "Masquer « Cette semaine dans vos chaînes »" },

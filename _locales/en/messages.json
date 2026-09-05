@@ -134,6 +134,7 @@
   "thisWeek": { "message": "This week" },
   "thisWeekInYourChannels": { "message": "This week in your channels" },
   "refreshThisWeek": { "message": "Refresh this week" },
+  "weeklyFeedRefreshFailed": { "message": "Refresh incomplete: $1 channel(s) could not be checked. Saved videos are shown; another attempt will be made automatically." },
   "lastWeeklyRefresh": { "message": "Last refresh" },
   "weeklyFeedNeverRefreshed": { "message": "Weekly feed has not been refreshed yet" },
   "hideThisWeekInYourChannels": { "message": "Hide “This week in your channels”" },

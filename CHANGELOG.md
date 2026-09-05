@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Check weekly feeds periodically while visible and on return or reconnection, respecting the configured interval and sharing concurrent refreshes.
+- Retrieve weekly uploads from YouTube channel pages as well as RSS, including forced refreshes; paginate recent uploads and retain discoveries when a source lags or fails.
+- Share videos discovered in channel views with the weekly cache, preserving exact RSS dates and stable estimates for YouTube-only videos.
+- Preserve cached videos on invalid or timed-out responses, report incomplete refreshes, and base freshness on the least recently checked channel.
+
 ## 3.3.16 - 2026-08-04
 
 - Made WebDAV uploads atomic and recoverable after a delayed server response.

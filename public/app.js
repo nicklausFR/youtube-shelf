@@ -1,6 +1,7 @@
 import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-export.js";
 import { searchTextMatchesQuery } from "./youtube-channel-search.js";
 import { fetchYoutubeChannelVideosPage } from "./youtube-channel-videos.js";
+import { fetchWeeklyChannelVideos, weeklyVideoSummary } from "./weekly-videos.js";
 import { createI18n } from "./i18n.js";
 import { mergeSynchronizationData, synchronizationContentChanged } from "./sync-merge.js";
 import { formatNetworkBytes, installNetworkMeter } from "./network-meter.js";
@@ -227,6 +228,8 @@ let videoNoteTarget = null;
 let configLoaded = false;
 let sessionFeedBaseline = new Map();
 let newVideosRefreshPending = false;
+let channelSummaryRefreshPromise = null;
+const weeklyFeedFailures = new Set();
 let listLayout = localStorage.getItem("listLayout") || "grid";
 if (listLayout === "rows" || listLayout === "thumbs") listLayout = "wide";
 if (!["wide", "grid", "single"].includes(listLayout)) listLayout = "grid";
@@ -1905,6 +1908,7 @@ function setNewVideoCheckOption(key, value) {
     localStorage.setItem(key, String(feedCheckConcurrency));
   }
   syncYoutubeDataOptionsDialog();
+  refreshDueChannelFeeds();
 }
 
 function dataContextActions() {
@@ -2966,10 +2970,20 @@ function syncResultsToolbarPlacement() {
 }
 
 function latestWeeklyRefreshAt() {
-  return Math.max(0, ...allChannels.map((channel) => Date.parse(channel.feedCheckedAt || "") || 0));
+  // One successful channel must not make an incomplete refresh look current.
+  return allChannels.length
+    ? Math.min(...allChannels.map((channel) => Date.parse(channel.feedCheckedAt || "") || 0))
+    : 0;
+}
+
+function weeklyFeedFailureText() {
+  const count = allChannels.filter((channel) => weeklyFeedFailures.has(channel.id)).length;
+  return count ? uiMessage("weeklyFeedRefreshFailed", [count]) : "";
 }
 
 function weeklyRefreshStatusText() {
+  const failure = weeklyFeedFailureText();
+  if (failure) return failure;
   const refreshedAt = latestWeeklyRefreshAt();
   if (!refreshedAt) return uiMessage("weeklyFeedNeverRefreshed");
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - refreshedAt) / 1000));
@@ -3047,6 +3061,9 @@ function xmlTextFrom(entry, tagName) {
 
 function parseFeed(xmlText) {
   const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+  if (doc.querySelector("parsererror") || doc.documentElement?.localName !== "feed") {
+    throw new Error("YouTube returned an invalid video feed");
+  }
   const entries = [...doc.querySelectorAll("entry")];
 
   return entries.map((entry) => {
@@ -3508,9 +3525,10 @@ function parseChannelMetadata(html = "") {
   return { description, tags, ...subscriber };
 }
 
-async function fetchChannelMetadata(channelId) {
+async function fetchChannelMetadata(channelId, signal) {
   const response = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channelId)}/about`, {
-    cache: "no-store"
+    cache: "no-store",
+    signal
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return parseChannelMetadata(await response.text());
@@ -3524,9 +3542,10 @@ async function fetchChannelSubscriberCount(channelId) {
   return parseChannelSubscriberCount(await response.text());
 }
 
-async function fetchChannelVideoCount(channelId) {
+async function fetchChannelVideoCount(channelId, signal) {
   const response = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channelId)}/videos`, {
-    cache: "no-store"
+    cache: "no-store",
+    signal
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return parseChannelVideoCount(await response.text());
@@ -4050,7 +4069,8 @@ function renderNewVideos() {
   else renderVideos(currentVideos, newVideoList);
   syncYoutubeThisWeekButton();
   syncVideoLayoutAvailability();
-  setStatus(currentVideos.length ? "" : "No new videos.", !currentVideos.length);
+  const failure = weeklyFeedFailureText();
+  setStatus(failure || (currentVideos.length ? "" : "No new videos."), Boolean(failure) || !currentVideos.length);
 }
 
 function showNewVideos(options = {}) {
@@ -4073,6 +4093,7 @@ function showNewVideos(options = {}) {
   syncStackedChannelViewState();
   renderNewVideos();
   if (!options.skipHistory) pushHistory(newVideosHistoryEntry());
+  refreshDueChannelFeeds();
 }
 function setActiveVideoButton() {
   for (const button of videosEl.querySelectorAll(".video")) {
@@ -6901,6 +6922,17 @@ async function selectChannel(channel, options = {}) {
   await loadFeed();
 }
 
+async function rememberChannelWeeklyVideos(channelId, youtubeVideos = [], rssVideos = []) {
+  const channel = allChannels.find((item) => item.id === channelId);
+  if (!channel) return;
+  const next = { ...channel, ...weeklyVideoSummary(channel, { rssVideos, youtubeVideos }) };
+  if (!feedSummaryChanged(channel, next)) return;
+  replaceChannelSummary(next);
+  await saveConfig();
+  renderCategories();
+  if (activeView === "youtubeHome" || activeView === "newVideos") renderNewVideos();
+}
+
 async function fetchRssChannelVideos(channel) {
   const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channel.id)}`, {
     cache: "no-store"
@@ -6967,6 +6999,7 @@ async function loadChannelVideosForYoutubeOrder(sort) {
     if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
     else renderChannelVideos(currentVideos);
     setStatus();
+    await rememberChannelWeeklyVideos(channel.id, page.videos);
   } catch (error) {
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
     channelVideosLoadedSort = "local";
@@ -7129,6 +7162,7 @@ async function loadMoreChannelVideos() {
       renderChannelVideos(currentVideos);
       setStatus();
     }
+    await rememberChannelWeeklyVideos(channel.id, page.videos);
   } catch (error) {
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
     setStatus(`Unable to load more videos: ${error.message}`, true);
@@ -7165,7 +7199,6 @@ async function loadFeed() {
 
   try {
     let rssVideos = [];
-    let rssLoaded = false;
     let innertubePage = null;
     let partialMessage = "";
     if (requestedYoutubeOrder) {
@@ -7185,7 +7218,6 @@ async function loadFeed() {
       ]);
       if (rssResult.status === "fulfilled") {
         rssVideos = rssResult.value;
-        rssLoaded = true;
       }
       if (innertubeResult.status === "fulfilled") innertubePage = innertubeResult.value;
       if (rssResult.status === "rejected" && innertubeResult.status === "rejected") {
@@ -7204,7 +7236,6 @@ async function loadFeed() {
       });
     } else if (!innertubePage && channelVideoSource === "rss") {
       rssVideos = await fetchRssChannelVideos(channel);
-      rssLoaded = true;
     }
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
 
@@ -7224,6 +7255,9 @@ async function loadFeed() {
       renderChannelVideos(currentVideos);
       setStatus(partialMessage, Boolean(partialMessage));
     }
+
+    await rememberChannelWeeklyVideos(channel.id, innertubePage?.videos || [], rssVideos);
+    if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
 
     let channelVideoCount = channel.channelVideoCount || 0;
     let channelMetadata = {
@@ -7248,21 +7282,8 @@ async function loadFeed() {
     }
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
 
-    const latestPublished = rssVideos[0]?.published || "";
     activeChannel = {
-      ...channel,
-      ...(rssLoaded ? {
-        feedVideoCount: rssVideos.length,
-        feedLatestPublished: latestPublished,
-        feedLatestTitle: rssVideos[0]?.title || "",
-        feedVideos: rssVideos.map((video) => ({
-          id: video.id,
-          title: video.title,
-          published: video.published,
-          description: video.description || "",
-          tags: video.tags || []
-        }))
-      } : {}),
+      ...(allChannels.find((item) => item.id === channel.id) || channel),
       channelVideoCount,
       description: channelMetadata.description || channel.description || "",
       tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
@@ -7326,7 +7347,7 @@ function feedSummaryChanged(previous, next) {
 
 function checkIsDue(lastCheckedAt, intervalMs, now = Date.now()) {
   const checkedAt = Date.parse(lastCheckedAt || "");
-  return !Number.isFinite(checkedAt) || now - checkedAt >= intervalMs;
+  return !Number.isFinite(checkedAt) || checkedAt > now || now - checkedAt >= intervalMs;
 }
 
 function channelFeedCacheMissing(channel) {
@@ -7345,20 +7366,43 @@ async function runConcurrent(items, limit, worker) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
 }
 
+function refreshDueChannelFeeds() {
+  if (document.visibilityState !== "visible" || navigator.onLine === false) return;
+  refreshChannelSummaries({ feedsOnly: true }).catch((error) => {
+    if (activeView === "youtubeHome" || activeView === "newVideos") setStatus(error.message, true);
+  });
+}
+
 async function refreshChannelSummaries(options = {}) {
+  // Share an ongoing refresh. A manual request still gets a forced pass after it.
+  while (channelSummaryRefreshPromise) {
+    await channelSummaryRefreshPromise;
+    if (!options.force && !options.forceFeeds) return;
+  }
+  const refresh = performChannelSummaryRefresh(options);
+  channelSummaryRefreshPromise = refresh;
+  try {
+    return await refresh;
+  } finally {
+    if (channelSummaryRefreshPromise === refresh) channelSummaryRefreshPromise = null;
+  }
+}
+
+async function performChannelSummaryRefresh(options = {}) {
   if (!configLoaded || !allChannels.length) return;
   const force = Boolean(options.force);
   const forceFeeds = force || Boolean(options.forceFeeds);
   const now = Date.now();
   const prioritizedChannels = prioritizedChannelsForRefresh();
   const refreshQueue = prioritizedChannels.filter((channel) => forceFeeds
+    || weeklyFeedFailures.has(channel.id)
     || channelFeedCacheMissing(channel)
     || checkIsDue(
       channel.feedCheckedAt,
       feedCheckIntervalMinutes * 60 * 1000,
       now
     ));
-  const metadataQueue = prioritizedChannels.filter((channel) => force || checkIsDue(
+  const metadataQueue = (options.feedsOnly ? [] : prioritizedChannels).filter((channel) => force || checkIsDue(
     channel.metadataCheckedAt,
     metadataCheckIntervalDays * 24 * 60 * 60 * 1000,
     now
@@ -7366,42 +7410,35 @@ async function refreshChannelSummaries(options = {}) {
   if (!refreshQueue.length && !metadataQueue.length) return;
 
   newVideosRefreshPending = true;
+  syncYoutubeThisWeekButton();
   renderCategories();
   renderSidePanelPath();
   let feedChanged = false;
   let metadataChanged = false;
 
   try {
-    // Refresh lightweight feeds first, in publication-cadence order, so likely
-    // new videos become visible before slower channel metadata is requested.
+    // Use the same YouTube video source as channel views, enriched with exact
+    // RSS dates. A forced check must not simply reload a stale RSS listing.
     await runConcurrent(refreshQueue, feedCheckConcurrency, async (queuedChannel) => {
       const channel = allChannels.find((item) => item.id === queuedChannel.id) || queuedChannel;
       try {
-        const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channel.id)}`, {
-          cache: "no-store"
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const videos = parseFeed(await response.text()).map((video) => videoWithChannel(video, channel));
+        const result = await fetchWeeklyChannelVideos({ channelId: channel.id, parseFeed });
+        const currentChannel = allChannels.find((item) => item.id === channel.id);
+        if (!currentChannel) return;
+        if (result.complete) weeklyFeedFailures.delete(channel.id);
+        else weeklyFeedFailures.add(channel.id);
         const next = {
-          ...channel,
-          feedVideoCount: videos.length,
-          feedLatestPublished: videos[0]?.published || "",
-          feedLatestTitle: videos[0]?.title || "",
-          feedCheckedAt: new Date().toISOString(),
-          feedVideos: videos.map((video) => ({
-            id: video.id,
-            title: video.title,
-            published: video.published,
-            description: video.description || "",
-            tags: video.tags || []
-          }))
+          ...currentChannel,
+          ...weeklyVideoSummary(currentChannel, result),
+          ...(result.complete ? { feedCheckedAt: new Date().toISOString() } : {})
         };
         const summaryChanged = feedSummaryChanged(channel, next);
         feedChanged = true;
         replaceChannelSummary(next);
-        if (summaryChanged && activePrimarySection === "youtube" && activeView === "youtubeHome") renderNewVideos();
+        if (summaryChanged && (activeView === "youtubeHome" || activeView === "newVideos")) renderNewVideos();
       } catch {
-        // Keep the previous feed when YouTube or RSS is temporarily unavailable.
+        // Keep cached videos and the last successful date, and retry on the next poll.
+        weeklyFeedFailures.add(channel.id);
       }
     });
 
@@ -7411,17 +7448,21 @@ async function refreshChannelSummaries(options = {}) {
     // prioritized feeds have had a chance to appear.
     await runConcurrent(metadataQueue, feedCheckConcurrency, async (queuedChannel) => {
       const channel = allChannels.find((item) => item.id === queuedChannel.id) || queuedChannel;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const [videoCountResult, metadataResult] = await Promise.allSettled([
-        fetchChannelVideoCount(channel.id),
-        fetchChannelMetadata(channel.id)
-      ]);
+        fetchChannelVideoCount(channel.id, controller.signal),
+        fetchChannelMetadata(channel.id, controller.signal)
+      ]).finally(() => clearTimeout(timeout));
       if (videoCountResult.status === "rejected" && metadataResult.status === "rejected") return;
       const channelVideoCount = videoCountResult.status === "fulfilled" && videoCountResult.value
         ? videoCountResult.value
         : channel.channelVideoCount || 0;
       const channelMetadata = metadataResult.status === "fulfilled" ? metadataResult.value : {};
+      const currentChannel = allChannels.find((item) => item.id === channel.id);
+      if (!currentChannel) return;
       const next = {
-        ...channel,
+        ...currentChannel,
         channelVideoCount,
         description: channelMetadata.description || channel.description || "",
         tags: channelMetadata.tags?.length ? channelMetadata.tags : channel.tags || [],
@@ -7437,7 +7478,7 @@ async function refreshChannelSummaries(options = {}) {
     if (!feedChanged && !metadataChanged) return;
     allChannels.sort((left, right) => left.title.localeCompare(right.title, "fr"));
     renderCategories();
-    if (activePrimarySection === "youtube" && activeView === "youtubeHome") {
+    if (activeView === "youtubeHome" || activeView === "newVideos") {
       renderNewVideos();
     } else if (activePrimarySection === "channels" && !activeChannel) {
       renderChannels(channelsForActiveCategory());
@@ -7445,6 +7486,7 @@ async function refreshChannelSummaries(options = {}) {
     setActiveChannelButton();
   } finally {
     newVideosRefreshPending = false;
+    if (activeView === "youtubeHome" || activeView === "newVideos") renderNewVideos();
     renderCategories();
     renderSidePanelPath();
     syncYoutubeThisWeekButton();
@@ -7673,6 +7715,7 @@ async function showYoutubeSearchHome() {
   setActiveChannelButton();
   syncStackedChannelViewState();
   syncVideoLayoutAvailability();
+  refreshDueChannelFeeds();
 }
 
 async function showYoutubeBlank() {
@@ -9461,8 +9504,14 @@ async function handlePendingDataCommand() {
 }
 document.addEventListener("visibilitychange", () => {
   syncPanelVisibilityState({ broadcast: true });
-  if (document.visibilityState === "visible") synchronizeWebDavConfig().catch(() => {});
+  if (document.visibilityState === "visible") {
+    synchronizeWebDavConfig().catch(() => {});
+    refreshDueChannelFeeds();
+  }
 });
+window.addEventListener("online", refreshDueChannelFeeds);
+// Check due dates once per minute; the user's interval controls each channel.
+window.setInterval(refreshDueChannelFeeds, 60 * 1000);
 window.addEventListener("resize", scheduleCategoryOverflowSync);
 window.setInterval(() => syncPanelVisibilityState({ broadcast: true }), 1000);
 window.setInterval(() => {
