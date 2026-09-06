@@ -118,6 +118,25 @@ const snapshotConfig = {
   updatedAt: new Date(now).toISOString()
 };
 
+// Enough fictional uploads to demonstrate dense and multi-column layouts.
+const extraTitles = [
+  "Choosing the Right Tools for a Small Workshop", "Light and Color in Everyday Photography",
+  "From Sketch to Finished Object", "The Science Behind a Simple Pendulum",
+  "Making Space for Creative Work", "Recording Clear Sound at Home",
+  "A Closer Look at Natural Patterns", "Repairing Instead of Replacing",
+  "Designing a Useful Everyday Object", "What Makes a Good Documentary?",
+  "Small Experiments, Surprising Results"
+];
+extraTitles.forEach((title, index) => {
+  const channel = snapshotConfig.channels[index % snapshotConfig.channels.length];
+  channel.feedVideos.push({ id: `extra${String(index).padStart(6, "0")}`, title,
+    published: isoDaysAgo(1 + index / 2), thumbnail: channel.thumbnail,
+    duration: "12:34", views: "24k views" });
+});
+snapshotConfig.channels.forEach((channel, index) => {
+  channel.subscriberCountText = ["128k subscribers", "84k subscribers", "256k subscribers"][index];
+});
+
 const bootstrap = `
 <script>
 (() => {

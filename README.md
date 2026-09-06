@@ -14,7 +14,7 @@
 
 YouTube Shelf keeps channels, recent uploads, favorite videos, and a personal watch-later list within reach while you browse YouTube. It runs as a narrow side panel or as a full-page workspace and does not require an account or a build step.
 
-> The screenshots below use fictional English-language channels and videos. They are rendered from the extension's real interface and styles. The YouTube page in contextual captures is deliberately blurred.
+> All screenshots below show the current interface, using fictional channels, videos and placeholder thumbnails. The YouTube page in contextual captures is deliberately blurred.
 
 ## Preview
 
@@ -49,7 +49,7 @@ The toolbar button switches between the browser side panel and a larger workspac
 
 ### Video display modes
 
-Each list can use the presentation best suited to the available panel width.
+Each list can use thumbnails only, adaptive columns, a single column, titles only, or compact titles with small thumbnails. Layout and zoom can be adjusted independently for each section.
 
 | Thumbnails | Adaptive columns |
 | --- | --- |
@@ -65,38 +65,35 @@ Each list can use the presentation best suited to the available panel width.
 
 ### Main sections
 
-| Channels | Favorites | Watch later |
-| --- | --- | --- |
-| <img src="docs/screenshots/youtube-shelf-panel-channels.png" alt="Channels tab"> | <img src="docs/screenshots/youtube-shelf-panel-favorites.png" alt="Favorites tab with Music categories and subcategories"> | <img src="docs/screenshots/youtube-shelf-panel-watch-later.png" alt="Watch later tab"> |
+| YouTube / weekly uploads | Channels |
+| --- | --- |
+| <img src="docs/screenshots/youtube-shelf-current-weekly.png" alt="YouTube tab with weekly uploads, search and refresh"> | <img src="docs/screenshots/youtube-shelf-panel-channels.png" alt="Channels, categories and age badges"> |
+
+| Favorites | Watch later |
+| --- | --- |
+| <img src="docs/screenshots/youtube-shelf-panel-favorites.png" alt="Favorites with categories, subcategories and personal notes"> | <img src="docs/screenshots/youtube-shelf-panel-watch-later.png" alt="Watch later with personal notes and video cards"> |
 
 Favorites support large, ordered category trees. In this example, **Music** contains **Live sessions**, **Albums**, **Production**, and **Music theory**.
 
+Search, sorting, notes, bulk selection and drag-and-drop grouping complement these views. On YouTube, clicking the dimmed weekly label clears the search and returns to weekly uploads.
+
+<details>
+<summary>Series and playlist discovery</summary>
+
+Right-click a video to discover related parts, then open its title badge to view numbered episodes. Refresh the list as new parts appear.
+
+<img src="docs/screenshots/youtube-shelf-current-series.png" width="600" alt="Series list with numbers over thumbnails">
+
+</details>
+
 ### Responsive layouts
 
-YouTube Shelf adapts from a narrow browser panel to a wide split view.
+YouTube Shelf adapts from a narrow browser panel to a wide layout. The four icon tabs share a single toolbar row when space allows.
 
 <p align="center">
   <img src="docs/screenshots/youtube-shelf-wide.png" width="62%" alt="YouTube Shelf wide split layout">
   <img src="docs/screenshots/youtube-shelf-narrow.png" width="28%" alt="YouTube Shelf narrow side-panel layout">
 </p>
-
-## Latest additions (3.3.19)
-
-The weekly label now clears a search with one click. Fullscreen hides Shelf and restores it on exit (or on the next page click if the browser requires it).
-
-Real interface rendered with fictional channels, videos and placeholder thumbnails; no personal account data.
-
-| Weekly videos | Channels |
-| --- | --- |
-| <img src="docs/screenshots/youtube-shelf-current-weekly.png" width="360" alt="Weekly video cards and icon navigation"> | <img src="docs/screenshots/youtube-shelf-current-channels.png" width="360" alt="Channel categories and age badges"> |
-
-### Series and playlists
-
-![Episode cards with prominent numbers over thumbnails](docs/screenshots/youtube-shelf-current-series.png)
-
-### YouTube subscriptions
-
-![YouTube and Shelf columns with directional copy controls](docs/screenshots/youtube-shelf-current-account.png)
 
 ## Installation
 
@@ -123,6 +120,8 @@ Updates installed from this repository are manual: replace the files, then use *
 5. Use the star action to save a video under **Favorites**, or add it to **Watch later**.
 6. Use the display and sorting controls above each list to tailor the view.
 
+YouTube fullscreen hides Shelf and restores it on exit; if the browser requires a gesture, the next page click restores it.
+
 The back and forward buttons navigate within the extension. The expand button opens full-page mode; the adjacent focus control changes how much of the surrounding YouTube page remains visible.
 
 ## Data and interoperability
@@ -144,7 +143,9 @@ Keep exported backups private if they contain personal notes or viewing organiza
 
 The **YouTube account** dialog compares **YouTube ← → Shelf** in compact rows. Shelf appears immediately; **Check subscriptions** fills YouTube progressively. Arrows copy one or all missing channels without removing the source. Right-click to unsubscribe on YouTube, or remove/classify a Shelf channel. Checks use your existing YouTube session without accessing your password; optional history stays local.
 
-Compact channel cards, responsive icon tabs, and animated refresh controls keep navigation clear. Repeated channel additions are deduplicated, and weekly reset preserves the current view.
+Shelf channels appear immediately; YouTube channels arrive as the check progresses. Hover a channel for the right-click hint. Repeated additions are deduplicated.
+
+<img src="docs/screenshots/youtube-shelf-current-account.png" width="680" alt="YouTube and Shelf subscription columns with copy arrows">
 
 ### WebDAV synchronization
 
@@ -179,7 +180,7 @@ The extension permissions are used to:
 
 No compilation or bundling is required. Edit the source files, then reload the unpacked extension from the browser's extension management page.
 
-The deterministic screenshot harness in `tools/snapshot-server.mjs` loads the real extension interface with fictional local data. It exists only for documentation captures and is not part of the installed extension runtime.
+The screenshot harness (`tools/snapshot-server.mjs` and `tools/capture-readme.cjs`, using Playwright) loads the real extension interface with fictional local data. It exists only for documentation captures and is not part of the installed extension runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
