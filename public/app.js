@@ -3769,7 +3769,7 @@ function syncYoutubeThisWeekButton() {
   const visible = activePrimarySection === "youtube" && youtubeTabHome !== "blank";
   youtubeThisWeekEl.hidden = !visible;
   const active = activeView === "youtubeHome";
-  youtubeThisWeekEl.setAttribute("aria-disabled", String(!active));
+  youtubeThisWeekEl.classList.toggle("is-inactive", !active);
   syncListRefreshButton();
   if (!visible) return;
   youtubeThisWeekEl.classList.toggle("is-active", active);
@@ -9302,6 +9302,20 @@ youtubeThisWeekRefreshEl?.addEventListener("click", async (event) => {
   } catch (error) {
     setStatus(error.message, true);
   }
+});
+async function returnToWeeklyVideos() {
+  if (activeView === "youtubeHome") return;
+  window.clearTimeout(globalSearchTimer);
+  globalSearchController?.abort();
+  hideGlobalSearchSuggestions();
+  youtubeSearchQuery = "";
+  activeSearchQuery = "";
+  searchInputEl.value = "";
+  await showYoutubeSearchHome();
+  pushHistory({ type: "youtubeHome", id: "youtube" });
+}
+youtubeThisWeekEl?.addEventListener("click", () => {
+  returnToWeeklyVideos().catch((error) => setStatus(error.message, true));
 });
 youtubeThisWeekEl?.addEventListener("contextmenu", openYoutubeThisWeekMenu);
 channelsEl.addEventListener("contextmenu", (event) => {

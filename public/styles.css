@@ -5674,11 +5674,11 @@ body.sidePanelVideos .channel.is-active .channelCategoryChip {
   flex-shrink: 0;
 }
 
-.thisWeekToolbarButton[aria-disabled="true"] {
+.thisWeekToolbarButton.is-inactive {
   opacity: .4;
-  cursor: default;
-  pointer-events: none;
+  cursor: pointer;
 }
+.thisWeekToolbarButton.is-inactive:hover { opacity: .75; }
 
 .youtubeAccountChannel { cursor: pointer; }
 .youtubeAccountChannel:hover {

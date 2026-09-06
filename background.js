@@ -128,6 +128,35 @@ async function fetchYoutubeSearchWithRetry(url, options) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "YOUTUBE_SHELF_RESTORE_AFTER_FULLSCREEN") {
+    const tab = sender.tab;
+    if (!tab?.active || !Number.isInteger(tab.windowId)
+        || !/^https:\/\/(www\.)?youtube\.com\//.test(sender.url || "")) return;
+    // Call directly from the content-script gesture, before any asynchronous work.
+    chrome.sidePanel.open({ windowId: tab.windowId })
+      .then(() => { openWindows.add(tab.windowId); sendResponse({ ok: true }); })
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+  if (message?.type === "YOUTUBE_SHELF_NATIVE_FULLSCREEN") {
+    const tab = sender.tab;
+    if (!tab?.active || !Number.isInteger(tab.windowId)
+        || !/^https:\/\/(www\.)?youtube\.com\//.test(sender.url || "")
+        || !chrome.sidePanel.close) return;
+    const wasOpen = openWindows.has(tab.windowId);
+    // Browser versions distinguish tab-specific and window-wide panels.
+    Promise.allSettled([
+      chrome.sidePanel.close({ windowId: tab.windowId }),
+      chrome.sidePanel.close({ tabId: tab.id })
+    ])
+      .then((results) => {
+        const ok = results.some((result) => result.status === "fulfilled");
+        if (ok) openWindows.delete(tab.windowId);
+        sendResponse({ ok, restorePanel: ok && wasOpen });
+      })
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
   if (message?.type === "YOUTUBE_SHELF_SUBSCRIPTION_RESULT") {
     const tabId = sender.tab?.id;
     const windowId = sender.tab?.windowId;

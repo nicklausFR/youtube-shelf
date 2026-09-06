@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.19 - 2026-09-06
+
+- Hide Shelf for YouTube fullscreen and restore it on exit, with a click fallback when required by the browser.
+- Let the dimmed weekly label clear a search and return to weekly videos.
+- Refresh README documentation and screenshots for the current interface.
+
 ## 3.3.18 - 2026-09-06
 
 - Add series/playlist discovery and numbered episode cards, plus drag-to-group favorites.

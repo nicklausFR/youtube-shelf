@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+const source=readFileSync('youtube-live.js','utf8');
+let calls=0,allowed=false;
+const ctx=vm.createContext({chrome:{runtime:{sendMessage:async()=>{calls++;return {ok:allowed};}}}});
+const start=source.indexOf('let restorePanelAfterFullscreen =');
+vm.runInContext(source.slice(start,source.indexOf('liveListener(document, "fullscreenchange"',start)),ctx);
+ctx.restoreFullscreenPanel();assert.equal(calls,0);
+vm.runInContext('restorePanelAfterFullscreen=true',ctx);
+ctx.restoreFullscreenPanel();await new Promise(resolve=>setImmediate(resolve));assert.equal(calls,1);
+allowed=true;ctx.restoreFullscreenPanel();await new Promise(resolve=>setImmediate(resolve));assert.equal(calls,2);
+ctx.restoreFullscreenPanel();assert.equal(calls,2);
+console.log('Fullscreen restore: only previously open panel; denied automatic restoration retries on gesture; successful restore runs once.');

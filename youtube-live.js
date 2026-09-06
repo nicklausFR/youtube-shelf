@@ -587,9 +587,27 @@ liveChromeListener(chrome.runtime.onMessage, (message, _sender, sendResponse) =>
   applyDisplayOptions();
 });
 
+let restorePanelAfterFullscreen = false;
+let restoringFullscreenPanel = false;
+function restoreFullscreenPanel() {
+  if (!restorePanelAfterFullscreen || restoringFullscreenPanel) return;
+  restoringFullscreenPanel = true;
+  Promise.resolve(chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_RESTORE_AFTER_FULLSCREEN" }))
+    .then((result) => { if (result?.ok) restorePanelAfterFullscreen = false; })
+    .catch(() => {})
+    .finally(() => { restoringFullscreenPanel = false; });
+}
+
 liveListener(document, "fullscreenchange", () => {
-  if (document.fullscreenElement) return;
+  if (document.fullscreenElement) {
+    // Both the YouTube player and Shelf's focus mode can own fullscreen.
+    Promise.resolve(chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_NATIVE_FULLSCREEN" }))
+      .then((result) => { restorePanelAfterFullscreen = Boolean(result?.restorePanel); })
+      .catch(() => {});
+    return;
+  }
   hideFullscreenEscapeHint();
+  restoreFullscreenPanel();
   if (!shelfFullscreenActive) return;
   shelfFullscreenActive = false;
   chrome.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: true });
@@ -600,11 +618,16 @@ liveListener(document, "keydown", (event) => {
   if (event.key !== "Escape" || !document.fullscreenElement) return;
   event.preventDefault();
   event.stopImmediatePropagation();
+  restoreFullscreenPanel();
   document.exitFullscreen().catch(() => {});
 }, true);
 
-liveListener(document, "pointerdown", () => {
-  if (!document.fullscreenElement) return;
+liveListener(document, "pointerdown", (event) => {
+  if (!document.fullscreenElement) {
+    restoreFullscreenPanel();
+    return;
+  }
+  if (event.target instanceof Element && event.target.closest(".ytp-fullscreen-button")) restoreFullscreenPanel();
   liveTimeout(hideFullscreenEscapeHint, 0);
 }, true);
 
