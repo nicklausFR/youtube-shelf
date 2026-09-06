@@ -1,251 +1,937 @@
 {
-  "extensionName": { "message": "YouTube Shelf", "description": "Extension name." },
-  "extensionDescription": { "message": "Search YouTube, organize channels, favorites and Watch later videos, add notes, and browse from a clean side panel.", "description": "Extension description." },
-  "settings": { "message": "Settings" },
-  "focusVideoPlayer": { "message": "Focus video player" },
-  "openFullPageMode": { "message": "Open full-page mode" },
-  "returnToSidePanel": { "message": "Return to side panel" },
-  "back": { "message": "Back" },
-  "forward": { "message": "Forward" },
-  "searchYoutube": { "message": "Search YouTube" },
-  "searchChannels": { "message": "Search channels" },
-  "searchChannel": { "message": "Search channel" },
-  "searchThisChannel": { "message": "Search in this channel" },
-  "searchThisWeek": { "message": "Search this week" },
-  "searchWatchLater": { "message": "Search Watch later" },
-  "searchFavorites": { "message": "Search favorites" },
-  "youtube": { "message": "YouTube" },
-  "channels": { "message": "Channels" },
-  "watchLater": { "message": "Watch later" },
-  "favorites": { "message": "Favorites" },
-  "expandFavoriteGroup": { "message": "Show $1 grouped favorites" },
-  "collapseFavoriteGroup": { "message": "Collapse group of $1 favorites" },
-  "noFavoritesInCategory": { "message": "No favorites in this category yet." },
-  "noFavoritesYet": { "message": "No favorites yet." },
-  "noFavoritesFound": { "message": "No favorites found." },
-  "youtubeSignIn": { "message": "YouTube sign in" },
-  "addChannelShort": { "message": "+ Channel" },
-  "addCategoryShort": { "message": "+ Category" },
-  "refresh": { "message": "Refresh" },
-  "classify": { "message": "Classify" },
-  "unsubscribe": { "message": "Unsubscribe" },
-  "markAsWatchedQuestion": { "message": "Mark as watched?" },
-  "videoIsInWatchLater": { "message": "This video is in Watch later." },
-  "keepInWatchLater": { "message": "Keep in Watch later" },
-  "markAsWatched": { "message": "Mark as watched" },
-  "personalNote": { "message": "Personal note" },
-  "cancel": { "message": "Cancel" },
-  "save": { "message": "Save" },
-  "close": { "message": "Close" },
-  "channelCategories": { "message": "Channel categories" },
-  "newCategory": { "message": "New category" },
-  "categoryChannels": { "message": "Category channels" },
-  "excludedFromNewVideos": { "message": "Excluded from New videos" },
-  "importExportSave": { "message": "Import/export/save" },
-  "exportShelfData": { "message": "Export/Save YouTube Shelf datas" },
-  "exportNewPipe": { "message": "Export for NewPipe" },
-  "importShelfData": { "message": "Import/restore YouTube Shelf datas" },
-  "importFreeTube": { "message": "Import from FreeTube" },
-  "youtubeDisplay": { "message": "YouTube Display" },
-  "interfaceTheme": { "message": "Interface theme" },
-  "themeAutomatic": { "message": "Automatic (system)" },
-  "themeLight": { "message": "Light" },
-  "themeDark": { "message": "Dark" },
-  "twoColumnsFrom": { "message": "Two columns from" },
-  "panelWidthPixels": { "message": "Panel width in pixels." },
-  "hideComments": { "message": "Hide comments" },
-  "hideSuggestions": { "message": "Hide suggestion list" },
-  "displayOptionsInactive": { "message": "Page display options apply only while the extension panel is open." },
-  "language": { "message": "Language" },
-  "youtubeVideoTitles": { "message": "YouTube video titles" },
-  "automaticTranslation": { "message": "Automatic translation" },
-  "keepOriginalLanguage": { "message": "Keep original language" },
-  "originalLanguageHint": { "message": "Original language keeps the title published by the video creator whenever YouTube provides it." },
-  "shelfInterface": { "message": "YouTube Shelf interface" },
-  "automaticBrowserLanguage": { "message": "Automatic (browser language)" },
-  "english": { "message": "English" },
-  "french": { "message": "Français" },
-  "editInterfaceTranslations": { "message": "Edit interface translations" },
-  "translationEditor": { "message": "Interface translation editor" },
-  "translationLanguage": { "message": "Translation language" },
-  "translationEditorHint": { "message": "Changes are saved locally and do not modify the packaged extension files." },
-  "translationFile": { "message": "Translation file" },
-  "restoreOriginal": { "message": "Restore original" },
-  "saveAndApply": { "message": "Save and apply" },
-  "invalidTranslationFile": { "message": "Invalid translation file: $1" },
-  "translationLoadFailed": { "message": "Unable to load the translation file." },
-  "aboutShelf": { "message": "About YouTube Shelf" },
-  "version": { "message": "Version" },
-  "currentVersion": { "message": "Current version" },
-  "versionUpToDate": { "message": "$1, up to date" },
-  "latestVersion": { "message": "Latest version" },
-  "checkingLatestVersion": { "message": "Checking…" },
-  "latestVersionUnavailable": { "message": "Unavailable" },
-  "downloadLatestVersion": { "message": "Download latest version" },
-  "backupBeforeUpdate": { "message": "Back up your YouTube Shelf data before updating." },
-  "createdBy": { "message": "Created by" },
-  "license": { "message": "License" },
-  "openGithub": { "message": "Open GitHub repository" },
-  "youtubeOptions": { "message": "Sniff YouTube" },
-  "sniffYoutubeMetadata": { "message": "Sniff YouTube metadata" },
-  "sniffYoutubeHint": { "message": "Retrieve channel descriptions, tags, and video counts from YouTube pages." },
-  "checkNewVideos": { "message": "Check new channel videos" },
-  "channelInformation": { "message": "Update channel metadata" },
-  "checkNewVideosHint": { "message": "Channels are checked in publication-cadence order so active channels appear first." },
-  "minimumRssInterval": { "message": "Frequency (minutes)" },
-  "metadataInterval": { "message": "Frequency (days)" },
-  "simultaneousChannelChecks": { "message": "Simultaneous requests" },
-  "data": { "message": "Data" },
-  "synchronization": { "message": "Synchronization" },
-  "cleanSlate": { "message": "Clean slate" },
-  "sniff": { "message": "Sniff" },
-  "display": { "message": "Display" },
-  "about": { "message": "About" },
-  "addChannel": { "message": "Add channel" },
-  "addToMyChannels": { "message": "Add to my channels" },
-  "addFavoriteVideo": { "message": "Add favorite video" },
-  "addWatchLaterVideo": { "message": "Add video to Watch later" },
-  "youtubeVideoUrlOrId": { "message": "YouTube video URL or ID" },
-  "invalidYoutubeVideoUrl": { "message": "Enter a valid YouTube video URL or ID." },
-  "searchYoutubeChannels": { "message": "Search YouTube channels" },
-  "search": { "message": "Search" },
-  "addCategory": { "message": "Add category" },
-  "addCategoryOrSubcategory": { "message": "Add category or subcategory" },
-  "parentCategory": { "message": "Parent category" },
-  "noParentMainCategory": { "message": "No parent — main category" },
-  "addSubcategoryTo": { "message": "Add subcategory to $1" },
-  "categoryName": { "message": "Category name" },
-  "add": { "message": "Add" },
-  "webdavSynchronization": { "message": "WebDAV synchronization" },
-  "webdavHint": { "message": "Synchronize the configuration through your Nextcloud WebDAV file." },
-  "webdavFileUrl": { "message": "WebDAV file URL" },
-  "username": { "message": "Username" },
-  "applicationPassword": { "message": "Application password" },
-  "status": { "message": "Status" },
-  "notConfigured": { "message": "Not configured" },
-  "testConnection": { "message": "Test connection" },
-  "saveAndEnable": { "message": "Save and enable" },
-  "synchronizeNow": { "message": "Synchronize now" },
-  "disconnect": { "message": "Disconnect and forget credentials" },
-  "credentialsHint": { "message": "Credentials stay on this device and are never included in exports or synchronized data." },
-  "newVideos": { "message": "New videos" },
-  "uncategorized": { "message": "Uncategorized" },
-  "allChannels": { "message": "All channels" },
-  "thisWeek": { "message": "This week" },
-  "thisWeekInYourChannels": { "message": "This week in your channels" },
-  "refreshThisWeek": { "message": "Refresh this week" },
-  "weeklyFeedRefreshFailed": { "message": "Refresh incomplete: $1 channel(s) could not be checked. Saved videos are shown; another attempt will be made automatically." },
-  "lastWeeklyRefresh": { "message": "Last refresh" },
-  "weeklyFeedNeverRefreshed": { "message": "Weekly feed has not been refreshed yet" },
-  "hideThisWeekInYourChannels": { "message": "Hide “This week in your channels”" },
-  "showThisWeekInYourChannels": { "message": "Show “This week in your channels”" },
-  "weeklyChannelCategories": { "message": "Channel categories to show" },
-  "allCategories": { "message": "All categories" },
-  "groupWeeklyVideosByChannel": { "message": "Group videos by channel" },
-  "ungroupWeeklyVideosByChannel": { "message": "Ungroup videos by channel" },
-  "weeklyChannelVideoCount": { "message": "$1 videos" },
-  "weeklyChannelOtherVideos": { "message": "$1 more" },
-  "showWeeklyChannelVideos": { "message": "Show the $1 videos from this channel" },
-  "hideWeeklyChannelVideos": { "message": "Hide the $1 videos from this channel" },
+  "connectYoutube": {
+    "message": "YouTube account"
+  },
+  "youtubeAccount": {
+    "message": "YouTube account"
+  },
+  "youtubeAccountIntro": {
+    "message": "Read the subscriptions page using the account already signed in on YouTube. No Google Cloud setup or OAuth permission is required."
+  },
+  "notConnected": {
+    "message": "Not connected"
+  },
+  "voluntarySubscriptionTracking": {
+    "message": "Keep a local history of subscription changes (voluntary tracking)"
+  },
+  "voluntarySubscriptionTrackingHint": {
+    "message": "When enabled, checks record added and removed subscriptions on this device. Turning it off deletes that history."
+  },
+  "connect": {
+    "message": "Open YouTube subscriptions"
+  },
+  "checkSubscriptions": {
+    "message": "Check subscriptions"
+  },
+  "addMissingSubscriptions": {
+    "message": "Add missing subscriptions to Shelf"
+  },
+  "disconnectYoutube": {
+    "message": "Forget local account data"
+  },
+  "youtubeOauthPrivacy": {
+    "message": "YouTube Shelf reads this page only after your action. It never receives your password and does not sign in or out for you."
+  },
+  "bilateralSubscriptionSummary": {
+    "message": "$1 YouTube subscriptions checked $2. $3 only on YouTube; $4 only in Shelf."
+  },
+  "youtubeOnlySubscriptions": {
+    "message": "$1 only on YouTube"
+  },
+  "shelfOnlySubscriptions": {
+    "message": "$1 only in Shelf"
+  },
+  "youtubeShelfSubscriptionsAligned": {
+    "message": "YouTube and Shelf contain the same channels."
+  },
+  "subscribeAllOnYoutube": {
+    "message": "Subscribe to all automatically"
+  },
+  "automaticSubscriptionHint": {
+    "message": "After this explicit action, each YouTube confirmation is accepted automatically, verified, then closed before continuing."
+  },
+  "confirmYoutubeSubscription": {
+    "message": "Confirm the YouTube subscription to $1."
+  },
+  "subscriptionQueueFinished": {
+    "message": "Subscription sequence finished: $1 confirmed, $2 skipped."
+  },
+  "hideWeeklyShorts": {
+    "message": "Hide Shorts"
+  },
+  "showWeeklyShorts": {
+    "message": "Show Shorts"
+  },
+  "extensionName": {
+    "message": "YouTube Shelf",
+    "description": "Extension name."
+  },
+  "extensionDescription": {
+    "message": "Search YouTube, organize channels, favorites and Watch later videos, add notes, and browse from a clean side panel.",
+    "description": "Extension description."
+  },
+  "settings": {
+    "message": "Settings"
+  },
+  "focusVideoPlayer": {
+    "message": "Focus video player"
+  },
+  "openFullPageMode": {
+    "message": "Open full-page mode"
+  },
+  "returnToSidePanel": {
+    "message": "Return to side panel"
+  },
+  "back": {
+    "message": "Back"
+  },
+  "forward": {
+    "message": "Forward"
+  },
+  "searchYoutube": {
+    "message": "Search YouTube"
+  },
+  "searchChannels": {
+    "message": "Search channels"
+  },
+  "searchChannel": {
+    "message": "Search channel"
+  },
+  "searchThisChannel": {
+    "message": "Search in this channel"
+  },
+  "searchThisWeek": {
+    "message": "Search this week"
+  },
+  "searchWatchLater": {
+    "message": "Search Watch later"
+  },
+  "searchFavorites": {
+    "message": "Search favorites"
+  },
+  "youtube": {
+    "message": "YouTube"
+  },
+  "channels": {
+    "message": "Channels"
+  },
+  "watchLater": {
+    "message": "Watch later"
+  },
+  "favorites": {
+    "message": "Favorites"
+  },
+  "expandFavoriteGroup": {
+    "message": "Show $1 grouped favorites"
+  },
+  "collapseFavoriteGroup": {
+    "message": "Collapse group of $1 favorites"
+  },
+  "expandWatchLaterGroup": {
+    "message": "Show the $1 videos in this series"
+  },
+  "collapseWatchLaterGroup": {
+    "message": "Collapse this series of $1 videos"
+  },
+  "videoSeriesPosition": {
+    "message": "Series $1/$2"
+  },
+  "videoSeriesPart": {
+    "message": "Series · Part $1"
+  },
+  "videoSeriesDetected": {
+    "message": "This video appears to belong to a series."
+  },
+  "videoSeriesDetectedCount": {
+    "message": "$1 videos from this evolving series are currently detected."
+  },
+  "videoPlaylist": {
+    "message": "Playlist"
+  },
+  "videoPlaylistPosition": {
+    "message": "Playlist $1/$2"
+  },
+  "noFavoritesInCategory": {
+    "message": "No favorites in this category yet."
+  },
+  "noFavoritesYet": {
+    "message": "No favorites yet."
+  },
+  "noFavoritesFound": {
+    "message": "No favorites found."
+  },
+  "youtubeSignIn": {
+    "message": "YouTube sign in"
+  },
+  "addChannelShort": {
+    "message": "+ Channel"
+  },
+  "addCategoryShort": {
+    "message": "+ Category"
+  },
+  "refresh": {
+    "message": "Refresh"
+  },
+  "classify": {
+    "message": "Classify"
+  },
+  "unsubscribe": {
+    "message": "Unsubscribe"
+  },
+  "markAsWatchedQuestion": {
+    "message": "Mark as watched?"
+  },
+  "videoIsInWatchLater": {
+    "message": "This video is in Watch later."
+  },
+  "keepInWatchLater": {
+    "message": "Keep in Watch later"
+  },
+  "markAsWatched": {
+    "message": "Mark as watched"
+  },
+  "personalNote": {
+    "message": "Personal note"
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "save": {
+    "message": "Save"
+  },
+  "close": {
+    "message": "Close"
+  },
+  "channelCategories": {
+    "message": "Channel categories"
+  },
+  "newCategory": {
+    "message": "New category"
+  },
+  "categoryChannels": {
+    "message": "Category channels"
+  },
+  "excludedFromNewVideos": {
+    "message": "Excluded from New videos"
+  },
+  "importExportSave": {
+    "message": "Import/export/save"
+  },
+  "exportShelfData": {
+    "message": "Export/Save YouTube Shelf datas"
+  },
+  "exportNewPipe": {
+    "message": "Export for NewPipe"
+  },
+  "importShelfData": {
+    "message": "Import/restore YouTube Shelf datas"
+  },
+  "importFreeTube": {
+    "message": "Import from FreeTube"
+  },
+  "youtubeDisplay": {
+    "message": "YouTube Display"
+  },
+  "interfaceTheme": {
+    "message": "Interface theme"
+  },
+  "themeAutomatic": {
+    "message": "Automatic (system)"
+  },
+  "themeLight": {
+    "message": "Light"
+  },
+  "themeDark": {
+    "message": "Dark"
+  },
+  "twoColumnsFrom": {
+    "message": "Two columns from"
+  },
+  "panelWidthPixels": {
+    "message": "Panel width in pixels."
+  },
+  "hideComments": {
+    "message": "Hide comments"
+  },
+  "hideSuggestions": {
+    "message": "Hide suggestion list"
+  },
+  "displayOptionsInactive": {
+    "message": "Page display options apply only while the extension panel is open."
+  },
+  "language": {
+    "message": "Language"
+  },
+  "youtubeVideoTitles": {
+    "message": "YouTube video titles"
+  },
+  "automaticTranslation": {
+    "message": "Automatic translation"
+  },
+  "keepOriginalLanguage": {
+    "message": "Keep original language"
+  },
+  "originalLanguageHint": {
+    "message": "Original language keeps the title published by the video creator whenever YouTube provides it."
+  },
+  "shelfInterface": {
+    "message": "YouTube Shelf interface"
+  },
+  "antiTranslateSuggestion": {
+    "message": "On YouTube pages, YouTube Anti-Translate can also restore original titles and audio tracks. This optional extension is installed separately and updated by your browser."
+  },
+  "installAntiTranslate": {
+    "message": "Install YouTube Anti-Translate"
+  },
+  "automaticBrowserLanguage": {
+    "message": "Automatic (browser language)"
+  },
+  "english": {
+    "message": "English"
+  },
+  "french": {
+    "message": "Français"
+  },
+  "editInterfaceTranslations": {
+    "message": "Edit interface translations"
+  },
+  "translationEditor": {
+    "message": "Interface translation editor"
+  },
+  "translationLanguage": {
+    "message": "Translation language"
+  },
+  "translationEditorHint": {
+    "message": "Changes are saved locally and do not modify the packaged extension files."
+  },
+  "translationFile": {
+    "message": "Translation file"
+  },
+  "restoreOriginal": {
+    "message": "Restore original"
+  },
+  "saveAndApply": {
+    "message": "Save and apply"
+  },
+  "invalidTranslationFile": {
+    "message": "Invalid translation file: $1"
+  },
+  "translationLoadFailed": {
+    "message": "Unable to load the translation file."
+  },
+  "aboutShelf": {
+    "message": "About YouTube Shelf"
+  },
+  "version": {
+    "message": "Version"
+  },
+  "currentVersion": {
+    "message": "Current version"
+  },
+  "versionUpToDate": {
+    "message": "$1, up to date"
+  },
+  "latestVersion": {
+    "message": "Latest version"
+  },
+  "checkingLatestVersion": {
+    "message": "Checking…"
+  },
+  "latestVersionUnavailable": {
+    "message": "Unavailable"
+  },
+  "downloadLatestVersion": {
+    "message": "Download latest version"
+  },
+  "backupBeforeUpdate": {
+    "message": "Back up your YouTube Shelf data before updating."
+  },
+  "createdBy": {
+    "message": "Created by"
+  },
+  "license": {
+    "message": "License"
+  },
+  "openGithub": {
+    "message": "Open GitHub repository"
+  },
+  "youtubeOptions": {
+    "message": "Sniff YouTube"
+  },
+  "sniffYoutubeMetadata": {
+    "message": "Sniff YouTube metadata"
+  },
+  "sniffYoutubeHint": {
+    "message": "Retrieve channel descriptions, tags, and video counts from YouTube pages."
+  },
+  "checkNewVideos": {
+    "message": "Check new channel videos"
+  },
+  "channelInformation": {
+    "message": "Update channel metadata"
+  },
+  "checkNewVideosHint": {
+    "message": "Channels are checked in publication-cadence order so active channels appear first."
+  },
+  "minimumRssInterval": {
+    "message": "Frequency (minutes)"
+  },
+  "metadataInterval": {
+    "message": "Frequency (days)"
+  },
+  "simultaneousChannelChecks": {
+    "message": "Simultaneous requests"
+  },
+  "data": {
+    "message": "Data"
+  },
+  "synchronization": {
+    "message": "Synchronization"
+  },
+  "cleanSlate": {
+    "message": "Clean slate"
+  },
+  "sniff": {
+    "message": "Sniff"
+  },
+  "display": {
+    "message": "Display"
+  },
+  "about": {
+    "message": "About"
+  },
+  "addChannel": {
+    "message": "Add channel"
+  },
+  "addToMyChannels": {
+    "message": "Add to my channels"
+  },
+  "addFavoriteVideo": {
+    "message": "Add favorite video"
+  },
+  "addWatchLaterVideo": {
+    "message": "Add video to Watch later"
+  },
+  "youtubeVideoUrlOrId": {
+    "message": "YouTube video URL or ID"
+  },
+  "invalidYoutubeVideoUrl": {
+    "message": "Enter a valid YouTube video URL or ID."
+  },
+  "searchYoutubeChannels": {
+    "message": "Search YouTube channels"
+  },
+  "search": {
+    "message": "Search"
+  },
+  "addCategory": {
+    "message": "Add category"
+  },
+  "addCategoryOrSubcategory": {
+    "message": "Add category or subcategory"
+  },
+  "parentCategory": {
+    "message": "Parent category"
+  },
+  "noParentMainCategory": {
+    "message": "No parent — main category"
+  },
+  "addSubcategoryTo": {
+    "message": "Add subcategory to $1"
+  },
+  "categoryName": {
+    "message": "Category name"
+  },
+  "add": {
+    "message": "Add"
+  },
+  "webdavSynchronization": {
+    "message": "WebDAV synchronization"
+  },
+  "webdavHint": {
+    "message": "Synchronize the configuration through your Nextcloud WebDAV file."
+  },
+  "webdavFileUrl": {
+    "message": "WebDAV file URL"
+  },
+  "username": {
+    "message": "Username"
+  },
+  "applicationPassword": {
+    "message": "Application password"
+  },
+  "status": {
+    "message": "Status"
+  },
+  "notConfigured": {
+    "message": "Not configured"
+  },
+  "testConnection": {
+    "message": "Test connection"
+  },
+  "saveAndEnable": {
+    "message": "Save credentials and enable synchronization"
+  },
+  "synchronizeNow": {
+    "message": "Synchronize now"
+  },
+  "replaceDamagedRemoteFile": {
+    "message": "Replace damaged remote file with this device's data"
+  },
+  "disconnect": {
+    "message": "Disconnect and forget credentials"
+  },
+  "credentialsHint": {
+    "message": "Credentials stay on this device and are never included in exports or synchronized data."
+  },
+  "newVideos": {
+    "message": "New videos"
+  },
+  "uncategorized": {
+    "message": "Uncategorized"
+  },
+  "allChannels": {
+    "message": "All channels"
+  },
+  "thisWeek": {
+    "message": "This week"
+  },
+  "thisWeekInYourChannels": {
+    "message": "This week in your channels"
+  },
+  "refreshThisWeek": {
+    "message": "Refresh this week"
+  },
+  "weeklyFeedRefreshFailed": {
+    "message": "Refresh incomplete: $1 channel(s) could not be checked. Saved videos are shown; another attempt will be made automatically."
+  },
+  "lastWeeklyRefresh": {
+    "message": "Last refresh"
+  },
+  "weeklyFeedNeverRefreshed": {
+    "message": "Weekly feed has not been refreshed yet"
+  },
+  "hideThisWeekInYourChannels": {
+    "message": "Hide “This week in your channels”"
+  },
+  "showThisWeekInYourChannels": {
+    "message": "Show “This week in your channels”"
+  },
+  "weeklyChannelCategories": {
+    "message": "Channel categories to show"
+  },
+  "allCategories": {
+    "message": "All categories"
+  },
+  "groupWeeklyVideosByChannel": {
+    "message": "Group videos by channel"
+  },
+  "ungroupWeeklyVideosByChannel": {
+    "message": "Ungroup videos by channel"
+  },
+  "weeklyChannelVideoCount": {
+    "message": "$1 videos"
+  },
+  "weeklyChannelOtherVideos": {
+    "message": "$1 more"
+  },
+  "showWeeklyChannelVideos": {
+    "message": "Show the $1 videos from this channel"
+  },
+  "hideWeeklyChannelVideos": {
+    "message": "Hide the $1 videos from this channel"
+  },
   "weeklyChannelGroupPosition": {
     "message": "Videos from this channel: $1 of $2",
     "description": "Tooltip for a weekly video grouped by channel. $1 is its position and $2 is the group size."
   },
-  "sortBy": { "message": "Sort: $1" },
-  "sortRelevance": { "message": "Relevance" },
-  "sortDefaultOrder": { "message": "Default order" },
-  "sortTitleAscending": { "message": "Title A–Z" },
-  "sortTitleDescending": { "message": "Title Z–A" },
-  "sortLatestVideoFirst": { "message": "Latest video first" },
-  "sortOldestLatestVideoFirst": { "message": "Oldest latest video first" },
-  "sortNewestFirst": { "message": "Newest first" },
-  "sortOldestFirst": { "message": "Oldest first" },
-  "sortDateAdded": { "message": "Date added" },
-  "sortMostConsulted": { "message": "Most consulted" },
-  "sortMostViewed": { "message": "Most YouTube views" },
-  "sortLeastViewed": { "message": "Least viewed" },
-  "sortMostSubscribers": { "message": "Most subscribers" },
-  "sortLeastSubscribers": { "message": "Least subscribers" },
-  "openThisWeek": { "message": "Open This week" },
-  "addPersonalNote": { "message": "Add a personal note about this video…" },
-  "showChannelIcons": { "message": "Show channel icons" },
-  "sortResults": { "message": "Sort results" },
-  "zoomOutList": { "message": "Zoom out list" },
-  "zoomInList": { "message": "Zoom in list" },
-  "showVideoRows": { "message": "Show video rows" },
-  "export": { "message": "Export" },
-  "exportComplete": { "message": "Export complete." },
-  "exportNewPipeHint": { "message": "Export subscriptions in NewPipe JSON format. Groups are not included." },
-  "selectShelfExport": { "message": "Select the YouTube Shelf export." },
-  "selectFreeTubeExport": { "message": "Select the FreeTube export." },
-  "chooseFile": { "message": "Choose a file" },
-  "importing": { "message": "Importing..." },
-  "openingFilePicker": { "message": "Opening file picker..." },
-  "cleanSlateTitle": { "message": "Clean Slate" },
-  "cleanSlateQuestion": { "message": "Delete all subscriptions and local data?" },
-  "cleanSlateComplete": { "message": "Clean Slate complete." },
-  "invalidShelfFile": { "message": "Invalid YouTube Shelf file" },
-  "noChannelRecognized": { "message": "No channel recognized" },
-  "searchYoutubeEmpty": { "message": "Search YouTube to see results." },
-  "searchingYoutube": { "message": "Searching YouTube…" },
-  "youtubeChannelResult": { "message": "$1 result from YouTube" },
-  "youtubeChannelResults": { "message": "$1 results from YouTube" },
-  "noYoutubeVideoFound": { "message": "No YouTube video found." },
-  "youtubeSearchSuggestions": { "message": "YouTube search suggestions" },
-  "addChannelHere": { "message": "Add a channel here" },
-  "addSubcategory": { "message": "Add subcategory" },
-  "subcategories": { "message": "Subcategories" },
-  "all": { "message": "All" },
-  "expandSubcategories": { "message": "Show subcategories" },
-  "collapseSubcategories": { "message": "Hide subcategories" },
-  "renameCategory": { "message": "Rename category" },
-  "deleteCategory": { "message": "Delete category" },
-  "rename": { "message": "Rename" },
-  "confirmAction": { "message": "Confirm action" },
-  "delete": { "message": "Delete" },
-  "openInNewTab": { "message": "Open in new tab" },
-  "editPersonalNote": { "message": "Edit personal note" },
-  "addPersonalNoteAction": { "message": "Add personal note" },
-  "addToCategory": { "message": "Add to category" },
-  "removeFromFavorites": { "message": "Remove from Favorites" },
-  "removeSelectedFavorites": { "message": "Remove $1 selected favorites" },
-  "confirmRemoveSelectedFavorites": { "message": "Remove the $1 selected videos from Favorites?" },
-  "favoritesAddedToCategory": { "message": "$1 favorites updated." },
-  "removeFromWatchLater": { "message": "Remove from Watch later" },
-  "markAsUnwatched": { "message": "Mark as unwatched" },
-  "excludeChannelFromNewVideos": { "message": "Do not include this channel in New videos" },
-  "personalNoteSaved": { "message": "Personal note saved." },
-  "personalNoteRemoved": { "message": "Personal note removed." },
-  "excludedChannels": { "message": "Excluded channels" },
-  "includeInNewVideos": { "message": "Include in New videos" },
-  "openYoutubeChannel": { "message": "Open YouTube channel" },
-  "removeChannel": { "message": "Remove channel" },
-  "resetWeeklyNew": { "message": "Clear the list" },
-  "restoreWeeklyList": { "message": "Reset the list" },
-  "subscribeOnYoutube": { "message": "Subscribe on YouTube" },
-  "ungroup": { "message": "Ungroup" },
+  "sortBy": {
+    "message": "Sort: $1"
+  },
+  "sortRelevance": {
+    "message": "Relevance"
+  },
+  "sortDefaultOrder": {
+    "message": "Default order"
+  },
+  "sortTitleAscending": {
+    "message": "Title A–Z"
+  },
+  "sortTitleDescending": {
+    "message": "Title Z–A"
+  },
+  "sortLatestVideoFirst": {
+    "message": "Latest video first"
+  },
+  "sortOldestLatestVideoFirst": {
+    "message": "Oldest latest video first"
+  },
+  "sortNewestFirst": {
+    "message": "Newest first"
+  },
+  "sortOldestFirst": {
+    "message": "Oldest first"
+  },
+  "sortDateAdded": {
+    "message": "Date added"
+  },
+  "sortMostConsulted": {
+    "message": "Most consulted"
+  },
+  "sortMostViewed": {
+    "message": "Most YouTube views"
+  },
+  "sortLeastViewed": {
+    "message": "Least viewed"
+  },
+  "sortMostSubscribers": {
+    "message": "Most subscribers"
+  },
+  "sortLeastSubscribers": {
+    "message": "Least subscribers"
+  },
+  "openThisWeek": {
+    "message": "Open This week"
+  },
+  "addPersonalNote": {
+    "message": "Add a personal note about this video…"
+  },
+  "showChannelIcons": {
+    "message": "Show channel icons"
+  },
+  "sortResults": {
+    "message": "Sort results"
+  },
+  "zoomOutList": {
+    "message": "Zoom out list"
+  },
+  "zoomInList": {
+    "message": "Zoom in list"
+  },
+  "showVideoRows": {
+    "message": "Show video rows"
+  },
+  "export": {
+    "message": "Export"
+  },
+  "exportComplete": {
+    "message": "Export complete."
+  },
+  "exportNewPipeHint": {
+    "message": "Export subscriptions in NewPipe JSON format. Groups are not included."
+  },
+  "selectShelfExport": {
+    "message": "Select the YouTube Shelf export."
+  },
+  "selectFreeTubeExport": {
+    "message": "Select the FreeTube export."
+  },
+  "chooseFile": {
+    "message": "Choose a file"
+  },
+  "importing": {
+    "message": "Importing..."
+  },
+  "openingFilePicker": {
+    "message": "Opening file picker..."
+  },
+  "cleanSlateTitle": {
+    "message": "Clean Slate"
+  },
+  "cleanSlateQuestion": {
+    "message": "Delete all subscriptions and local data?"
+  },
+  "cleanSlateComplete": {
+    "message": "Clean Slate complete."
+  },
+  "invalidShelfFile": {
+    "message": "Invalid YouTube Shelf file"
+  },
+  "noChannelRecognized": {
+    "message": "No channel recognized"
+  },
+  "searchYoutubeEmpty": {
+    "message": "Search YouTube to see results."
+  },
+  "searchingYoutube": {
+    "message": "Searching YouTube…"
+  },
+  "youtubeChannelResult": {
+    "message": "$1 result from YouTube"
+  },
+  "youtubeChannelResults": {
+    "message": "$1 results from YouTube"
+  },
+  "noYoutubeVideoFound": {
+    "message": "No YouTube video found."
+  },
+  "youtubeSearchSuggestions": {
+    "message": "YouTube search suggestions"
+  },
+  "addChannelHere": {
+    "message": "Add a channel here"
+  },
+  "addSubcategory": {
+    "message": "Add subcategory"
+  },
+  "subcategories": {
+    "message": "Subcategories"
+  },
+  "all": {
+    "message": "All"
+  },
+  "expandSubcategories": {
+    "message": "Show subcategories"
+  },
+  "collapseSubcategories": {
+    "message": "Hide subcategories"
+  },
+  "renameCategory": {
+    "message": "Rename category"
+  },
+  "deleteCategory": {
+    "message": "Delete category"
+  },
+  "rename": {
+    "message": "Rename"
+  },
+  "confirmAction": {
+    "message": "Confirm action"
+  },
+  "delete": {
+    "message": "Delete"
+  },
+  "openInNewTab": {
+    "message": "Open in new tab"
+  },
+  "openInPopup": {
+    "message": "Open in a popup"
+  },
+  "editPersonalNote": {
+    "message": "Edit personal note"
+  },
+  "addPersonalNoteAction": {
+    "message": "Add personal note"
+  },
+  "addToCategory": {
+    "message": "Add to category"
+  },
+  "removeFromFavorites": {
+    "message": "Remove from Favorites"
+  },
+  "removeSelectedFavorites": {
+    "message": "Remove $1 selected favorites"
+  },
+  "confirmRemoveSelectedFavorites": {
+    "message": "Remove the $1 selected videos from Favorites?"
+  },
+  "favoritesAddedToCategory": {
+    "message": "$1 favorites updated."
+  },
+  "removeFromWatchLater": {
+    "message": "Remove from Watch later"
+  },
+  "markAsUnwatched": {
+    "message": "Mark as unwatched"
+  },
+  "excludeChannelFromNewVideos": {
+    "message": "Do not include this channel in New videos"
+  },
+  "personalNoteSaved": {
+    "message": "Personal note saved."
+  },
+  "personalNoteRemoved": {
+    "message": "Personal note removed."
+  },
+  "excludedChannels": {
+    "message": "Excluded channels"
+  },
+  "includeInNewVideos": {
+    "message": "Include in New videos"
+  },
+  "openYoutubeChannel": {
+    "message": "Open YouTube channel"
+  },
+  "removeChannel": {
+    "message": "Remove channel"
+  },
+  "resetWeeklyNew": {
+    "message": "Clear the list"
+  },
+  "restoreWeeklyList": {
+    "message": "Reset the list"
+  },
+  "subscribeOnYoutube": {
+    "message": "Subscribe on YouTube"
+  },
+  "ungroup": {
+    "message": "Ungroup"
+  },
   "favoriteGroupPosition": {
     "message": "Favorite group: $1 of $2",
     "description": "Tooltip for a grouped favorite video. $1 is its position and $2 is the group size."
   },
-  "searchingYoutubeFor": { "message": "Searching YouTube for “$1”…" },
-  "loadingMoreResults": { "message": "Loading more…" },
-  "loadMoreResults": { "message": "Load $1 more" },
-  "unableToLoadMoreYoutubeResults": { "message": "Unable to load more YouTube results: $1" },
-  "youtubeSearchHeader": { "message": "YouTube search: $1" },
-  "youtubeSearchFailed": { "message": "YouTube search failed: $1" },
-  "noYoutubeResultFound": { "message": "No YouTube result found." },
-  "searchFailed": { "message": "Search failed: $1" },
-  "channel": { "message": "Channel" },
-  "searching": { "message": "Searching…" },
-  "noChannelFound": { "message": "No channel found." },
-  "networkMeterLabel": { "message": "YouTube data activity" },
-  "networkMeterTooltip": { "message": "$1 requests, about $2 transferred" },
-  "youtubeTab": { "message": "YouTube tab" },
-  "blank": { "message": "Blank" },
-  "embeddedVideoUnavailable": { "message": "This video cannot be played here" },
-  "embeddedVideoBlockedByOwner": { "message": "The channel does not allow this video to play in an embedded player." },
-  "embeddedVideoYoutubeOnly": { "message": "YouTube requires this video to be watched directly on YouTube." },
-  "openInCleanYoutubeView": { "message": "Watch in clean YouTube view" },
-  "fullscreenEscapeClickHint": { "message": "Click the video, then press Escape to exit full screen." }
+  "watchLaterGroupPosition": {
+    "message": "Series: video $1 of $2",
+    "description": "Tooltip for a grouped Watch later video. $1 is its position and $2 is the current series size."
+  },
+  "searchingYoutubeFor": {
+    "message": "Searching YouTube for “$1”…"
+  },
+  "loadingMoreResults": {
+    "message": "Loading more…"
+  },
+  "loadMoreResults": {
+    "message": "Load $1 more"
+  },
+  "unableToLoadMoreYoutubeResults": {
+    "message": "Unable to load more YouTube results: $1"
+  },
+  "youtubeSearchHeader": {
+    "message": "YouTube search: $1"
+  },
+  "youtubeSearchFailed": {
+    "message": "YouTube search failed: $1"
+  },
+  "noYoutubeResultFound": {
+    "message": "No YouTube result found."
+  },
+  "searchFailed": {
+    "message": "Search failed: $1"
+  },
+  "channel": {
+    "message": "Channel"
+  },
+  "searching": {
+    "message": "Searching…"
+  },
+  "loading": {
+    "message": "Loading…"
+  },
+  "noChannelFound": {
+    "message": "No channel found."
+  },
+  "networkMeterLabel": {
+    "message": "YouTube data activity"
+  },
+  "networkMeterTooltip": {
+    "message": "$1 requests, about $2 transferred"
+  },
+  "youtubeTab": {
+    "message": "YouTube tab"
+  },
+  "blank": {
+    "message": "Blank"
+  },
+  "embeddedVideoUnavailable": {
+    "message": "This video cannot be played here"
+  },
+  "embeddedVideoBlockedByOwner": {
+    "message": "The channel does not allow this video to play in an embedded player."
+  },
+  "embeddedVideoYoutubeOnly": {
+    "message": "YouTube requires this video to be watched directly on YouTube."
+  },
+  "openInCleanYoutubeView": {
+    "message": "Watch in clean YouTube view"
+  },
+  "fullscreenEscapeClickHint": {
+    "message": "Click the video, then press Escape to exit full screen."
+  },
+  "seriesButton": {
+    "message": "Series"
+  },
+  "seriesOpen": {
+    "message": "Show the full playlist or detected series"
+  },
+  "seriesClose": {
+    "message": "Close"
+  },
+  "seriesRefresh": {
+    "message": "Refresh"
+  },
+  "seriesFavorite": {
+    "message": "Add to favorites"
+  },
+  "seriesWatchLater": {
+    "message": "Watch later"
+  },
+  "seriesLoading": {
+    "message": "Looking for episodes on YouTube…"
+  },
+  "seriesLoadingCount": {
+    "message": "$1 videos found — loading…"
+  },
+  "seriesMissingChannel": {
+    "message": "Channel unknown: add the video with its channel to find further episodes."
+  },
+  "seriesIncomplete": {
+    "message": "YouTube repeated a page; the list may be incomplete."
+  },
+  "seriesPlaylistComplete": {
+    "message": "$1 available videos · updated from YouTube."
+  },
+  "seriesDetectedComplete": {
+    "message": "$1 videos detected by title · membership is inferred. Refresh or reopen to find new episodes."
+  },
+  "seriesLoadError": {
+    "message": "Partial or cached list — update failed: $1"
+  },
+  "seriesContextSearch": {
+    "message": "Find series / playlist"
+  },
+  "accountTableCaption": {
+    "message": "One channel per row. Manage each side independently."
+  },
+  "accountAddAll": {
+    "message": "Add all ($1)"
+  },
+  "accountRemoveAll": {
+    "message": "Remove all ($1)"
+  },
+  "accountConfirmRemoveAll": {
+    "message": "Remove all $1 channels from $2?"
+  },
+  "accountPresent": {
+    "message": "Present"
+  },
+  "accountAbsent": {
+    "message": "Absent"
+  },
+  "accountAdd": {
+    "message": "Add"
+  },
+  "accountRemove": {
+    "message": "Remove"
+  },
+  "accountUnsubscribing": {
+    "message": "Unsubscribing on YouTube: $1"
+  },
+  "accountAll": {
+    "message": "All"
+  },
+  "accountCopyAllTo": {
+    "message": "Copy all missing channels to $1; keep the source"
+  },
+  "accountRemoveAllFrom": {
+    "message": "Remove all channels from $1"
+  },
+  "accountCopyTo": {
+    "message": "Copy $1 to $2; keep the source"
+  },
+  "accountRemoveFrom": {
+    "message": "Remove $1 from $2"
+  },
+  "listLoading": {
+    "message": "Loading…"
+  },
+  "refreshChannelList": {
+    "message": "Refresh channel videos"
+  },
+  "listUpToDate": {
+    "message": "No refresh needed"
+  },
+  "accountTransfer": {
+    "message": "Copy between YouTube and YouTube Shelf"
+  }
 }

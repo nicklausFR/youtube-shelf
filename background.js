@@ -5,7 +5,30 @@ const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
-const HEARTBEAT_TTL_MS = 2500;
+// Each extension view owns a connection. A hidden view cannot close another
+// view's session, and background timer throttling cannot expire an open tab.
+const panelPresenceSessions = new Map();
+let panelPresenceWrites = Promise.resolve();
+function publishPanelPresence() {
+  const open = [...panelPresenceSessions.values()].some(Boolean);
+  panelPresenceWrites = panelPresenceWrites.catch(() => {}).then(() =>
+    chrome.storage.local.set({ [PANEL_OPEN_KEY]: open, [PANEL_HEARTBEAT_KEY]: open ? Date.now() : 0 })
+  );
+}
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "youtube-shelf-presence") return;
+  panelPresenceSessions.set(port, false);
+  port.onMessage.addListener((message) => {
+    const open = message?.open === true;
+    if (panelPresenceSessions.get(port) === open) return;
+    panelPresenceSessions.set(port, open);
+    publishPanelPresence();
+  });
+  port.onDisconnect.addListener(() => {
+    panelPresenceSessions.delete(port);
+    publishPanelPresence();
+  });
+});
 const THUMBNAIL_URLS = [
   "https://i.ytimg.com/*",
   "https://yt3.ggpht.com/*",
@@ -14,7 +37,12 @@ const THUMBNAIL_URLS = [
 const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
 const thumbnailResponseBytes = new Map();
 const YOUTUBE_EMBED_REFERER_RULE_ID = 1001;
+const VIDEO_POPUP_BOUNDS_KEY = "youtubeChannelShelfVideoPopupBounds";
+const SUBSCRIPTION_AUTOMATION_PREFIX = "youtubeShelfSubscriptionAutomation:";
 const fullPageTabsByWindow = new Map();
+let videoPopupWindowId = null;
+let videoPopupTabId = null;
+let videoPopupBoundsTimer = null;
 
 function configureYoutubeEmbedRefererRule() {
   return chrome.declarativeNetRequest.updateDynamicRules({
@@ -99,7 +127,70 @@ async function fetchYoutubeSearchWithRetry(url, options) {
   throw lastError;
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "YOUTUBE_SHELF_SUBSCRIPTION_RESULT") {
+    const tabId = sender.tab?.id;
+    const windowId = sender.tab?.windowId;
+    const channelId = String(message.channelId || "");
+    if (!Number.isInteger(tabId) || !Number.isInteger(windowId) || !/^UC[-_a-zA-Z0-9]+$/.test(channelId)) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    const key = `${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`;
+    chrome.storage.session.get(key)
+      .then(async (result) => {
+        const target = typeof result[key] === "string" ? { channelId: result[key], action: "subscribe" } : result[key];
+        const expected = target?.action === "unsubscribe" ? "unsubscribed" : "subscribed";
+        if (target?.channelId !== channelId || ![expected, "cancelled"].includes(message.status)) {
+          sendResponse({ ok: false });
+          return;
+        }
+        await chrome.storage.session.remove(key);
+        await Promise.resolve(chrome.runtime.sendMessage({
+          type: "YOUTUBE_SHELF_SUBSCRIPTION_RESULT_RELAY",
+          status: message.status,
+          channelId
+        })).catch(() => {});
+        await chrome.windows.remove(windowId).catch(() => {});
+        sendResponse({ ok: true });
+      })
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+  if (message?.type === "YOUTUBE_SHELF_REGISTER_SUBSCRIPTION_AUTOMATION") {
+    const tabId = Number(message.tabId);
+    const channelId = String(message.channelId || "");
+    if (!sender.url?.startsWith(extensionOrigin) || !Number.isInteger(tabId) || !/^UC[-_a-zA-Z0-9]+$/.test(channelId)) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    chrome.storage.session.set({ [`${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`]: { channelId, action: message.action === "unsubscribe" ? "unsubscribe" : "subscribe" } })
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+  if (message?.type === "YOUTUBE_SHELF_GET_SUBSCRIPTION_AUTOMATION") {
+    const tabId = sender.tab?.id;
+    if (!Number.isInteger(tabId)) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    chrome.storage.session.get(`${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`)
+      .then((result) => sendResponse({
+        ok: true,
+        ...(typeof result[`${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`] === "string"
+          ? { channelId: result[`${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`], action: "subscribe" }
+          : result[`${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`] || {})
+      }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+  if (message?.type === "YOUTUBE_SHELF_OPEN_VIDEO_POPUP") {
+    openVideoPopup(message.videoId, message.title)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || "Unable to open video popup" }));
+    return true;
+  }
   if (!["YOUTUBE_SHELF_SEARCH_PAGE", "YOUTUBE_SHELF_SEARCH_CONTINUATION"].includes(message?.type)) {
     return undefined;
   }
@@ -182,6 +273,7 @@ chrome.tabs.query({}).then((tabs) => tabs.forEach(trackFullPageTab)).catch(() =>
 chrome.tabs.onCreated.addListener(trackFullPageTab);
 chrome.tabs.onUpdated.addListener((_tabId, _changeInfo, tab) => trackFullPageTab(tab));
 chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.remove(`${SUBSCRIPTION_AUTOMATION_PREFIX}${tabId}`).catch(() => {});
   for (const [windowId, tabIds] of fullPageTabsByWindow) {
     tabIds.delete(tabId);
     if (!tabIds.size) fullPageTabsByWindow.delete(windowId);
@@ -267,10 +359,12 @@ function createContextMenus() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  publishPanelPresence();
   createContextMenus();
   configureYoutubeEmbedRefererRule();
 });
 chrome.runtime.onStartup?.addListener?.(() => {
+  publishPanelPresence();
   createContextMenus();
   configureYoutubeEmbedRefererRule();
 });
@@ -290,6 +384,74 @@ async function openDataPopup(command) {
     top
   });
 }
+
+function videoPopupUrl(videoId, title = "") {
+  const params = new URLSearchParams({ video: videoId });
+  if (title) params.set("title", String(title).slice(0, 180));
+  return chrome.runtime.getURL(`public/video-popup.html?${params}`);
+}
+
+async function findVideoPopupTab() {
+  if (videoPopupTabId !== null) {
+    const known = await chrome.tabs.get(videoPopupTabId).catch(() => null);
+    if (known) return known;
+  }
+  const popupBaseUrl = chrome.runtime.getURL("public/video-popup.html");
+  const tabs = await chrome.tabs.query({});
+  return tabs.find((tab) => String(tab.url || "").startsWith(popupBaseUrl)) || null;
+}
+
+async function openVideoPopup(rawVideoId, title = "") {
+  const videoId = String(rawVideoId || "").trim();
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) throw new Error("Invalid YouTube video identifier");
+  const url = videoPopupUrl(videoId, title);
+  const existingTab = await findVideoPopupTab();
+  if (existingTab?.id !== undefined && existingTab.windowId !== undefined) {
+    videoPopupTabId = existingTab.id;
+    videoPopupWindowId = existingTab.windowId;
+    await chrome.tabs.update(existingTab.id, { active: true, url });
+    await chrome.windows.update(existingTab.windowId, { focused: true, state: "normal" });
+    return;
+  }
+
+  const stored = await chrome.storage.local.get(VIDEO_POPUP_BOUNDS_KEY);
+  const bounds = stored?.[VIDEO_POPUP_BOUNDS_KEY] || {};
+  const options = {
+    url,
+    type: "popup",
+    focused: true,
+    width: Math.max(420, Number(bounds.width) || 720),
+    height: Math.max(260, Number(bounds.height) || 435)
+  };
+  if (Number.isFinite(bounds.left)) options.left = bounds.left;
+  if (Number.isFinite(bounds.top)) options.top = bounds.top;
+  const popup = await chrome.windows.create(options);
+  videoPopupWindowId = popup?.id ?? null;
+  videoPopupTabId = popup?.tabs?.[0]?.id ?? null;
+}
+
+chrome.windows.onBoundsChanged?.addListener?.((window) => {
+  if (window.id !== videoPopupWindowId || window.state !== "normal") return;
+  if (videoPopupBoundsTimer) clearTimeout(videoPopupBoundsTimer);
+  videoPopupBoundsTimer = setTimeout(() => {
+    videoPopupBoundsTimer = null;
+    chrome.storage.local.set({
+      [VIDEO_POPUP_BOUNDS_KEY]: {
+        left: window.left,
+        top: window.top,
+        width: window.width,
+        height: window.height
+      }
+    });
+  }, 250);
+});
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (windowId !== videoPopupWindowId) return;
+  videoPopupWindowId = null;
+  videoPopupTabId = null;
+});
+
 async function sendDataCommand(command) {
   await chrome.storage.local.set({
     [DATA_COMMAND_KEY]: {
@@ -317,7 +479,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 function syncDisplayContextMenus() {
   chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, PANEL_OPEN_KEY, PANEL_HEARTBEAT_KEY], (result) => {
-    const displayOptionsEnabled = Boolean(result[PANEL_OPEN_KEY]) && Date.now() - Number(result[PANEL_HEARTBEAT_KEY] || 0) < HEARTBEAT_TTL_MS;
+    const displayOptionsEnabled = Boolean(result[PANEL_OPEN_KEY]);
     chrome.contextMenus.update("hideComments", {
       checked: Boolean(result[COMMENTS_MODE_KEY]),
       enabled: displayOptionsEnabled

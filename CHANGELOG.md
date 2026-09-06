@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.18 - 2026-09-06
+
+- Add series/playlist discovery and numbered episode cards, plus drag-to-group favorites.
+- Compare YouTube/Shelf subscriptions with progressive loading, copy arrows and context actions.
+- Refine compact navigation and loading indicators; prevent duplicate channel additions and preserve the current view on reset.
+- Stabilize YouTube display controls across extension updates.
+
 ## 3.3.17 - 2026-09-05
 
 - Normalize video view counts across all video lists and global search using compact labels such as 13k views and 1.2M views, accepting raw counts and English or French metadata.

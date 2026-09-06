@@ -1,3 +1,5 @@
+import { platform } from "./platform.js";
+
 const DEFAULT_LOCALE = "en";
 const SUPPORTED_LOCALES = new Set(["en", "fr"]);
 const TRANSLATION_OVERRIDES_KEY = "youtubeChannelShelfTranslationOverrides";
@@ -8,7 +10,7 @@ function normalizedLocale(value) {
 }
 
 async function loadMessages(locale) {
-  const url = chrome.runtime.getURL(`_locales/${locale}/messages.json`);
+  const url = platform.assetUrl(`_locales/${locale}/messages.json`);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Unable to load locale ${locale}`);
   return response.json();
@@ -39,7 +41,7 @@ function mergedMessages(base, overrides) {
 }
 
 export async function createI18n(preference = "auto") {
-  const browserLocale = chrome.i18n?.getUILanguage?.() || navigator.language || DEFAULT_LOCALE;
+  const browserLocale = platform.browserLanguage();
   const locale = preference === "auto" ? normalizedLocale(browserLocale) : normalizedLocale(preference);
   const packagedDefaultMessages = await loadMessages(DEFAULT_LOCALE);
   const packagedSelectedMessages = locale === DEFAULT_LOCALE

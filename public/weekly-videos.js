@@ -23,6 +23,7 @@ export function weeklyVideoSummary(channel, { rssVideos = [], youtubeVideos = []
         description: video.description || previous.description || "",
         tags: video.tags?.length ? video.tags : previous.tags || [],
         duration: video.duration || previous.duration || "",
+        ...(typeof (video.isShort ?? previous.isShort) === "boolean" ? { isShort: video.isShort ?? previous.isShort } : {}),
         views: video.views || video.viewCountText || previous.views || "",
         thumbnail: video.thumbnail || previous.thumbnail || ""
       });

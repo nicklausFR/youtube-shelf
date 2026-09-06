@@ -1,5 +1,48 @@
-if (!globalThis.__youtubeChannelShelfLiveInjected) {
-globalThis.__youtubeChannelShelfLiveInjected = true;
+(() => {
+const previous = globalThis.__youtubeChannelShelfLiveInjected;
+const version = chrome.runtime.getManifest().version;
+if (previous?.version === version && previous.active()) return;
+previous?.dispose?.();
+let disposed = false;
+const cleanup = [];
+function liveActive() {
+  if (!disposed && !chrome.runtime?.id) disposeLive();
+  return !disposed;
+}
+function disposeLive() {
+  if (disposed) return;
+  disposed = true;
+  for (const remove of cleanup.splice(0)) {
+    try { remove(); } catch { /* The old extension context may already be gone. */ }
+  }
+  stopTrackingVideo();
+  hideFullscreenEscapeHint();
+}
+function liveListener(target, type, listener, options) {
+  const guarded = (...args) => liveActive() ? listener(...args) : undefined;
+  target.addEventListener(type, guarded, options);
+  cleanup.push(() => target.removeEventListener(type, guarded, options));
+}
+function liveChromeListener(event, listener) {
+  const guarded = (...args) => liveActive() ? listener(...args) : undefined;
+  event.addListener(guarded);
+  cleanup.push(() => event.removeListener(guarded));
+}
+function liveInterval(callback, delay) {
+  const timer = window.setInterval(() => { if (liveActive()) callback(); }, delay);
+  cleanup.push(() => window.clearInterval(timer));
+}
+function liveTimeout(callback, delay) {
+  const cancel = () => window.clearTimeout(timer);
+  const timer = window.setTimeout(() => {
+    const index = cleanup.indexOf(cancel);
+    if (index >= 0) cleanup.splice(index, 1);
+    if (liveActive()) callback();
+  }, delay);
+  cleanup.push(cancel);
+  return timer;
+}
+globalThis.__youtubeChannelShelfLiveInjected = { version, active: liveActive, dispose: disposeLive };
 
 const COMMENTS_MODE_KEY = "youtubeChannelShelfHideComments";
 const SUGGESTIONS_MODE_KEY = "youtubeChannelShelfHideSuggestions";
@@ -8,7 +51,6 @@ const FOCUS_FULLSCREEN_EXITED_KEY = "youtubeChannelShelfFocusFullscreenExited";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const VIDEO_PROGRESS_KEY = "youtubeChannelShelfVideoProgress";
-const HEARTBEAT_TTL_MS = 2500;
 const VIDEO_PROGRESS_SAVE_INTERVAL_SECONDS = 5;
 const VIDEO_PROGRESS_MINIMUM_SECONDS = 5;
 const VIDEO_PROGRESS_FINISHED_SECONDS = 15;
@@ -28,6 +70,15 @@ let trackedVideoId = "";
 let lastSavedVideoSecond = -1;
 let restoreAttempted = false;
 let fullscreenHintTimer = 0;
+let youtubeShelfSubscriptionResultSent = false;
+let youtubeShelfSubscriptionResultSending = false;
+let youtubeShelfSubscriptionButtonClicked = false;
+let youtubeShelfConfirmationButtonClicked = false;
+let youtubeShelfSubscriptionFallbackTimer = 0;
+let youtubeShelfSubscriptionTargetChannelId = "";
+let youtubeShelfSubscriptionAction = "subscribe";
+let youtubeShelfSubscriptionStartedAt = 0;
+let youtubeShelfSubscriptionTargetRequestPending = false;
 
 const videoProgressReady = new Promise((resolve) => {
   chrome.storage.local.get(VIDEO_PROGRESS_KEY, (result) => {
@@ -123,6 +174,7 @@ async function restoreTrackedVideoProgress() {
   const video = trackedVideo;
   const videoId = trackedVideoId;
   await videoProgressReady;
+  if (!liveActive()) return;
   if (video !== trackedVideo || videoId !== trackedVideoId || restoreAttempted) return;
 
   const duration = Number(video.duration);
@@ -186,10 +238,14 @@ function trackCurrentVideo() {
 }
 
 function isPanelActuallyVisible() {
-  return panelOpen && Date.now() - panelHeartbeat < HEARTBEAT_TTL_MS;
+  return panelOpen;
 }
 
 function applyDisplayOptions() {
+  // Updating an extension invalidates its old content-script context without
+  // stopping timers in tabs that were already open. Leave the DOM to the new
+  // script instead of repeatedly applying stale display preferences.
+  if (!liveActive()) return;
   const active = isPanelActuallyVisible() || shelfFullscreenActive;
   document.documentElement.classList.toggle("yt-companion-panel-open", active);
   document.documentElement.classList.toggle("yt-companion-hide-comments", active && commentsModeEnabled);
@@ -231,11 +287,238 @@ function showFullscreenEscapeHint() {
 
 function scheduleFullscreenEscapeHint() {
   hideFullscreenEscapeHint();
-  fullscreenHintTimer = window.setTimeout(() => {
+  fullscreenHintTimer = liveTimeout(() => {
     fullscreenHintTimer = 0;
     if (document.fullscreenElement) showFullscreenEscapeHint();
   }, 3500);
 }
+
+function youtubeShelfSubscriptionFromCard(card) {
+  const data = card?.data || card?.__data?.data || {};
+  const dataId = data.channelId
+    || data.navigationEndpoint?.browseEndpoint?.browseId
+    || data.contentId
+    || "";
+  const links = [...card.querySelectorAll("a[href]")];
+  const link = links.find((item) => /\/(?:channel\/UC[-_a-zA-Z0-9]+|@[-_.a-zA-Z0-9]+|c\/|user\/)/.test(item.getAttribute("href") || ""));
+  if (!link && !/^UC[-_a-zA-Z0-9]+$/.test(dataId)) return null;
+  const url = link ? new URL(link.getAttribute("href"), location.origin).href : `https://www.youtube.com/channel/${dataId}`;
+  const id = /^UC[-_a-zA-Z0-9]+$/.test(dataId)
+    ? dataId
+    : url.match(/\/channel\/(UC[-_a-zA-Z0-9]+)/)?.[1] || "";
+  const title = String(
+    data.title?.simpleText
+    || data.title?.runs?.[0]?.text
+    || card.querySelector("#channel-title, #text-container, .yt-lockup-metadata-view-model__title")?.textContent
+    || link?.getAttribute("title")
+    || link?.textContent
+    || id
+  ).trim();
+  const image = card.querySelector("img");
+  return {
+    id,
+    url,
+    title,
+    thumbnail: image?.currentSrc || image?.src || ""
+  };
+}
+
+async function youtubeShelfReadSubscriptionsPage(requestId = "") {
+  if (location.pathname !== "/feed/channels") {
+    return { ok: false, error: "Open the YouTube subscriptions page first" };
+  }
+
+  const hasAccountAvatar = Boolean(document.querySelector("#avatar-btn, button[aria-label*='Account'], button[aria-label*='compte']"));
+  const channels = new Map();
+  let stablePasses = 0;
+  let previousSignature = "";
+
+  for (let pass = 0; pass < 60 && stablePasses < 4; pass += 1) {
+    const cards = document.querySelectorAll("ytd-channel-renderer, ytd-grid-channel-renderer, yt-lockup-view-model, ytd-rich-item-renderer");
+    for (const card of cards) {
+      const channel = youtubeShelfSubscriptionFromCard(card);
+      if (!channel?.url) continue;
+      channels.set(channel.id || channel.url, channel);
+    }
+    if (requestId && !previousSignature.startsWith(`${channels.size}:`)) {
+      Promise.resolve(chrome.runtime.sendMessage({
+        type: "YOUTUBE_SHELF_SUBSCRIPTIONS_PROGRESS", requestId, channels: [...channels.values()]
+      })).catch(() => {});
+    }
+    const signature = `${channels.size}:${document.documentElement.scrollHeight}`;
+    stablePasses = signature === previousSignature ? stablePasses + 1 : 0;
+    previousSignature = signature;
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await new Promise((resolve) => liveTimeout(resolve, 500));
+  }
+
+  window.scrollTo(0, 0);
+  if (!hasAccountAvatar && channels.size === 0) {
+    return { ok: false, signedIn: false, error: "Sign in to YouTube in this tab, then try again" };
+  }
+  return { ok: true, signedIn: true, channels: [...channels.values()] };
+}
+
+function youtubeShelfSubscriptionConfirmationChannelId() {
+  if (!youtubeShelfSubscriptionTargetChannelId && !youtubeShelfSubscriptionTargetRequestPending) {
+    youtubeShelfSubscriptionTargetRequestPending = true;
+    Promise.resolve(chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_GET_SUBSCRIPTION_AUTOMATION" }))
+      .then((response) => {
+        const channelId = String(response?.channelId || "");
+        if (/^UC[-_a-zA-Z0-9]+$/.test(channelId)) {
+          youtubeShelfSubscriptionTargetChannelId = channelId;
+          youtubeShelfSubscriptionAction = response.action === "unsubscribe" ? "unsubscribe" : "subscribe";
+          youtubeShelfSubscriptionStartedAt = Date.now();
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        youtubeShelfSubscriptionTargetRequestPending = false;
+      });
+  }
+  return youtubeShelfSubscriptionTargetChannelId;
+}
+
+function youtubeShelfSubscriptionIsConfirmed() {
+  if (document.querySelector("ytd-subscribe-button-renderer[subscribed], [subscribe-button-invisible][subscribed]")) return true;
+  return [...document.querySelectorAll("button, tp-yt-paper-button")].some((button) => {
+    const value = [button.textContent, button.getAttribute("aria-label"), button.getAttribute("title")]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    return /\bsubscribed\b|\bunsubscribe\b|se d\u00e9sabonner|(?:^|[^\p{L}])abonn\u00e9(?:e)?(?!\p{L})/iu.test(value);
+  });
+}
+
+function youtubeShelfButtonText(button) {
+  return [button?.textContent, button?.getAttribute?.("aria-label"), button?.getAttribute?.("title")]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function youtubeShelfIsSubscribeAction(button) {
+  return /^(subscribe|s[\u0027\u2019]abonner)(?:\s|$)/iu.test(youtubeShelfButtonText(button));
+}
+
+function youtubeShelfScheduleSubscriptionResult(delay) {
+  if (youtubeShelfSubscriptionFallbackTimer || youtubeShelfSubscriptionResultSent) return;
+  youtubeShelfSubscriptionFallbackTimer = liveTimeout(() => {
+    youtubeShelfSubscriptionFallbackTimer = 0;
+    youtubeShelfMonitorSubscriptionConfirmation();
+  }, delay);
+}
+
+function youtubeShelfClickSubscriptionConfirmation() {
+  const channelId = youtubeShelfSubscriptionConfirmationChannelId();
+  if (!channelId || youtubeShelfSubscriptionResultSent) return;
+
+  const dialogs = [...document.querySelectorAll("tp-yt-paper-dialog, ytd-popup-container")]
+    .filter((dialog) => dialog.getClientRects().length);
+  for (const dialog of dialogs) {
+    const confirmButton = [...dialog.querySelectorAll("button, tp-yt-paper-button")]
+      .find((button) => youtubeShelfIsSubscribeAction(button));
+    if (confirmButton && !youtubeShelfConfirmationButtonClicked) {
+      youtubeShelfConfirmationButtonClicked = true;
+      confirmButton.click();
+      youtubeShelfScheduleSubscriptionResult(900);
+      return;
+    }
+  }
+
+  if (youtubeShelfSubscriptionButtonClicked) return;
+  const subscribeRenderer = document.querySelector("ytd-subscribe-button-renderer:not([subscribed]), yt-subscribe-button-view-model");
+  const subscribeButton = subscribeRenderer?.querySelector("button, tp-yt-paper-button");
+  if (subscribeButton && youtubeShelfIsSubscribeAction(subscribeButton)) {
+    youtubeShelfSubscriptionButtonClicked = true;
+    subscribeButton.click();
+    youtubeShelfScheduleSubscriptionResult(1400);
+    return;
+  }
+}
+
+function youtubeShelfReportSubscriptionResult(status) {
+  const channelId = youtubeShelfSubscriptionConfirmationChannelId();
+  if (!channelId || youtubeShelfSubscriptionResultSent || youtubeShelfSubscriptionResultSending) return;
+  youtubeShelfSubscriptionResultSending = true;
+  Promise.resolve(chrome.runtime.sendMessage({
+    type: "YOUTUBE_SHELF_SUBSCRIPTION_RESULT",
+    status,
+    channelId
+  }))
+    .then((response) => {
+      if (response?.ok) {
+        youtubeShelfSubscriptionResultSent = true;
+        if (youtubeShelfSubscriptionFallbackTimer) {
+          window.clearTimeout(youtubeShelfSubscriptionFallbackTimer);
+          youtubeShelfSubscriptionFallbackTimer = 0;
+        }
+        return;
+      }
+      youtubeShelfScheduleSubscriptionResult(500);
+    })
+    .catch(() => youtubeShelfScheduleSubscriptionResult(500))
+    .finally(() => {
+      youtubeShelfSubscriptionResultSending = false;
+    });
+}
+
+function youtubeShelfClickUnsubscribe() {
+  const visible = (element) => element.getClientRects().length > 0;
+  const isUnsubscribe = (button) => /^(unsubscribe|se d[ée]sabonner)(?:\s|$)/iu.test(youtubeShelfButtonText(button));
+  const popupButtons = [...document.querySelectorAll("ytd-popup-container button, ytd-popup-container tp-yt-paper-item, tp-yt-paper-dialog button, tp-yt-paper-dialog tp-yt-paper-button")];
+  const confirm = popupButtons.find((button) => visible(button) && isUnsubscribe(button));
+  if (confirm) {
+    if (!youtubeShelfConfirmationButtonClicked) {
+      youtubeShelfConfirmationButtonClicked = true;
+      confirm.click();
+      liveTimeout(() => { youtubeShelfConfirmationButtonClicked = false; }, 700);
+    }
+    return;
+  }
+  const renderer = document.querySelector("ytd-subscribe-button-renderer, yt-subscribe-button-view-model");
+  const button = renderer?.querySelector("button, tp-yt-paper-button");
+  if (!youtubeShelfSubscriptionButtonClicked && button && visible(button) && !youtubeShelfIsSubscribeAction(button)) {
+    youtubeShelfSubscriptionButtonClicked = true;
+    button.click();
+  }
+}
+
+function youtubeShelfMonitorSubscriptionConfirmation() {
+  const channelId = youtubeShelfSubscriptionConfirmationChannelId();
+  if (!channelId || youtubeShelfSubscriptionResultSent) return;
+  // An operation belongs to the explicitly registered channel page only.
+  if (Date.now() - youtubeShelfSubscriptionStartedAt > 30000) {
+    youtubeShelfReportSubscriptionResult("cancelled");
+    return;
+  }
+  if (location.pathname !== `/channel/${channelId}`
+    && document.querySelector('meta[itemprop="channelId"]')?.content !== channelId) return;
+  if (youtubeShelfSubscriptionAction === "unsubscribe") {
+    const renderer = document.querySelector("ytd-subscribe-button-renderer, yt-subscribe-button-view-model");
+    const button = renderer?.querySelector("button, tp-yt-paper-button");
+    if (button && youtubeShelfIsSubscribeAction(button)) {
+      youtubeShelfReportSubscriptionResult("unsubscribed");
+      return;
+    }
+    youtubeShelfClickUnsubscribe();
+    return;
+  }
+  if (youtubeShelfSubscriptionIsConfirmed()) {
+    youtubeShelfReportSubscriptionResult("subscribed");
+    return;
+  }
+  youtubeShelfClickSubscriptionConfirmation();
+}
+
+liveListener(document, "click", (event) => {
+  if (!youtubeShelfSubscriptionConfirmationChannelId() || youtubeShelfSubscriptionResultSent) return;
+  const button = event.target.closest?.("button, tp-yt-paper-button");
+  const dialog = button?.closest?.("tp-yt-paper-dialog, ytd-popup-container");
+  if (!dialog || !/^(cancel|annuler)$/iu.test(button.textContent.trim())) return;
+  youtubeShelfReportSubscriptionResult("cancelled");
+}, true);
 
 chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY, PANEL_OPEN_KEY, PANEL_HEARTBEAT_KEY], (result) => {
   commentsModeEnabled = Boolean(result[COMMENTS_MODE_KEY]);
@@ -246,7 +529,7 @@ chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_
   applyDisplayOptions();
 });
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
+liveChromeListener(chrome.storage.onChanged, (changes, areaName) => {
   if (areaName !== "local") return;
   if (changes[VIDEO_PROGRESS_KEY]) {
     const stored = changes[VIDEO_PROGRESS_KEY].newValue;
@@ -270,7 +553,13 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   applyDisplayOptions();
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+liveChromeListener(chrome.runtime.onMessage, (message, _sender, sendResponse) => {
+  if (message?.type === "YOUTUBE_SHELF_READ_SUBSCRIPTIONS_PAGE") {
+    youtubeShelfReadSubscriptionsPage(message.requestId)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ ok: false, error: error.message || "Unable to read YouTube subscriptions" }));
+    return true;
+  }
   if (message?.type === "YOUTUBE_SHELF_PAUSE_VIDEO") {
     document.querySelector("video")?.pause();
     return;
@@ -283,8 +572,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         chrome.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: false });
         focusFullscreenKeyboardTarget();
         requestAnimationFrame(focusFullscreenKeyboardTarget);
-        window.setTimeout(focusFullscreenKeyboardTarget, 100);
-        window.setTimeout(focusFullscreenKeyboardTarget, 300);
+        liveTimeout(focusFullscreenKeyboardTarget, 100);
+        liveTimeout(focusFullscreenKeyboardTarget, 300);
         scheduleFullscreenEscapeHint();
         sendResponse({ ok: true });
       })
@@ -295,16 +584,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   commentsModeEnabled = Boolean(message.hideComments);
   suggestionsModeEnabled = message.hideSuggestions === undefined ? true : Boolean(message.hideSuggestions);
   focusPlayerModeEnabled = Boolean(message.focusPlayer);
-  if (message.panelOpen !== undefined) {
-    panelOpen = Boolean(message.panelOpen);
-  }
-  if (message.panelHeartbeat !== undefined) {
-    panelHeartbeat = Number(message.panelHeartbeat || 0);
-  }
   applyDisplayOptions();
 });
 
-document.addEventListener("fullscreenchange", () => {
+liveListener(document, "fullscreenchange", () => {
   if (document.fullscreenElement) return;
   hideFullscreenEscapeHint();
   if (!shelfFullscreenActive) return;
@@ -313,27 +596,27 @@ document.addEventListener("fullscreenchange", () => {
   applyDisplayOptions();
 });
 
-document.addEventListener("keydown", (event) => {
+liveListener(document, "keydown", (event) => {
   if (event.key !== "Escape" || !document.fullscreenElement) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   document.exitFullscreen().catch(() => {});
 }, true);
 
-document.addEventListener("pointerdown", () => {
+liveListener(document, "pointerdown", () => {
   if (!document.fullscreenElement) return;
-  window.setTimeout(hideFullscreenEscapeHint, 0);
+  liveTimeout(hideFullscreenEscapeHint, 0);
 }, true);
 
-window.setInterval(applyDisplayOptions, 1000);
-window.setInterval(trackCurrentVideo, 1000);
+liveInterval(trackCurrentVideo, 1000);
+liveInterval(youtubeShelfMonitorSubscriptionConfirmation, 400);
 
-document.addEventListener("yt-navigate-start", () => saveTrackedVideoProgress(true));
-document.addEventListener("yt-navigate-finish", trackCurrentVideo);
-document.addEventListener("visibilitychange", () => {
+liveListener(document, "yt-navigate-start", () => saveTrackedVideoProgress(true));
+liveListener(document, "yt-navigate-finish", trackCurrentVideo);
+liveListener(document, "visibilitychange", () => {
   if (document.visibilityState === "hidden") saveTrackedVideoProgress(true);
 });
-window.addEventListener("pagehide", () => saveTrackedVideoProgress(true));
+liveListener(window, "pagehide", () => saveTrackedVideoProgress(true));
 
 trackCurrentVideo();
-}
+})();

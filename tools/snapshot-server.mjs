@@ -21,7 +21,16 @@ const snapshotConfig = {
   categories: [
     { id: "tech", name: "Technology" },
     { id: "culture", name: "Culture" },
-    { id: "science", name: "Science" }
+    { id: "science", name: "Science" },
+    { id: "physics", name: "Physics", parentId: "science" },
+    { id: "space", name: "Space", parentId: "science" },
+    { id: "automotive", name: "Automotive" },
+    { id: "engineering", name: "Engineering" },
+    { id: "education", name: "Tutorials and education" },
+    { id: "metalworking", name: "Metalworking" },
+    { id: "politics", name: "Politics and analysis" },
+    { id: "travel", name: "Travel" },
+    { id: "woodworking", name: "Woodworking" }
   ],
   favoriteCategories: [
     { id: "learning", name: "Learning" },
@@ -54,7 +63,7 @@ const snapshotConfig = {
       metadataCheckedAt: isoDaysAgo(0.05),
       newVideosSeenAt: isoDaysAgo(8),
       feedVideos: [
-        { id: "snapdemo001", title: "Discover a Better Creative Workflow", published: isoDaysAgo(0.4), thumbnail: neutralThumbnail("#563a52", "#20283a") },
+        { id: "snapdemo001", isShort: true, title: "Discover a Better Creative Workflow", published: isoDaysAgo(0.4), thumbnail: neutralThumbnail("#563a52", "#20283a") },
         { id: "snapdemo002", title: "A Practical Guide in Ten Minutes", published: isoDaysAgo(2), thumbnail: neutralThumbnail("#36576a", "#222b3c") }
       ]
     },
@@ -205,6 +214,25 @@ const server = http.createServer(async (request, response) => {
           iframe { display: block; width: 420px; height: 900px; border: 0; }
         </style></head><body>
           <iframe src="/public/index.html?layout=${layout}" title="YouTube Shelf"></iframe>
+        </body></html>`;
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      response.end(capture);
+      return;
+    }
+    if ((request.url || "").split("?")[0] === "/__landscape-capture") {
+      const captureUrl = new URL(request.url || "/", "http://127.0.0.1");
+      const requestedWidth = Number.parseInt(captureUrl.searchParams.get("width") || "800", 10);
+      const requestedHeight = Number.parseInt(captureUrl.searchParams.get("height") || "360", 10);
+      const width = Math.min(1920, Math.max(700, requestedWidth || 800));
+      const height = Math.min(520, Math.max(240, requestedHeight || 360));
+      const capture = `<!doctype html>
+        <html><head><meta charset="utf-8"><style>
+          * { box-sizing: border-box; }
+          html, body { width: 100%; height: 100%; margin: 0; overflow: auto; background: #090a0d; }
+          body { display: grid; min-height: 100%; place-items: start center; padding: 12px; }
+          iframe { display: block; width: ${width}px; height: ${height}px; border: 1px solid #444; }
+        </style></head><body>
+          <iframe src="/public/index.html?layout=columns&amp;mode=page" title="YouTube Shelf landscape"></iframe>
         </body></html>`;
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       response.end(capture);

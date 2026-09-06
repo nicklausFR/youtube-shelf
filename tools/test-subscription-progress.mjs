@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+const app=readFileSync('public/app.js','utf8');
+let listener,resolveFinal,removed=false;const progress=[];
+const final=new Promise(resolve=>resolveFinal=resolve);
+const ctx=vm.createContext({crypto:{randomUUID:()=> 'scan-1'},openYoutubeSubscriptionsTab:async()=>({id:42}),normalizeYoutubeSubscription:item=>item.id?item:null,resolveDroppedChannelId:async()=> 'UC_resolved',waitForYoutubeTab:async()=>{},ensureYoutubeCompanion:async()=>{},chrome:{runtime:{onMessage:{addListener:fn=>listener=fn,removeListener:fn=>{assert.equal(fn,listener);removed=true;}}},tabs:{sendMessage:async()=>final}}});
+const start=app.indexOf('async function readSubscriptionsFromYoutubeTab(');
+vm.runInContext(app.slice(start,app.indexOf('async function checkYoutubeAccount(',start)),ctx);
+const reading=ctx.readSubscriptionsFromYoutubeTab(items=>progress.push(items));
+await new Promise(resolve => setImmediate(resolve));
+const message={type:'YOUTUBE_SHELF_SUBSCRIPTIONS_PROGRESS',requestId:'scan-1',channels:[{id:'UC_first',title:'First'}]};
+listener(message,{tab:{id:99}});assert.equal(progress.length,0);
+listener(message,{tab:{id:42}});assert.equal(progress.at(-1)[0].id,'UC_first');assert.equal(removed,false);
+listener(message,{tab:{id:42}});assert.equal(progress.length,1);
+resolveFinal({ok:true,channels:[...message.channels,{url:'https://www.youtube.com/@test',title:'Resolved'}]});
+const result=await reading;assert.equal(result.length,2);assert.equal(progress.at(-1).length,2);assert.equal(removed,true);
+console.log('Subscription stream: results before scan completion, sender isolation, deduplication, handle resolution, listener cleanup passed.');

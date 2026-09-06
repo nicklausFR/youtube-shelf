@@ -1,3 +1,5 @@
+import { rendererIsShort } from "./youtube-shorts.js";
+
 const YOUTUBE_ORIGIN = "https://www.youtube.com";
 const BROWSE_URL = `${YOUTUBE_ORIGIN}/youtubei/v1/browse?prettyPrint=false`;
 
@@ -70,14 +72,20 @@ function videoFromRenderer(renderer) {
   const duration = textFrom(renderer.lengthText) || renderer.thumbnailOverlays
     ?.map((overlay) => textFrom(overlay?.thumbnailOverlayTimeStatusRenderer?.text))
     .find(Boolean) || "";
+  const watchEndpoint = renderer.navigationEndpoint?.watchEndpoint || {};
   return {
     id,
     title: textFrom(renderer.title),
     published: relativeDateToIso(publishedText),
     publishedText,
     duration,
+    ...(rendererIsShort(renderer) ? { isShort: true } : {}),
     viewCountText: textFrom(renderer.viewCountText) || textFrom(renderer.shortViewCountText),
     thumbnail: normalizeThumbnailUrl(largestThumbnail(thumbnails) || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`),
+    ...(watchEndpoint.playlistId ? {
+      playlistId: watchEndpoint.playlistId,
+      playlistIndex: Number(watchEndpoint.index || 0)
+    } : {}),
     live: renderer.badges?.some((badge) => badge?.metadataBadgeRenderer?.style === "BADGE_STYLE_TYPE_LIVE_NOW") || false
   };
 }
@@ -92,14 +100,20 @@ function videoFromLockup(lockup) {
     ?.flatMap((overlay) => overlay?.thumbnailBottomOverlayViewModel?.badges || []) || [];
   const duration = badges.map((badge) => badge?.thumbnailBadgeViewModel?.text || "").find((value) => /\d/.test(value)) || "";
   const sources = lockup.contentImage?.thumbnailViewModel?.image?.sources || [];
+  const watchEndpoint = lockup.rendererContext?.commandContext?.onTap?.innertubeCommand?.watchEndpoint || {};
   return {
     id,
     title: String(lockup.metadata?.lockupMetadataViewModel?.title?.content || "").trim(),
     published: relativeDateToIso(publishedText),
     publishedText,
     duration,
+    ...(rendererIsShort(lockup) ? { isShort: true } : {}),
     viewCountText: metadataStrings.find((value) => /views?|watching/i.test(value)) || "",
     thumbnail: normalizeThumbnailUrl(largestThumbnail(sources) || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`),
+    ...(watchEndpoint.playlistId ? {
+      playlistId: watchEndpoint.playlistId,
+      playlistIndex: Number(watchEndpoint.index || 0)
+    } : {}),
     live: badges.some((badge) => badge?.thumbnailBadgeViewModel?.badgeStyle === "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE")
   };
 }
@@ -107,9 +121,14 @@ function videoFromLockup(lockup) {
 function collectPageData(node, state = { videos: [], ids: new Set(), continuation: "" }) {
   if (!node || typeof node !== "object") return state;
 
-  const renderer = node.videoRenderer || node.gridVideoRenderer;
+  const renderer = node.videoRenderer || node.gridVideoRenderer || node.playlistVideoRenderer;
   const video = renderer ? videoFromRenderer(renderer) : node.lockupViewModel ? videoFromLockup(node.lockupViewModel) : null;
   if (video?.id && !state.ids.has(video.id)) {
+    if (node.playlistVideoRenderer) {
+      video.playlistIndex = Number(textFrom(renderer.index)) || 0;
+      video.channel = textFrom(renderer.shortBylineText);
+      video.channelId = renderer.shortBylineText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || "";
+    }
     state.ids.add(video.id);
     state.videos.push(video);
   }
@@ -291,4 +310,18 @@ export async function fetchYoutubeChannelVideosPage(options = {}) {
     }
   }
   throw lastError;
+}
+
+export async function fetchYoutubePlaylistPage({ playlistId, continuation = "", fetchImpl = fetch } = {}) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(playlistId || "")) throw new Error("Invalid playlist identifier");
+  const clientVersion = await youtubeClientVersion(fetchImpl);
+  const body = requestBody(clientVersion, `VL${playlistId}`, continuation);
+  delete body.params;
+  const response = await postBrowse(fetchImpl, body, clientVersion);
+  const content = continuation ? continuationContent(response) : videosTabContent(response);
+  if (!content) throw new Error("Playlist unavailable");
+  const page = extractYoutubeVideosFromData(content);
+  const playlistTitle = textFrom(response.header?.playlistHeaderRenderer?.title)
+    || response.metadata?.playlistMetadataRenderer?.title || "";
+  return { ...page, playlistTitle, videos: page.videos.map((video) => ({ ...video, playlistId, playlistTitle })) };
 }

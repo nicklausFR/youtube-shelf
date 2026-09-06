@@ -100,6 +100,7 @@ for (const maxPages of [1, 10]) {
   };
   let saves = 0;
   const h = { allChannels: [{ id: "StarTalk", ...config }], activeChannel: null, weeklyVideoSummary,
+    weeklyShowShorts: true, youtubeShorts: { known: video => video.isShort },
     saveConfig: async () => { saves++; }, renderCategories: () => {}, activeView: "channels",
     channelMatchesWeeklyCategories: () => true, shouldGroupWeeklyVideos: () => false,
     videoWithChannel: v => v, Date: class extends Date { static now() { return now; } }

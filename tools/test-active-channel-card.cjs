@@ -1,0 +1,15 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const app=fs.readFileSync('public/app.js','utf8');
+const start=app.indexOf('function renderChannels(channels)');
+const end=app.indexOf('  if (!visibleChannels.length)',start);
+const active={id:'opened',title:'Opened channel'};
+let scope=false,videoMode=true;
+const ctx=vm.createContext({channelsEl:{classList:{remove(){}}},sortChannelsForDisplay:items=>[...items],isSelectedChannelSearchScope:()=>scope,filterChannelsForSearch:items=>items,activeChannel:active,channelSearchQuery:'',document:{body:{classList:{contains:()=>videoMode}}}});
+vm.runInContext(app.slice(start,end)+'return visibleChannels;}',ctx);
+assert.equal(ctx.renderChannels([])[0],active);
+assert.equal(ctx.renderChannels([{id:'other'}])[0],active);
+assert.equal(ctx.renderChannels([active]).length,1);
+videoMode=false;assert.equal(ctx.renderChannels([]).length,0);
+videoMode=true;ctx.channelSearchQuery='query';assert.equal(ctx.renderChannels([]).length,0);
+scope=true;assert.equal(ctx.renderChannels([])[0],active);
+console.log('Active channel card preserved across empty/category refreshes; no duplicates or interference with channel search.');

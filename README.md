@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Version 3.3.17</strong> · English and French · GPL-3.0-or-later
+  <strong>Version 3.3.18</strong> · English and French · GPL-3.0-or-later
 </p>
 
 YouTube Shelf keeps channels, recent uploads, favorite videos, and a personal watch-later list within reach while you browse YouTube. It runs as a narrow side panel or as a full-page workspace and does not require an account or a build step.
@@ -27,7 +27,8 @@ The extension remains a compact **420 px side panel** beside the current YouTube
 - Browse recent uploads by week, channel, or category.
 - Search YouTube without leaving the extension and add channels from the results.
 - Organize channels and favorites with ordered categories and subcategories.
-- Save favorite videos, add personal notes, and group multi-part series in sequence.
+- Save favorites, add notes, and merge videos by dropping one onto another favorite.
+- Find series/playlists by right-clicking a video; open the title badge for numbered episode cards and refresh for new parts.
 - Maintain a separate `Watch later` list.
 - Switch between thumbnails, columns, cards, titles, and compact-title layouts.
 - Sort channels and videos by name, date, subscribers, views, or date added.
@@ -121,6 +122,12 @@ The import/export dialog can:
 
 Keep exported backups private if they contain personal notes or viewing organization.
 
+### YouTube account (optional)
+
+The **YouTube account** dialog compares **YouTube ← → Shelf** in compact rows. Shelf appears immediately; **Check subscriptions** fills YouTube progressively. Arrows copy one or all missing channels without removing the source. Right-click to unsubscribe on YouTube, or remove/classify a Shelf channel. Checks use your existing YouTube session without accessing your password; optional history stays local.
+
+Compact channel cards, responsive icon tabs, and animated refresh controls keep navigation clear. Repeated channel additions are deduplicated, and weekly reset preserves the current view.
+
 ### WebDAV synchronization
 
 Open **Settings → WebDAV synchronization**, then enter the full URL of the synchronization file, your Nextcloud username, and a dedicated application password. The default filename is:
@@ -137,7 +144,7 @@ The newest configuration wins using its update timestamp, revision, and device i
 
 ## Privacy and permissions
 
-YouTube Shelf has no analytics and no mandatory remote account. Its regular network access is limited to the resources needed to read YouTube pages, channel feeds, thumbnails, and release information. Optional WebDAV access is requested only for the server origin chosen by the user.
+YouTube Shelf has no analytics and no mandatory remote account. Its regular network access is limited to the resources needed to read YouTube pages, channel feeds, thumbnails, and release information. Reading account subscriptions uses the existing `youtube.com` website session only after an explicit action, and optional WebDAV access is requested only for the server origin chosen by the user.
 
 The extension permissions are used to:
 
@@ -146,6 +153,7 @@ The extension permissions are used to:
 - adjust the YouTube page for focus and playback integration;
 - add toolbar context-menu actions;
 - access YouTube content and thumbnails;
+- read account subscriptions from an explicitly opened, signed-in YouTube tab;
 - check GitHub release metadata;
 - connect to an explicitly configured HTTPS WebDAV server.
 

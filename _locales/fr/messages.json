@@ -1,251 +1,935 @@
 {
-  "extensionName": { "message": "YouTube Shelf" },
-  "extensionDescription": { "message": "Recherchez sur YouTube, organisez vos chaînes, favoris et vidéos à regarder, ajoutez des notes et naviguez depuis un panneau latéral épuré." },
-  "settings": { "message": "Paramètres" },
-  "focusVideoPlayer": { "message": "Centrer le lecteur vidéo" },
-  "openFullPageMode": { "message": "Ouvrir en mode pleine page" },
-  "returnToSidePanel": { "message": "Revenir au panneau latéral" },
-  "back": { "message": "Retour" },
-  "forward": { "message": "Suivant" },
-  "searchYoutube": { "message": "Rechercher sur YouTube" },
-  "searchChannels": { "message": "Rechercher des chaînes" },
-  "searchChannel": { "message": "Rechercher une chaîne" },
-  "searchThisChannel": { "message": "Rechercher dans cette chaîne" },
-  "searchThisWeek": { "message": "Rechercher dans les vidéos de la semaine" },
-  "searchWatchLater": { "message": "Rechercher dans À regarder" },
-  "searchFavorites": { "message": "Rechercher dans les favoris" },
-  "youtube": { "message": "YouTube" },
-  "channels": { "message": "Chaînes" },
-  "watchLater": { "message": "À regarder" },
-  "favorites": { "message": "Favoris" },
-  "expandFavoriteGroup": { "message": "Afficher les $1 favoris groupés" },
-  "collapseFavoriteGroup": { "message": "Réduire le groupe de $1 favoris" },
-  "noFavoritesInCategory": { "message": "Aucun favori dans cette catégorie pour le moment." },
-  "noFavoritesYet": { "message": "Aucun favori pour le moment." },
-  "noFavoritesFound": { "message": "Aucun favori trouvé." },
-  "youtubeSignIn": { "message": "Connexion YouTube" },
-  "addChannelShort": { "message": "+ Chaîne" },
-  "addCategoryShort": { "message": "+ Catégorie" },
-  "refresh": { "message": "Actualiser" },
-  "classify": { "message": "Classer" },
-  "unsubscribe": { "message": "Se désabonner" },
-  "markAsWatchedQuestion": { "message": "Marquer comme regardée ?" },
-  "videoIsInWatchLater": { "message": "Cette vidéo est dans À regarder." },
-  "keepInWatchLater": { "message": "Conserver dans À regarder" },
-  "markAsWatched": { "message": "Marquer comme regardée" },
-  "personalNote": { "message": "Note personnelle" },
-  "cancel": { "message": "Annuler" },
-  "save": { "message": "Enregistrer" },
-  "close": { "message": "Fermer" },
-  "channelCategories": { "message": "Catégories de la chaîne" },
-  "newCategory": { "message": "Nouvelle catégorie" },
-  "categoryChannels": { "message": "Chaînes de la catégorie" },
-  "excludedFromNewVideos": { "message": "Exclues des nouvelles vidéos" },
-  "importExportSave": { "message": "Importer/exporter/sauvegarder" },
-  "exportShelfData": { "message": "Exporter/sauvegarder les données YouTube Shelf" },
-  "exportNewPipe": { "message": "Exporter pour NewPipe" },
-  "importShelfData": { "message": "Importer/restaurer les données YouTube Shelf" },
-  "importFreeTube": { "message": "Importer depuis FreeTube" },
-  "youtubeDisplay": { "message": "Affichage YouTube" },
-  "interfaceTheme": { "message": "Thème de l’interface" },
-  "themeAutomatic": { "message": "Automatique (système)" },
-  "themeLight": { "message": "Clair" },
-  "themeDark": { "message": "Sombre" },
-  "twoColumnsFrom": { "message": "Deux colonnes à partir de" },
-  "panelWidthPixels": { "message": "Largeur du panneau en pixels." },
-  "hideComments": { "message": "Masquer les commentaires" },
-  "hideSuggestions": { "message": "Masquer la liste des suggestions" },
-  "displayOptionsInactive": { "message": "Les options d’affichage de la page s’appliquent uniquement lorsque le panneau de l’extension est ouvert." },
-  "language": { "message": "Langue" },
-  "youtubeVideoTitles": { "message": "Titres des vidéos YouTube" },
-  "automaticTranslation": { "message": "Traduction automatique" },
-  "keepOriginalLanguage": { "message": "Conserver la langue d’origine" },
-  "originalLanguageHint": { "message": "La langue d’origine conserve le titre publié par le créateur lorsque YouTube le fournit." },
-  "shelfInterface": { "message": "Interface YouTube Shelf" },
-  "automaticBrowserLanguage": { "message": "Automatique (langue du navigateur)" },
-  "english": { "message": "Anglais" },
-  "french": { "message": "Français" },
-  "editInterfaceTranslations": { "message": "Modifier les traductions de l’interface" },
-  "translationEditor": { "message": "Éditeur des traductions de l’interface" },
-  "translationLanguage": { "message": "Langue à modifier" },
-  "translationEditorHint": { "message": "Les modifications sont enregistrées localement et ne modifient pas les fichiers intégrés à l’extension." },
-  "translationFile": { "message": "Fichier de traduction" },
-  "restoreOriginal": { "message": "Restaurer l’original" },
-  "saveAndApply": { "message": "Enregistrer et appliquer" },
-  "invalidTranslationFile": { "message": "Fichier de traduction invalide : $1" },
-  "translationLoadFailed": { "message": "Impossible de charger le fichier de traduction." },
-  "aboutShelf": { "message": "À propos de YouTube Shelf" },
-  "version": { "message": "Version" },
-  "currentVersion": { "message": "Version actuelle" },
-  "versionUpToDate": { "message": "$1, à jour" },
-  "latestVersion": { "message": "Dernière version" },
-  "checkingLatestVersion": { "message": "Vérification…" },
-  "latestVersionUnavailable": { "message": "Indisponible" },
-  "downloadLatestVersion": { "message": "Télécharger la dernière version" },
-  "backupBeforeUpdate": { "message": "Sauvegardez vos données YouTube Shelf avant la mise à jour." },
-  "createdBy": { "message": "Créé par" },
-  "license": { "message": "Licence" },
-  "openGithub": { "message": "Ouvrir le dépôt GitHub" },
-  "youtubeOptions": { "message": "Sniff YouTube" },
-  "sniffYoutubeMetadata": { "message": "Analyser les métadonnées YouTube" },
-  "sniffYoutubeHint": { "message": "Récupérer les descriptions, mots-clés et nombres de vidéos depuis les pages YouTube." },
-  "checkNewVideos": { "message": "Check des nouvelles vidéos des chaînes" },
-  "channelInformation": { "message": "Mise à jour des métadonnées des chaînes" },
-  "checkNewVideosHint": { "message": "Les chaînes sont vérifiées selon leur cadence de publication afin d’afficher les chaînes actives en premier." },
-  "minimumRssInterval": { "message": "Fréquence (minutes)" },
-  "metadataInterval": { "message": "Fréquence (jours)" },
-  "simultaneousChannelChecks": { "message": "Requêtes simultanées" },
-  "data": { "message": "Données" },
-  "synchronization": { "message": "Synchronisation" },
-  "cleanSlate": { "message": "Tout réinitialiser" },
-  "sniff": { "message": "Sniff" },
-  "display": { "message": "Affichage" },
-  "about": { "message": "À propos" },
-  "addChannel": { "message": "Ajouter une chaîne" },
-  "addToMyChannels": { "message": "Ajouter à mes chaînes" },
-  "addFavoriteVideo": { "message": "Ajouter une vidéo favorite" },
-  "addWatchLaterVideo": { "message": "Ajouter une vidéo à la liste À regarder" },
-  "youtubeVideoUrlOrId": { "message": "URL ou identifiant de vidéo YouTube" },
-  "invalidYoutubeVideoUrl": { "message": "Saisissez une URL ou un identifiant de vidéo YouTube valide." },
-  "searchYoutubeChannels": { "message": "Rechercher des chaînes YouTube" },
-  "search": { "message": "Rechercher" },
-  "addCategory": { "message": "Ajouter une catégorie" },
-  "addCategoryOrSubcategory": { "message": "Ajouter une catégorie ou une sous-catégorie" },
-  "parentCategory": { "message": "Catégorie parente" },
-  "noParentMainCategory": { "message": "Aucun parent — catégorie principale" },
-  "addSubcategoryTo": { "message": "Ajouter une sous-catégorie à $1" },
-  "categoryName": { "message": "Nom de la catégorie" },
-  "add": { "message": "Ajouter" },
-  "webdavSynchronization": { "message": "Synchronisation WebDAV" },
-  "webdavHint": { "message": "Synchroniser la configuration avec votre fichier WebDAV Nextcloud." },
-  "webdavFileUrl": { "message": "URL du fichier WebDAV" },
-  "username": { "message": "Nom d’utilisateur" },
-  "applicationPassword": { "message": "Mot de passe d’application" },
-  "status": { "message": "État" },
-  "notConfigured": { "message": "Non configuré" },
-  "testConnection": { "message": "Tester la connexion" },
-  "saveAndEnable": { "message": "Enregistrer et activer" },
-  "synchronizeNow": { "message": "Synchroniser maintenant" },
-  "disconnect": { "message": "Déconnecter et oublier les identifiants" },
-  "credentialsHint": { "message": "Les identifiants restent sur cet appareil et ne sont jamais inclus dans les exports ou les données synchronisées." },
-  "newVideos": { "message": "Nouvelles vidéos" },
-  "uncategorized": { "message": "Sans catégorie" },
-  "allChannels": { "message": "Toutes les chaînes" },
-  "thisWeek": { "message": "Cette semaine" },
-  "thisWeekInYourChannels": { "message": "Cette semaine dans vos chaînes" },
-  "refreshThisWeek": { "message": "Actualiser cette semaine" },
-  "weeklyFeedRefreshFailed": { "message": "Actualisation incomplète : $1 chaîne(s) n’ont pas pu être vérifiées. Les vidéos enregistrées restent affichées ; une nouvelle tentative sera automatique." },
-  "lastWeeklyRefresh": { "message": "Dernière actualisation" },
-  "weeklyFeedNeverRefreshed": { "message": "Le flux hebdomadaire n’a pas encore été actualisé" },
-  "hideThisWeekInYourChannels": { "message": "Masquer « Cette semaine dans vos chaînes »" },
-  "showThisWeekInYourChannels": { "message": "Afficher « Cette semaine dans vos chaînes »" },
-  "weeklyChannelCategories": { "message": "Catégories de chaînes à afficher" },
-  "allCategories": { "message": "Toutes les catégories" },
-  "groupWeeklyVideosByChannel": { "message": "Grouper les vidéos par chaîne" },
-  "ungroupWeeklyVideosByChannel": { "message": "Dégrouper les vidéos par chaîne" },
-  "weeklyChannelVideoCount": { "message": "$1 vidéos" },
-  "weeklyChannelOtherVideos": { "message": "$1 autres" },
-  "showWeeklyChannelVideos": { "message": "Afficher les $1 vidéos de cette chaîne" },
-  "hideWeeklyChannelVideos": { "message": "Masquer les $1 vidéos de cette chaîne" },
+  "connectYoutube": {
+    "message": "Compte YouTube"
+  },
+  "youtubeAccount": {
+    "message": "Compte YouTube"
+  },
+  "youtubeAccountIntro": {
+    "message": "Lire la page des abonnements avec le compte déjà connecté sur YouTube. Aucun projet Google Cloud ni accès OAuth n’est nécessaire."
+  },
+  "notConnected": {
+    "message": "Non connecté"
+  },
+  "voluntarySubscriptionTracking": {
+    "message": "Conserver un historique local des changements d’abonnements (suivi volontaire)"
+  },
+  "voluntarySubscriptionTrackingHint": {
+    "message": "Lorsque cette option est activée, les vérifications enregistrent les abonnements ajoutés et retirés sur cet appareil. La désactiver supprime cet historique."
+  },
+  "connect": {
+    "message": "Ouvrir les abonnements YouTube"
+  },
+  "checkSubscriptions": {
+    "message": "Vérifier les abonnements"
+  },
+  "addMissingSubscriptions": {
+    "message": "Ajouter à Shelf les abonnements manquants"
+  },
+  "disconnectYoutube": {
+    "message": "Oublier les données locales du compte"
+  },
+  "youtubeOauthPrivacy": {
+    "message": "YouTube Shelf lit cette page uniquement après votre action. L’extension ne reçoit jamais votre mot de passe et ne vous connecte ni ne vous déconnecte."
+  },
+  "bilateralSubscriptionSummary": {
+    "message": "$1 abonnements YouTube vérifiés le $2. $3 seulement sur YouTube ; $4 seulement dans Shelf."
+  },
+  "youtubeOnlySubscriptions": {
+    "message": "$1 seulement sur YouTube"
+  },
+  "shelfOnlySubscriptions": {
+    "message": "$1 seulement dans Shelf"
+  },
+  "youtubeShelfSubscriptionsAligned": {
+    "message": "YouTube et Shelf contiennent les mêmes chaînes."
+  },
+  "subscribeAllOnYoutube": {
+    "message": "S’abonner automatiquement à tout"
+  },
+  "automaticSubscriptionHint": {
+    "message": "Après cette action explicite, chaque confirmation YouTube est acceptée automatiquement, vérifiée, puis fermée avant de continuer."
+  },
+  "confirmYoutubeSubscription": {
+    "message": "Confirmez l’abonnement YouTube à $1."
+  },
+  "subscriptionQueueFinished": {
+    "message": "Séquence terminée : $1 abonnement(s) confirmé(s), $2 ignoré(s)."
+  },
+  "hideWeeklyShorts": {
+    "message": "Masquer les Shorts"
+  },
+  "showWeeklyShorts": {
+    "message": "Afficher les Shorts"
+  },
+  "extensionName": {
+    "message": "YouTube Shelf"
+  },
+  "extensionDescription": {
+    "message": "Recherchez sur YouTube, organisez vos chaînes, favoris et vidéos à regarder, ajoutez des notes et naviguez depuis un panneau latéral épuré."
+  },
+  "settings": {
+    "message": "Paramètres"
+  },
+  "focusVideoPlayer": {
+    "message": "Centrer le lecteur vidéo"
+  },
+  "openFullPageMode": {
+    "message": "Ouvrir en mode pleine page"
+  },
+  "returnToSidePanel": {
+    "message": "Revenir au panneau latéral"
+  },
+  "back": {
+    "message": "Retour"
+  },
+  "forward": {
+    "message": "Suivant"
+  },
+  "searchYoutube": {
+    "message": "Rechercher sur YouTube"
+  },
+  "searchChannels": {
+    "message": "Rechercher des chaînes"
+  },
+  "searchChannel": {
+    "message": "Rechercher une chaîne"
+  },
+  "searchThisChannel": {
+    "message": "Rechercher dans cette chaîne"
+  },
+  "searchThisWeek": {
+    "message": "Rechercher dans les vidéos de la semaine"
+  },
+  "searchWatchLater": {
+    "message": "Rechercher dans À regarder"
+  },
+  "searchFavorites": {
+    "message": "Rechercher dans les favoris"
+  },
+  "youtube": {
+    "message": "YouTube"
+  },
+  "channels": {
+    "message": "Chaînes"
+  },
+  "watchLater": {
+    "message": "À regarder"
+  },
+  "favorites": {
+    "message": "Favoris"
+  },
+  "expandFavoriteGroup": {
+    "message": "Afficher les $1 favoris groupés"
+  },
+  "collapseFavoriteGroup": {
+    "message": "Réduire le groupe de $1 favoris"
+  },
+  "expandWatchLaterGroup": {
+    "message": "Afficher les $1 vidéos de cette série"
+  },
+  "collapseWatchLaterGroup": {
+    "message": "Réduire cette série de $1 vidéos"
+  },
+  "videoSeriesPosition": {
+    "message": "Série $1/$2"
+  },
+  "videoSeriesPart": {
+    "message": "Série · Partie $1"
+  },
+  "videoSeriesDetected": {
+    "message": "Cette vidéo semble appartenir à une série."
+  },
+  "videoSeriesDetectedCount": {
+    "message": "$1 vidéos de cette série évolutive sont actuellement détectées."
+  },
+  "videoPlaylist": {
+    "message": "Playlist"
+  },
+  "videoPlaylistPosition": {
+    "message": "Playlist $1/$2"
+  },
+  "noFavoritesInCategory": {
+    "message": "Aucun favori dans cette catégorie pour le moment."
+  },
+  "noFavoritesYet": {
+    "message": "Aucun favori pour le moment."
+  },
+  "noFavoritesFound": {
+    "message": "Aucun favori trouvé."
+  },
+  "youtubeSignIn": {
+    "message": "Connexion YouTube"
+  },
+  "addChannelShort": {
+    "message": "+ Chaîne"
+  },
+  "addCategoryShort": {
+    "message": "+ Catégorie"
+  },
+  "refresh": {
+    "message": "Actualiser"
+  },
+  "classify": {
+    "message": "Classer"
+  },
+  "unsubscribe": {
+    "message": "Se désabonner"
+  },
+  "markAsWatchedQuestion": {
+    "message": "Marquer comme regardée ?"
+  },
+  "videoIsInWatchLater": {
+    "message": "Cette vidéo est dans À regarder."
+  },
+  "keepInWatchLater": {
+    "message": "Conserver dans À regarder"
+  },
+  "markAsWatched": {
+    "message": "Marquer comme regardée"
+  },
+  "personalNote": {
+    "message": "Note personnelle"
+  },
+  "cancel": {
+    "message": "Annuler"
+  },
+  "save": {
+    "message": "Enregistrer"
+  },
+  "close": {
+    "message": "Fermer"
+  },
+  "channelCategories": {
+    "message": "Catégories de la chaîne"
+  },
+  "newCategory": {
+    "message": "Nouvelle catégorie"
+  },
+  "categoryChannels": {
+    "message": "Chaînes de la catégorie"
+  },
+  "excludedFromNewVideos": {
+    "message": "Exclues des nouvelles vidéos"
+  },
+  "importExportSave": {
+    "message": "Importer/exporter/sauvegarder"
+  },
+  "exportShelfData": {
+    "message": "Exporter/sauvegarder les données YouTube Shelf"
+  },
+  "exportNewPipe": {
+    "message": "Exporter pour NewPipe"
+  },
+  "importShelfData": {
+    "message": "Importer/restaurer les données YouTube Shelf"
+  },
+  "importFreeTube": {
+    "message": "Importer depuis FreeTube"
+  },
+  "youtubeDisplay": {
+    "message": "Affichage YouTube"
+  },
+  "interfaceTheme": {
+    "message": "Thème de l’interface"
+  },
+  "themeAutomatic": {
+    "message": "Automatique (système)"
+  },
+  "themeLight": {
+    "message": "Clair"
+  },
+  "themeDark": {
+    "message": "Sombre"
+  },
+  "twoColumnsFrom": {
+    "message": "Deux colonnes à partir de"
+  },
+  "panelWidthPixels": {
+    "message": "Largeur du panneau en pixels."
+  },
+  "hideComments": {
+    "message": "Masquer les commentaires"
+  },
+  "hideSuggestions": {
+    "message": "Masquer la liste des suggestions"
+  },
+  "displayOptionsInactive": {
+    "message": "Les options d’affichage de la page s’appliquent uniquement lorsque le panneau de l’extension est ouvert."
+  },
+  "language": {
+    "message": "Langue"
+  },
+  "youtubeVideoTitles": {
+    "message": "Titres des vidéos YouTube"
+  },
+  "automaticTranslation": {
+    "message": "Traduction automatique"
+  },
+  "keepOriginalLanguage": {
+    "message": "Conserver la langue d’origine"
+  },
+  "originalLanguageHint": {
+    "message": "La langue d’origine conserve le titre publié par le créateur lorsque YouTube le fournit."
+  },
+  "shelfInterface": {
+    "message": "Interface YouTube Shelf"
+  },
+  "antiTranslateSuggestion": {
+    "message": "Sur les pages YouTube, YouTube Anti-Translate permet aussi de retrouver les titres et les pistes audio d’origine. Cette extension facultative s’installe séparément et se met à jour via votre navigateur."
+  },
+  "installAntiTranslate": {
+    "message": "Installer YouTube Anti-Translate"
+  },
+  "automaticBrowserLanguage": {
+    "message": "Automatique (langue du navigateur)"
+  },
+  "english": {
+    "message": "Anglais"
+  },
+  "french": {
+    "message": "Français"
+  },
+  "editInterfaceTranslations": {
+    "message": "Modifier les traductions de l’interface"
+  },
+  "translationEditor": {
+    "message": "Éditeur des traductions de l’interface"
+  },
+  "translationLanguage": {
+    "message": "Langue à modifier"
+  },
+  "translationEditorHint": {
+    "message": "Les modifications sont enregistrées localement et ne modifient pas les fichiers intégrés à l’extension."
+  },
+  "translationFile": {
+    "message": "Fichier de traduction"
+  },
+  "restoreOriginal": {
+    "message": "Restaurer l’original"
+  },
+  "saveAndApply": {
+    "message": "Enregistrer et appliquer"
+  },
+  "invalidTranslationFile": {
+    "message": "Fichier de traduction invalide : $1"
+  },
+  "translationLoadFailed": {
+    "message": "Impossible de charger le fichier de traduction."
+  },
+  "aboutShelf": {
+    "message": "À propos de YouTube Shelf"
+  },
+  "version": {
+    "message": "Version"
+  },
+  "currentVersion": {
+    "message": "Version actuelle"
+  },
+  "versionUpToDate": {
+    "message": "$1, à jour"
+  },
+  "latestVersion": {
+    "message": "Dernière version"
+  },
+  "checkingLatestVersion": {
+    "message": "Vérification…"
+  },
+  "latestVersionUnavailable": {
+    "message": "Indisponible"
+  },
+  "downloadLatestVersion": {
+    "message": "Télécharger la dernière version"
+  },
+  "backupBeforeUpdate": {
+    "message": "Sauvegardez vos données YouTube Shelf avant la mise à jour."
+  },
+  "createdBy": {
+    "message": "Créé par"
+  },
+  "license": {
+    "message": "Licence"
+  },
+  "openGithub": {
+    "message": "Ouvrir le dépôt GitHub"
+  },
+  "youtubeOptions": {
+    "message": "Sniff YouTube"
+  },
+  "sniffYoutubeMetadata": {
+    "message": "Analyser les métadonnées YouTube"
+  },
+  "sniffYoutubeHint": {
+    "message": "Récupérer les descriptions, mots-clés et nombres de vidéos depuis les pages YouTube."
+  },
+  "checkNewVideos": {
+    "message": "Check des nouvelles vidéos des chaînes"
+  },
+  "channelInformation": {
+    "message": "Mise à jour des métadonnées des chaînes"
+  },
+  "checkNewVideosHint": {
+    "message": "Les chaînes sont vérifiées selon leur cadence de publication afin d’afficher les chaînes actives en premier."
+  },
+  "minimumRssInterval": {
+    "message": "Fréquence (minutes)"
+  },
+  "metadataInterval": {
+    "message": "Fréquence (jours)"
+  },
+  "simultaneousChannelChecks": {
+    "message": "Requêtes simultanées"
+  },
+  "data": {
+    "message": "Données"
+  },
+  "synchronization": {
+    "message": "Synchronisation"
+  },
+  "cleanSlate": {
+    "message": "Tout réinitialiser"
+  },
+  "sniff": {
+    "message": "Sniff"
+  },
+  "display": {
+    "message": "Affichage"
+  },
+  "about": {
+    "message": "À propos"
+  },
+  "addChannel": {
+    "message": "Ajouter une chaîne"
+  },
+  "addToMyChannels": {
+    "message": "Ajouter à mes chaînes"
+  },
+  "addFavoriteVideo": {
+    "message": "Ajouter une vidéo favorite"
+  },
+  "addWatchLaterVideo": {
+    "message": "Ajouter une vidéo à la liste À regarder"
+  },
+  "youtubeVideoUrlOrId": {
+    "message": "URL ou identifiant de vidéo YouTube"
+  },
+  "invalidYoutubeVideoUrl": {
+    "message": "Saisissez une URL ou un identifiant de vidéo YouTube valide."
+  },
+  "searchYoutubeChannels": {
+    "message": "Rechercher des chaînes YouTube"
+  },
+  "search": {
+    "message": "Rechercher"
+  },
+  "addCategory": {
+    "message": "Ajouter une catégorie"
+  },
+  "addCategoryOrSubcategory": {
+    "message": "Ajouter une catégorie ou une sous-catégorie"
+  },
+  "parentCategory": {
+    "message": "Catégorie parente"
+  },
+  "noParentMainCategory": {
+    "message": "Aucun parent — catégorie principale"
+  },
+  "addSubcategoryTo": {
+    "message": "Ajouter une sous-catégorie à $1"
+  },
+  "categoryName": {
+    "message": "Nom de la catégorie"
+  },
+  "add": {
+    "message": "Ajouter"
+  },
+  "webdavSynchronization": {
+    "message": "Synchronisation WebDAV"
+  },
+  "webdavHint": {
+    "message": "Synchroniser la configuration avec votre fichier WebDAV Nextcloud."
+  },
+  "webdavFileUrl": {
+    "message": "URL du fichier WebDAV"
+  },
+  "username": {
+    "message": "Nom d’utilisateur"
+  },
+  "applicationPassword": {
+    "message": "Mot de passe d’application"
+  },
+  "status": {
+    "message": "État"
+  },
+  "notConfigured": {
+    "message": "Non configuré"
+  },
+  "testConnection": {
+    "message": "Tester la connexion"
+  },
+  "saveAndEnable": {
+    "message": "Enregistrer les identifiants et activer la synchronisation"
+  },
+  "synchronizeNow": {
+    "message": "Synchroniser maintenant"
+  },
+  "replaceDamagedRemoteFile": {
+    "message": "Remplacer le fichier distant endommagé par les données de cet appareil"
+  },
+  "disconnect": {
+    "message": "Déconnecter et oublier les identifiants"
+  },
+  "credentialsHint": {
+    "message": "Les identifiants restent sur cet appareil et ne sont jamais inclus dans les exports ou les données synchronisées."
+  },
+  "newVideos": {
+    "message": "Nouvelles vidéos"
+  },
+  "uncategorized": {
+    "message": "Sans catégorie"
+  },
+  "allChannels": {
+    "message": "Toutes les chaînes"
+  },
+  "thisWeek": {
+    "message": "Cette semaine"
+  },
+  "thisWeekInYourChannels": {
+    "message": "Cette semaine dans vos chaînes"
+  },
+  "refreshThisWeek": {
+    "message": "Actualiser cette semaine"
+  },
+  "weeklyFeedRefreshFailed": {
+    "message": "Actualisation incomplète : $1 chaîne(s) n’ont pas pu être vérifiées. Les vidéos enregistrées restent affichées ; une nouvelle tentative sera automatique."
+  },
+  "lastWeeklyRefresh": {
+    "message": "Dernière actualisation"
+  },
+  "weeklyFeedNeverRefreshed": {
+    "message": "Le flux hebdomadaire n’a pas encore été actualisé"
+  },
+  "hideThisWeekInYourChannels": {
+    "message": "Masquer « Cette semaine dans vos chaînes »"
+  },
+  "showThisWeekInYourChannels": {
+    "message": "Afficher « Cette semaine dans vos chaînes »"
+  },
+  "weeklyChannelCategories": {
+    "message": "Catégories de chaînes à afficher"
+  },
+  "allCategories": {
+    "message": "Toutes les catégories"
+  },
+  "groupWeeklyVideosByChannel": {
+    "message": "Grouper les vidéos par chaîne"
+  },
+  "ungroupWeeklyVideosByChannel": {
+    "message": "Dégrouper les vidéos par chaîne"
+  },
+  "weeklyChannelVideoCount": {
+    "message": "$1 vidéos"
+  },
+  "weeklyChannelOtherVideos": {
+    "message": "$1 autres"
+  },
+  "showWeeklyChannelVideos": {
+    "message": "Afficher les $1 vidéos de cette chaîne"
+  },
+  "hideWeeklyChannelVideos": {
+    "message": "Masquer les $1 vidéos de cette chaîne"
+  },
   "weeklyChannelGroupPosition": {
     "message": "Vidéos de cette chaîne : $1 sur $2",
     "description": "Info-bulle d’une vidéo hebdomadaire groupée par chaîne. $1 est sa position et $2 la taille du groupe."
   },
-  "sortBy": { "message": "Trier : $1" },
-  "sortRelevance": { "message": "Pertinence" },
-  "sortDefaultOrder": { "message": "Ordre par défaut" },
-  "sortTitleAscending": { "message": "Titre A–Z" },
-  "sortTitleDescending": { "message": "Titre Z–A" },
-  "sortLatestVideoFirst": { "message": "Dernière vidéo la plus récente" },
-  "sortOldestLatestVideoFirst": { "message": "Dernière vidéo la plus ancienne" },
-  "sortNewestFirst": { "message": "Plus récentes" },
-  "sortOldestFirst": { "message": "Plus anciennes" },
-  "sortDateAdded": { "message": "Date d’ajout" },
-  "sortMostConsulted": { "message": "Les plus consultés" },
-  "sortMostViewed": { "message": "Les plus de vues YouTube" },
-  "sortLeastViewed": { "message": "Moins vues" },
-  "sortMostSubscribers": { "message": "Plus d’abonnés" },
-  "sortLeastSubscribers": { "message": "Moins d’abonnés" },
-  "openThisWeek": { "message": "Ouvrir Cette semaine" },
-  "addPersonalNote": { "message": "Ajouter une note personnelle à propos de cette vidéo…" },
-  "showChannelIcons": { "message": "Afficher les icônes des chaînes" },
-  "sortResults": { "message": "Trier les résultats" },
-  "zoomOutList": { "message": "Réduire la liste" },
-  "zoomInList": { "message": "Agrandir la liste" },
-  "showVideoRows": { "message": "Afficher les vidéos en lignes" },
-  "export": { "message": "Exporter" },
-  "exportComplete": { "message": "Export terminé." },
-  "exportNewPipeHint": { "message": "Exporter les abonnements au format JSON NewPipe. Les groupes ne sont pas inclus." },
-  "selectShelfExport": { "message": "Sélectionnez l’export YouTube Shelf." },
-  "selectFreeTubeExport": { "message": "Sélectionnez l’export FreeTube." },
-  "chooseFile": { "message": "Choisir un fichier" },
-  "importing": { "message": "Importation..." },
-  "openingFilePicker": { "message": "Ouverture du sélecteur de fichiers..." },
-  "cleanSlateTitle": { "message": "Tout réinitialiser" },
-  "cleanSlateQuestion": { "message": "Supprimer tous les abonnements et toutes les données locales ?" },
-  "cleanSlateComplete": { "message": "Réinitialisation terminée." },
-  "invalidShelfFile": { "message": "Fichier YouTube Shelf invalide" },
-  "noChannelRecognized": { "message": "Aucune chaîne reconnue" },
-  "searchYoutubeEmpty": { "message": "Recherchez sur YouTube pour afficher des résultats." },
-  "searchingYoutube": { "message": "Recherche sur YouTube…" },
-  "youtubeChannelResult": { "message": "$1 résultat renvoyé par YouTube" },
-  "youtubeChannelResults": { "message": "$1 résultats renvoyés par YouTube" },
-  "noYoutubeVideoFound": { "message": "Aucune vidéo YouTube trouvée." },
-  "youtubeSearchSuggestions": { "message": "Suggestions de recherche YouTube" },
-  "addChannelHere": { "message": "Ajouter une chaîne ici" },
-  "addSubcategory": { "message": "Ajouter une sous-catégorie" },
-  "subcategories": { "message": "Sous-catégories" },
-  "all": { "message": "Toutes" },
-  "expandSubcategories": { "message": "Afficher les sous-catégories" },
-  "collapseSubcategories": { "message": "Masquer les sous-catégories" },
-  "renameCategory": { "message": "Renommer la catégorie" },
-  "deleteCategory": { "message": "Supprimer la catégorie" },
-  "rename": { "message": "Renommer" },
-  "confirmAction": { "message": "Confirmer l’action" },
-  "delete": { "message": "Supprimer" },
-  "openInNewTab": { "message": "Ouvrir dans un nouvel onglet" },
-  "editPersonalNote": { "message": "Modifier la note personnelle" },
-  "addPersonalNoteAction": { "message": "Ajouter une note personnelle" },
-  "addToCategory": { "message": "Ajouter à une catégorie" },
-  "removeFromFavorites": { "message": "Retirer des favoris" },
-  "removeSelectedFavorites": { "message": "Retirer les $1 favoris sélectionnés" },
-  "confirmRemoveSelectedFavorites": { "message": "Retirer des favoris les $1 vidéos sélectionnées ?" },
-  "favoritesAddedToCategory": { "message": "$1 favoris mis à jour." },
-  "removeFromWatchLater": { "message": "Retirer de À regarder" },
-  "markAsUnwatched": { "message": "Marquer comme non regardée" },
-  "excludeChannelFromNewVideos": { "message": "Exclure cette chaîne des nouvelles vidéos" },
-  "personalNoteSaved": { "message": "Note personnelle enregistrée." },
-  "personalNoteRemoved": { "message": "Note personnelle supprimée." },
-  "excludedChannels": { "message": "Chaînes exclues" },
-  "includeInNewVideos": { "message": "Inclure dans les nouvelles vidéos" },
-  "openYoutubeChannel": { "message": "Ouvrir la chaîne YouTube" },
-  "removeChannel": { "message": "Supprimer la chaîne" },
-  "resetWeeklyNew": { "message": "Mise à zéro" },
-  "restoreWeeklyList": { "message": "Réinitialiser la liste" },
-  "subscribeOnYoutube": { "message": "S’abonner sur YouTube" },
-  "ungroup": { "message": "Dégrouper" },
+  "sortBy": {
+    "message": "Trier : $1"
+  },
+  "sortRelevance": {
+    "message": "Pertinence"
+  },
+  "sortDefaultOrder": {
+    "message": "Ordre par défaut"
+  },
+  "sortTitleAscending": {
+    "message": "Titre A–Z"
+  },
+  "sortTitleDescending": {
+    "message": "Titre Z–A"
+  },
+  "sortLatestVideoFirst": {
+    "message": "Dernière vidéo la plus récente"
+  },
+  "sortOldestLatestVideoFirst": {
+    "message": "Dernière vidéo la plus ancienne"
+  },
+  "sortNewestFirst": {
+    "message": "Plus récentes"
+  },
+  "sortOldestFirst": {
+    "message": "Plus anciennes"
+  },
+  "sortDateAdded": {
+    "message": "Date d’ajout"
+  },
+  "sortMostConsulted": {
+    "message": "Les plus consultés"
+  },
+  "sortMostViewed": {
+    "message": "Les plus de vues YouTube"
+  },
+  "sortLeastViewed": {
+    "message": "Moins vues"
+  },
+  "sortMostSubscribers": {
+    "message": "Plus d’abonnés"
+  },
+  "sortLeastSubscribers": {
+    "message": "Moins d’abonnés"
+  },
+  "openThisWeek": {
+    "message": "Ouvrir Cette semaine"
+  },
+  "addPersonalNote": {
+    "message": "Ajouter une note personnelle à propos de cette vidéo…"
+  },
+  "showChannelIcons": {
+    "message": "Afficher les icônes des chaînes"
+  },
+  "sortResults": {
+    "message": "Trier les résultats"
+  },
+  "zoomOutList": {
+    "message": "Réduire la liste"
+  },
+  "zoomInList": {
+    "message": "Agrandir la liste"
+  },
+  "showVideoRows": {
+    "message": "Afficher les vidéos en lignes"
+  },
+  "export": {
+    "message": "Exporter"
+  },
+  "exportComplete": {
+    "message": "Export terminé."
+  },
+  "exportNewPipeHint": {
+    "message": "Exporter les abonnements au format JSON NewPipe. Les groupes ne sont pas inclus."
+  },
+  "selectShelfExport": {
+    "message": "Sélectionnez l’export YouTube Shelf."
+  },
+  "selectFreeTubeExport": {
+    "message": "Sélectionnez l’export FreeTube."
+  },
+  "chooseFile": {
+    "message": "Choisir un fichier"
+  },
+  "importing": {
+    "message": "Importation..."
+  },
+  "openingFilePicker": {
+    "message": "Ouverture du sélecteur de fichiers..."
+  },
+  "cleanSlateTitle": {
+    "message": "Tout réinitialiser"
+  },
+  "cleanSlateQuestion": {
+    "message": "Supprimer tous les abonnements et toutes les données locales ?"
+  },
+  "cleanSlateComplete": {
+    "message": "Réinitialisation terminée."
+  },
+  "invalidShelfFile": {
+    "message": "Fichier YouTube Shelf invalide"
+  },
+  "noChannelRecognized": {
+    "message": "Aucune chaîne reconnue"
+  },
+  "searchYoutubeEmpty": {
+    "message": "Recherchez sur YouTube pour afficher des résultats."
+  },
+  "searchingYoutube": {
+    "message": "Recherche sur YouTube…"
+  },
+  "youtubeChannelResult": {
+    "message": "$1 résultat renvoyé par YouTube"
+  },
+  "youtubeChannelResults": {
+    "message": "$1 résultats renvoyés par YouTube"
+  },
+  "noYoutubeVideoFound": {
+    "message": "Aucune vidéo YouTube trouvée."
+  },
+  "youtubeSearchSuggestions": {
+    "message": "Suggestions de recherche YouTube"
+  },
+  "addChannelHere": {
+    "message": "Ajouter une chaîne ici"
+  },
+  "addSubcategory": {
+    "message": "Ajouter une sous-catégorie"
+  },
+  "subcategories": {
+    "message": "Sous-catégories"
+  },
+  "all": {
+    "message": "Toutes"
+  },
+  "expandSubcategories": {
+    "message": "Afficher les sous-catégories"
+  },
+  "collapseSubcategories": {
+    "message": "Masquer les sous-catégories"
+  },
+  "renameCategory": {
+    "message": "Renommer la catégorie"
+  },
+  "deleteCategory": {
+    "message": "Supprimer la catégorie"
+  },
+  "rename": {
+    "message": "Renommer"
+  },
+  "confirmAction": {
+    "message": "Confirmer l’action"
+  },
+  "delete": {
+    "message": "Supprimer"
+  },
+  "openInNewTab": {
+    "message": "Ouvrir dans un nouvel onglet"
+  },
+  "openInPopup": {
+    "message": "Ouvrir dans une popup"
+  },
+  "editPersonalNote": {
+    "message": "Modifier la note personnelle"
+  },
+  "addPersonalNoteAction": {
+    "message": "Ajouter une note personnelle"
+  },
+  "addToCategory": {
+    "message": "Ajouter à une catégorie"
+  },
+  "removeFromFavorites": {
+    "message": "Retirer des favoris"
+  },
+  "removeSelectedFavorites": {
+    "message": "Retirer les $1 favoris sélectionnés"
+  },
+  "confirmRemoveSelectedFavorites": {
+    "message": "Retirer des favoris les $1 vidéos sélectionnées ?"
+  },
+  "favoritesAddedToCategory": {
+    "message": "$1 favoris mis à jour."
+  },
+  "removeFromWatchLater": {
+    "message": "Retirer de À regarder"
+  },
+  "markAsUnwatched": {
+    "message": "Marquer comme non regardée"
+  },
+  "excludeChannelFromNewVideos": {
+    "message": "Exclure cette chaîne des nouvelles vidéos"
+  },
+  "personalNoteSaved": {
+    "message": "Note personnelle enregistrée."
+  },
+  "personalNoteRemoved": {
+    "message": "Note personnelle supprimée."
+  },
+  "excludedChannels": {
+    "message": "Chaînes exclues"
+  },
+  "includeInNewVideos": {
+    "message": "Inclure dans les nouvelles vidéos"
+  },
+  "openYoutubeChannel": {
+    "message": "Ouvrir la chaîne YouTube"
+  },
+  "removeChannel": {
+    "message": "Supprimer la chaîne"
+  },
+  "resetWeeklyNew": {
+    "message": "Mise à zéro"
+  },
+  "restoreWeeklyList": {
+    "message": "Réinitialiser la liste"
+  },
+  "subscribeOnYoutube": {
+    "message": "S’abonner sur YouTube"
+  },
+  "ungroup": {
+    "message": "Dégrouper"
+  },
   "favoriteGroupPosition": {
     "message": "Groupe de favoris : $1 sur $2",
     "description": "Info-bulle d’une vidéo favorite groupée. $1 est sa position et $2 la taille du groupe."
   },
-  "searchingYoutubeFor": { "message": "Recherche sur YouTube pour « $1 »…" },
-  "loadingMoreResults": { "message": "Chargement de résultats supplémentaires…" },
-  "loadMoreResults": { "message": "Charger $1 résultats supplémentaires" },
-  "unableToLoadMoreYoutubeResults": { "message": "Impossible de charger plus de résultats YouTube : $1" },
-  "youtubeSearchHeader": { "message": "Recherche YouTube : $1" },
-  "youtubeSearchFailed": { "message": "Échec de la recherche YouTube : $1" },
-  "noYoutubeResultFound": { "message": "Aucun résultat YouTube trouvé." },
-  "searchFailed": { "message": "Échec de la recherche : $1" },
-  "channel": { "message": "Chaîne" },
-  "searching": { "message": "Recherche en cours…" },
-  "noChannelFound": { "message": "Aucune chaîne trouvée." },
-  "networkMeterLabel": { "message": "Activité des données YouTube" },
-  "networkMeterTooltip": { "message": "$1 requêtes, environ $2 transférés" },
-  "youtubeTab": { "message": "Onglet YouTube" },
-  "blank": { "message": "Blank" },
-  "embeddedVideoUnavailable": { "message": "Cette vidéo ne peut pas être lue ici" },
-  "embeddedVideoBlockedByOwner": { "message": "Cette chaîne n’autorise pas la lecture de cette vidéo dans un lecteur intégré." },
-  "embeddedVideoYoutubeOnly": { "message": "YouTube impose de regarder cette vidéo directement sur YouTube." },
-  "openInCleanYoutubeView": { "message": "Regarder dans l’affichage YouTube épuré" },
-  "fullscreenEscapeClickHint": { "message": "Cliquez sur la vidéo, puis appuyez sur Échap pour quitter le plein écran." }
+  "watchLaterGroupPosition": {
+    "message": "Série : vidéo $1 sur $2",
+    "description": "Info-bulle d’une vidéo À regarder groupée. $1 est sa position et $2 la taille actuelle de la série."
+  },
+  "searchingYoutubeFor": {
+    "message": "Recherche sur YouTube pour « $1 »…"
+  },
+  "loadingMoreResults": {
+    "message": "Chargement de résultats supplémentaires…"
+  },
+  "loadMoreResults": {
+    "message": "Charger $1 résultats supplémentaires"
+  },
+  "unableToLoadMoreYoutubeResults": {
+    "message": "Impossible de charger plus de résultats YouTube : $1"
+  },
+  "youtubeSearchHeader": {
+    "message": "Recherche YouTube : $1"
+  },
+  "youtubeSearchFailed": {
+    "message": "Échec de la recherche YouTube : $1"
+  },
+  "noYoutubeResultFound": {
+    "message": "Aucun résultat YouTube trouvé."
+  },
+  "searchFailed": {
+    "message": "Échec de la recherche : $1"
+  },
+  "channel": {
+    "message": "Chaîne"
+  },
+  "searching": {
+    "message": "Recherche en cours…"
+  },
+  "loading": {
+    "message": "Chargement…"
+  },
+  "noChannelFound": {
+    "message": "Aucune chaîne trouvée."
+  },
+  "networkMeterLabel": {
+    "message": "Activité des données YouTube"
+  },
+  "networkMeterTooltip": {
+    "message": "$1 requêtes, environ $2 transférés"
+  },
+  "youtubeTab": {
+    "message": "Onglet YouTube"
+  },
+  "blank": {
+    "message": "Blank"
+  },
+  "embeddedVideoUnavailable": {
+    "message": "Cette vidéo ne peut pas être lue ici"
+  },
+  "embeddedVideoBlockedByOwner": {
+    "message": "Cette chaîne n’autorise pas la lecture de cette vidéo dans un lecteur intégré."
+  },
+  "embeddedVideoYoutubeOnly": {
+    "message": "YouTube impose de regarder cette vidéo directement sur YouTube."
+  },
+  "openInCleanYoutubeView": {
+    "message": "Regarder dans l’affichage YouTube épuré"
+  },
+  "fullscreenEscapeClickHint": {
+    "message": "Cliquez sur la vidéo, puis appuyez sur Échap pour quitter le plein écran."
+  },
+  "seriesButton": {
+    "message": "Série"
+  },
+  "seriesOpen": {
+    "message": "Afficher la playlist ou la série détectée"
+  },
+  "seriesClose": {
+    "message": "Fermer"
+  },
+  "seriesRefresh": {
+    "message": "Actualiser"
+  },
+  "seriesFavorite": {
+    "message": "Ajouter aux favoris"
+  },
+  "seriesWatchLater": {
+    "message": "À regarder plus tard"
+  },
+  "seriesLoading": {
+    "message": "Recherche des épisodes sur YouTube…"
+  },
+  "seriesLoadingCount": {
+    "message": "$1 vidéos trouvées — chargement…"
+  },
+  "seriesMissingChannel": {
+    "message": "Chaîne inconnue : ajoutez la vidéo avec sa chaîne pour rechercher les autres épisodes."
+  },
+  "seriesIncomplete": {
+    "message": "YouTube a répété une page ; la liste peut être incomplète."
+  },
+  "seriesPlaylistComplete": {
+    "message": "$1 vidéos accessibles · liste actualisée depuis YouTube."
+  },
+  "seriesDetectedComplete": {
+    "message": "$1 vidéos détectées par titre · appartenance déduite, à vérifier. Actualisez ou rouvrez pour rechercher les nouveaux épisodes."
+  },
+  "seriesLoadError": {
+    "message": "Liste partielle ou en cache — échec de l’actualisation : $1"
+  },
+  "seriesContextSearch": {
+    "message": "Rechercher une série / playlist"
+  },
+  "accountTableCaption": {
+    "message": "Une chaîne par ligne. Gérez chaque côté indépendamment."
+  },
+  "accountAddAll": {
+    "message": "Ajouter tout ($1)"
+  },
+  "accountRemoveAll": {
+    "message": "Supprimer tout ($1)"
+  },
+  "accountConfirmRemoveAll": {
+    "message": "Supprimer les $1 chaînes de $2 ?"
+  },
+  "accountPresent": {
+    "message": "Présente"
+  },
+  "accountAbsent": {
+    "message": "Absente"
+  },
+  "accountAdd": {
+    "message": "Ajouter"
+  },
+  "accountRemove": {
+    "message": "Supprimer"
+  },
+  "accountUnsubscribing": {
+    "message": "Désabonnement sur YouTube : $1"
+  },
+  "accountAll": {
+    "message": "Tout"
+  },
+  "accountCopyAllTo": {
+    "message": "Copier toutes les chaînes manquantes vers $1 ; conserver la source"
+  },
+  "accountRemoveAllFrom": {
+    "message": "Supprimer toutes les chaînes de $1"
+  },
+  "accountCopyTo": {
+    "message": "Copier $1 vers $2 ; conserver la source"
+  },
+  "accountRemoveFrom": {
+    "message": "Supprimer $1 de $2"
+  },
+  "listLoading": {
+    "message": "Chargement…"
+  },
+  "refreshChannelList": {
+    "message": "Actualiser les vidéos de la chaîne"
+  },
+  "listUpToDate": {
+    "message": "Aucune actualisation nécessaire"
+  },
+  "accountTransfer": {
+    "message": "Copier entre YouTube et YouTube Shelf"
+  }
 }

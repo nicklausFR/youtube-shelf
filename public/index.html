@@ -28,18 +28,19 @@
       <form id="searchForm" class="topSearchForm" role="search">
         <input id="searchInput" type="search" placeholder="Search YouTube" autocomplete="off" aria-label="Search YouTube" aria-autocomplete="list" aria-controls="globalSearchResults" aria-expanded="false">
       </form>
-      <button id="networkSniffer" class="networkSnifferButton" type="button" aria-label="Extension network activity">
-        <img class="networkSnifferImage" src="../icons/network-sniffer.png" alt="">
-      </button>
       <div id="globalSearchResults" class="globalSearchResults" role="listbox" aria-label="YouTube search suggestions" hidden></div>
     </header>
 
     <nav class="primaryTabs" aria-label="Main sections">
-      <button class="primaryTab is-active" type="button" data-section="youtube" aria-current="page">YouTube</button>
-      <button class="primaryTab" type="button" data-section="channels">Channels</button>
-      <button class="primaryTab" type="button" data-section="favorites">Favorites</button>
-      <button class="primaryTab" type="button" data-section="watchLater">Watch later</button>
+      <button class="primaryTab is-active" type="button" data-section="youtube" aria-current="page" title="YouTube" aria-label="YouTube"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m10 8 6 4-6 4Z"/></svg></button>
+      <button class="primaryTab" type="button" data-section="channels" title="Channels" aria-label="Channels"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M7 21h10"/></svg></button>
+      <button class="primaryTab" type="button" data-section="favorites" title="Favorites" aria-label="Favorites"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
+      <button class="primaryTab" type="button" data-section="watchLater" title="Watch later" aria-label="Watch later"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
     </nav>
+
+    <div id="appLoading" class="appLoading" role="status" aria-label="Loading…">
+      <span class="appLoadingSpinner" aria-hidden="true"></span>
+    </div>
 
     <header class="mainbar" aria-label="Navigation">
       <div class="leftTools">
@@ -49,7 +50,7 @@
       </div>
 
       <div class="rightTools">
-        <a class="signinButton" href="https://www.youtube.com/signin" target="_blank">YouTube sign in</a>
+        <button id="youtubeAccount" class="signinButton" type="button">YouTube account</button>
       </div>
     </header>
 
@@ -288,6 +289,10 @@
           </select>
         </label>
         <p class="modalHint">Original language keeps the title published by the video creator whenever YouTube provides it.</p>
+        <aside class="languageExtensionSuggestion" aria-label="YouTube Anti-Translate">
+          <p class="modalHint">On YouTube pages, YouTube Anti-Translate can also restore original titles and audio tracks. This optional extension is installed separately and updated by your browser.</p>
+          <a class="modalButton secondary languageExtensionLink" href="https://chromewebstore.google.com/detail/youtube-anti-translate/ndpmhjnlfkgfalaieeneneenijondgag" target="_blank" rel="noopener noreferrer">Install YouTube Anti-Translate</a>
+        </aside>
         <label class="modalSelectField" for="interfaceLanguageOption">
           <span>YouTube Shelf interface</span>
           <select id="interfaceLanguageOption">
@@ -364,6 +369,33 @@
         </section>
         <div class="modalActions">
           <button id="closeYoutubeDataOptions" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="youtubeAccountPrompt" class="modalOverlay" hidden>
+      <div class="modal youtubeAccountModal" role="dialog" aria-modal="true" aria-labelledby="youtubeAccountTitle">
+        <h2 id="youtubeAccountTitle">YouTube account</h2>
+        <p class="youtubeAccountContextHint">Clic droit sur une chaîne : supprimer · classer côté Shelf.</p>
+        <div class="youtubeAccountStatusRow">
+          <strong id="youtubeAccountStatus">Not connected</strong>
+          <div class="youtubeAccountActions">
+            <button id="connectYoutubeAccount" class="modalButton primary" type="button">Open YouTube subscriptions</button>
+            <button id="checkYoutubeSubscriptions" class="modalButton secondary" type="button" disabled>Check subscriptions</button>
+          </div>
+        </div>
+        <div id="youtubeAccountComparison" class="youtubeAccountComparison" hidden></div>
+        <details class="youtubeAccountSettings">
+          <summary>Options</summary>
+          <label class="modalCheckbox youtubeTrackingOption">
+            <input id="youtubeTrackingEnabled" type="checkbox" />
+            <span>Keep a local history of subscription changes (voluntary tracking)</span>
+          </label>
+          <button id="disconnectYoutubeAccount" class="modalButton secondary" type="button" disabled>Forget local account data</button>
+        </details>
+        <button id="importYoutubeSubscriptions" type="button" hidden disabled>Add missing subscriptions to Shelf</button>
+        <div class="modalActions">
+          <button id="closeYoutubeAccount" class="modalButton secondary" type="button">Close</button>
         </div>
       </div>
     </div>
