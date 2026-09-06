@@ -36,6 +36,20 @@ The screenshot below shows the side panel at **420 px** width.
 
 ## Interface
 
+### Main sections
+
+| YouTube / weekly uploads | Channels |
+| --- | --- |
+| <img src="docs/screenshots/youtube-shelf-current-weekly.png" alt="YouTube tab with weekly uploads, search and refresh"> | <img src="docs/screenshots/youtube-shelf-panel-channels.png" alt="Channels, categories and age badges"> |
+
+| Favorites | Watch later |
+| --- | --- |
+| <img src="docs/screenshots/youtube-shelf-panel-favorites.png" alt="Favorites with categories, subcategories and personal notes"> | <img src="docs/screenshots/youtube-shelf-panel-watch-later.png" alt="Watch later with personal notes and video cards"> |
+
+Favorites use ordered categories and subcategories.
+
+Search, sorting, notes, bulk selection and drag-and-drop grouping complement these views. On YouTube, clicking the dimmed weekly label clears the search and returns to weekly uploads.
+
 ### Full-page workspace
 
 The toolbar button switches between the browser side panel and a larger workspace. Video playback remains available inside full-page mode.
@@ -57,20 +71,6 @@ Each list can use thumbnails only, adaptive columns, a single column, titles onl
 #### Compact titles with small thumbnails
 
 ![Compact video titles with small thumbnails](docs/screenshots/youtube-shelf-panel-compact-titles.png)
-
-### Main sections
-
-| YouTube / weekly uploads | Channels |
-| --- | --- |
-| <img src="docs/screenshots/youtube-shelf-current-weekly.png" alt="YouTube tab with weekly uploads, search and refresh"> | <img src="docs/screenshots/youtube-shelf-panel-channels.png" alt="Channels, categories and age badges"> |
-
-| Favorites | Watch later |
-| --- | --- |
-| <img src="docs/screenshots/youtube-shelf-panel-favorites.png" alt="Favorites with categories, subcategories and personal notes"> | <img src="docs/screenshots/youtube-shelf-panel-watch-later.png" alt="Watch later with personal notes and video cards"> |
-
-Favorites use ordered categories and subcategories.
-
-Search, sorting, notes, bulk selection and drag-and-drop grouping complement these views. On YouTube, clicking the dimmed weekly label clears the search and returns to weekly uploads.
 
 <details>
 <summary>Series and playlist discovery</summary>

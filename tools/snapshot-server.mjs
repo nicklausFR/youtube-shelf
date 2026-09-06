@@ -118,6 +118,22 @@ const snapshotConfig = {
   updatedAt: new Date(now).toISOString()
 };
 
+// Fictional channels showing category and subcategory organization.
+for (const [index, title, category] of [
+  [1, "Physics in Practice", "physics"],
+  [2, "The Night Sky", "space"],
+  [3, "Small Lab Experiments", "physics"],
+  [4, "Exploring the Solar System", "space"]
+]) {
+  snapshotConfig.channels.push({
+    id: `UC_SNAPSHOT_SCIENCE_${index}`, title,
+    thumbnail: neutralThumbnail("#374d58", "#1c232a"),
+    categories: ["science", category],
+    feedLatestPublished: isoDaysAgo(index),
+    feedCheckedAt: isoDaysAgo(0.05), metadataCheckedAt: isoDaysAgo(0.05),
+    newVideosSeenAt: isoDaysAgo(8), feedVideos: []
+  });
+}
 // Enough fictional uploads to demonstrate dense and multi-column layouts.
 const extraTitles = [
   "Choosing the Right Tools for a Small Workshop", "Light and Color in Everyday Photography",
@@ -134,7 +150,7 @@ extraTitles.forEach((title, index) => {
     duration: "12:34", views: "24k views" });
 });
 snapshotConfig.channels.forEach((channel, index) => {
-  channel.subscriberCountText = ["128k subscribers", "84k subscribers", "256k subscribers"][index];
+  channel.subscriberCountText = ["128k subscribers", "84k subscribers", "256k subscribers"][index % 3];
 });
 
 const bootstrap = `
@@ -184,6 +200,7 @@ const bootstrap = `
     localStorage.setItem('channelListMode:newVideos', snapshotLayout);
     localStorage.setItem('channelListMode:watchLater', snapshotLayout);
     localStorage.setItem('channelListMode:channelVideos', snapshotLayout);
+    localStorage.setItem('channelListMode:favorites', snapshotLayout);
   }
   localStorage.setItem('youtubeChannelShelfInterfaceLanguage', 'en');
   localStorage.setItem('youtubeChannelShelfTheme', 'dark');

@@ -16,6 +16,7 @@ const base = 'http://127.0.0.1:4173';
       if (url === base + '/public/app.js') {
         const hooks = `
           globalThis.readmeCapture = {
+            channels() { showChannelListState("science"); },
             favorites() { activeFavoriteCategoryId="music"; renderFavoritesHome(); },
             series() {
               const thumb = allChannels[0].thumbnail;
@@ -42,32 +43,40 @@ const base = 'http://127.0.0.1:4173';
       await page.locator('.newVideos .video').first().waitFor();
       await page.evaluate(()=>document.fonts.ready);
     }
+    async function show(section) {
+      await page.locator(`[data-section="${section}"]`).click();
+      if (section === 'favorites') await page.evaluate(()=>readmeCapture.favorites());
+      if (section === 'channels') await page.evaluate(()=>readmeCapture.channels());
+      await page.locator(section === 'channels' ? '.channel' : '.video').first().waitFor();
+      await page.evaluate(()=>document.fonts.ready);
+    }
     for (const layout of ['icons','columns','single','titles','compactTitles']) {
       await open(layout, layout === "columns" ? 720 : 420);
+      if (layout !== 'icons') await show('favorites');
       const suffix=layout==='compactTitles'?'compact-titles':layout;
       await capture('youtube-shelf-panel-'+suffix+'.png');
     }
     await open('columns');
     await capture('youtube-shelf-current-weekly.png');
-    await page.locator('[data-section="channels"]').click();
-    await page.locator('.channel').first().waitFor();
+    await show('channels');
     await capture('youtube-shelf-panel-channels.png');
     await capture('youtube-shelf-current-channels.png');
-    await page.locator('[data-section="favorites"]').click();
-    await page.evaluate(()=>readmeCapture.favorites());
-    await page.locator('.video').first().waitFor();
+    await show('favorites');
     await capture('youtube-shelf-panel-favorites.png');
     await page.locator('[data-section="watchLater"]').click();
     await page.locator('.video').first().waitFor();
     await capture('youtube-shelf-panel-watch-later.png');
     await open('columns',1280,800,true);
+    await show('favorites');
     await capture('youtube-shelf-full-page.png');
     await open('columns',1080,700);
+    await show('channels');
     await capture('youtube-shelf-wide.png');
     await open('columns',360,800);
+    await show('favorites');
     await capture('youtube-shelf-narrow.png');
     await page.setViewportSize({width:1920,height:900});
-    await page.goto(base+'/__side-panel-context?panel=youtube-shelf-panel-single.png');
+    await page.goto(base+'/__side-panel-context?panel=youtube-shelf-panel-channels.png');
     await page.locator('.panel img').waitFor();
     await page.waitForFunction(()=>[...document.images].every(image=>image.complete));
     await capture('youtube-shelf-side-panel-context.png');

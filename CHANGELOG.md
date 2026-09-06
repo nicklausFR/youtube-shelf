@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.21 - 2026-09-06
+
+- Keep the active tab and selected category when switching between the side panel and full-page mode, including during video transfer.
+- Make the upper zoom controls resize categories and the active channel card, while the lower controls resize the video list.
+- Reorganize the README and refresh screenshots to show channel and favorite categories and subcategories.
+
 ## 3.3.20 - 2026-09-06
 
 - Separate browser-specific APIs from application logic to prepare future browser and web/PWA ports; Chromium remains the only implemented target.

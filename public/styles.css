@@ -723,12 +723,21 @@ body.webMode .globalYoutubeSearch.channelSearch {
 
 .channels {
   --list-zoom: 1;
+  zoom: var(--shelf-list-zoom, 1);
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 0;
   padding-right: 12px;
   width: 100%;
+}
+
+#videos {
+  zoom: var(--shelf-list-zoom, 1);
+}
+
+body.sidePanelVideos.hasActiveChannel:not(.isChannelSearching) .channels {
+  zoom: var(--shelf-category-zoom, 1);
 }
 
 .categories {

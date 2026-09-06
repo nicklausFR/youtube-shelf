@@ -3359,6 +3359,7 @@ function syncCategoryZoomButtons() {
 
 function applyCategoryZoom() {
   categoryZoom = clampCategoryZoom(categoryZoom);
+  document.documentElement.style.setProperty("--shelf-category-zoom", String(categoryZoom));
   sidePanelPathEl?.style.setProperty("--category-path-zoom", String(categoryZoom));
   localStorage.setItem(CATEGORY_ZOOM_KEY, String(categoryZoom));
   syncCategoryZoomButtons();
@@ -3601,9 +3602,7 @@ function clampListZoom(value) {
 
 function applyListZoom() {
   listZoom = clampListZoom(listZoom);
-  channelsEl.style.setProperty("--list-zoom", String(listZoom));
-  channelsEl.style.zoom = String(listZoom);
-  channelsEl.style.width = "100%";
+  document.documentElement.style.setProperty("--shelf-list-zoom", String(listZoom));
   localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
   const percent = Math.round(listZoom * 100);
   channelZoomOutEl?.toggleAttribute("disabled", listZoom <= LIST_ZOOM_MIN);
@@ -4558,11 +4557,9 @@ function currentModeHandoffEntry() {
       : { type: "youtubeHome", id: "youtube" };
   }
 
-  const current = historyStack[historyIndex];
-  if (current?.type === "video") {
-    return historyStack[historyIndex - 1] || currentShelfBaseHistoryEntry();
-  }
-  return current || currentShelfBaseHistoryEntry();
+  // Tab changes do not always add a history entry. Transfer the visible state,
+  // rather than an entry that may still describe another tab.
+  return channelSearchHistoryEntry();
 }
 
 async function writeModeHandoff(target, options = {}) {
@@ -4571,6 +4568,7 @@ async function writeModeHandoff(target, options = {}) {
     [MODE_HANDOFF_KEY]: {
       target,
       createdAt: Date.now(),
+      section: activePrimarySection,
       entry: currentModeHandoffEntry(),
       videoId: options.videoId || "",
       videoStart: Number(options.videoStart) || 0,
@@ -10900,6 +10898,7 @@ loadChannels().then(async () => {
   }
   const modeHandoff = initialModeHandoff;
   if (modeHandoff?.entry) {
+    setActivePrimarySection(modeHandoff.section);
     historyStack = [modeHandoff.entry];
     if (expectsTransferredVideo) {
       // The transferred video is already being presented by showPlayerView().
