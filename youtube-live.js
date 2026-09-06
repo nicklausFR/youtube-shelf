@@ -1,12 +1,13 @@
 (() => {
+const host = globalThis.YouTubeShelfHosts.createHost();
 const previous = globalThis.__youtubeChannelShelfLiveInjected;
-const version = chrome.runtime.getManifest().version;
+const version = host.runtime.getManifest().version;
 if (previous?.version === version && previous.active()) return;
 previous?.dispose?.();
 let disposed = false;
 const cleanup = [];
 function liveActive() {
-  if (!disposed && !chrome.runtime?.id) disposeLive();
+  if (!disposed && !host.runtime?.id) disposeLive();
   return !disposed;
 }
 function disposeLive() {
@@ -81,7 +82,7 @@ let youtubeShelfSubscriptionStartedAt = 0;
 let youtubeShelfSubscriptionTargetRequestPending = false;
 
 const videoProgressReady = new Promise((resolve) => {
-  chrome.storage.local.get(VIDEO_PROGRESS_KEY, (result) => {
+  host.storage.local.get(VIDEO_PROGRESS_KEY, (result) => {
     const stored = result[VIDEO_PROGRESS_KEY];
     videoProgress = stored && typeof stored === "object" ? stored : {};
     if (removeExpiredVideoProgress()) persistVideoProgress();
@@ -135,7 +136,7 @@ function trimVideoProgress() {
 
 function persistVideoProgress() {
   trimVideoProgress();
-  chrome.storage.local.set({ [VIDEO_PROGRESS_KEY]: videoProgress });
+  host.storage.local.set({ [VIDEO_PROGRESS_KEY]: videoProgress });
 }
 
 function forgetVideoProgress(videoId) {
@@ -280,7 +281,7 @@ function showFullscreenEscapeHint() {
   const hint = document.createElement("div");
   hint.id = FULLSCREEN_HINT_ID;
   hint.className = "youtubeShelfFullscreenHint";
-  hint.textContent = chrome.i18n.getMessage("fullscreenEscapeClickHint")
+  hint.textContent = host.i18n.getMessage("fullscreenEscapeClickHint")
     || "Click the video, then press Escape to exit full screen.";
   (document.querySelector("#movie_player") || document.body || document.documentElement).append(hint);
 }
@@ -341,7 +342,7 @@ async function youtubeShelfReadSubscriptionsPage(requestId = "") {
       channels.set(channel.id || channel.url, channel);
     }
     if (requestId && !previousSignature.startsWith(`${channels.size}:`)) {
-      Promise.resolve(chrome.runtime.sendMessage({
+      Promise.resolve(host.runtime.sendMessage({
         type: "YOUTUBE_SHELF_SUBSCRIPTIONS_PROGRESS", requestId, channels: [...channels.values()]
       })).catch(() => {});
     }
@@ -362,7 +363,7 @@ async function youtubeShelfReadSubscriptionsPage(requestId = "") {
 function youtubeShelfSubscriptionConfirmationChannelId() {
   if (!youtubeShelfSubscriptionTargetChannelId && !youtubeShelfSubscriptionTargetRequestPending) {
     youtubeShelfSubscriptionTargetRequestPending = true;
-    Promise.resolve(chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_GET_SUBSCRIPTION_AUTOMATION" }))
+    Promise.resolve(host.runtime.sendMessage({ type: "YOUTUBE_SHELF_GET_SUBSCRIPTION_AUTOMATION" }))
       .then((response) => {
         const channelId = String(response?.channelId || "");
         if (/^UC[-_a-zA-Z0-9]+$/.test(channelId)) {
@@ -442,7 +443,7 @@ function youtubeShelfReportSubscriptionResult(status) {
   const channelId = youtubeShelfSubscriptionConfirmationChannelId();
   if (!channelId || youtubeShelfSubscriptionResultSent || youtubeShelfSubscriptionResultSending) return;
   youtubeShelfSubscriptionResultSending = true;
-  Promise.resolve(chrome.runtime.sendMessage({
+  Promise.resolve(host.runtime.sendMessage({
     type: "YOUTUBE_SHELF_SUBSCRIPTION_RESULT",
     status,
     channelId
@@ -520,7 +521,7 @@ liveListener(document, "click", (event) => {
   youtubeShelfReportSubscriptionResult("cancelled");
 }, true);
 
-chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY, PANEL_OPEN_KEY, PANEL_HEARTBEAT_KEY], (result) => {
+host.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY, PANEL_OPEN_KEY, PANEL_HEARTBEAT_KEY], (result) => {
   commentsModeEnabled = Boolean(result[COMMENTS_MODE_KEY]);
   suggestionsModeEnabled = result[SUGGESTIONS_MODE_KEY] === undefined ? true : Boolean(result[SUGGESTIONS_MODE_KEY]);
   focusPlayerModeEnabled = Boolean(result[FOCUS_PLAYER_MODE_KEY]);
@@ -529,7 +530,7 @@ chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_
   applyDisplayOptions();
 });
 
-liveChromeListener(chrome.storage.onChanged, (changes, areaName) => {
+liveChromeListener(host.storage.onChanged, (changes, areaName) => {
   if (areaName !== "local") return;
   if (changes[VIDEO_PROGRESS_KEY]) {
     const stored = changes[VIDEO_PROGRESS_KEY].newValue;
@@ -553,7 +554,7 @@ liveChromeListener(chrome.storage.onChanged, (changes, areaName) => {
   applyDisplayOptions();
 });
 
-liveChromeListener(chrome.runtime.onMessage, (message, _sender, sendResponse) => {
+liveChromeListener(host.runtime.onMessage, (message, _sender, sendResponse) => {
   if (message?.type === "YOUTUBE_SHELF_READ_SUBSCRIPTIONS_PAGE") {
     youtubeShelfReadSubscriptionsPage(message.requestId)
       .then(sendResponse)
@@ -569,7 +570,7 @@ liveChromeListener(chrome.runtime.onMessage, (message, _sender, sendResponse) =>
     Promise.resolve(document.documentElement.requestFullscreen())
       .then(() => {
         shelfFullscreenActive = true;
-        chrome.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: false });
+        host.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: false });
         focusFullscreenKeyboardTarget();
         requestAnimationFrame(focusFullscreenKeyboardTarget);
         liveTimeout(focusFullscreenKeyboardTarget, 100);
@@ -592,7 +593,7 @@ let restoringFullscreenPanel = false;
 function restoreFullscreenPanel() {
   if (!restorePanelAfterFullscreen || restoringFullscreenPanel) return;
   restoringFullscreenPanel = true;
-  Promise.resolve(chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_RESTORE_AFTER_FULLSCREEN" }))
+  Promise.resolve(host.runtime.sendMessage({ type: "YOUTUBE_SHELF_RESTORE_AFTER_FULLSCREEN" }))
     .then((result) => { if (result?.ok) restorePanelAfterFullscreen = false; })
     .catch(() => {})
     .finally(() => { restoringFullscreenPanel = false; });
@@ -601,7 +602,7 @@ function restoreFullscreenPanel() {
 liveListener(document, "fullscreenchange", () => {
   if (document.fullscreenElement) {
     // Both the YouTube player and Shelf's focus mode can own fullscreen.
-    Promise.resolve(chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_NATIVE_FULLSCREEN" }))
+    Promise.resolve(host.runtime.sendMessage({ type: "YOUTUBE_SHELF_NATIVE_FULLSCREEN" }))
       .then((result) => { restorePanelAfterFullscreen = Boolean(result?.restorePanel); })
       .catch(() => {});
     return;
@@ -610,7 +611,7 @@ liveListener(document, "fullscreenchange", () => {
   restoreFullscreenPanel();
   if (!shelfFullscreenActive) return;
   shelfFullscreenActive = false;
-  chrome.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: true });
+  host.storage.local.set({ [FOCUS_FULLSCREEN_EXITED_KEY]: true });
   applyDisplayOptions();
 });
 

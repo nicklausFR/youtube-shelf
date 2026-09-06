@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const source=readFileSync('youtube-live.js','utf8');
 let calls=0,allowed=false;
-const ctx=vm.createContext({chrome:{runtime:{sendMessage:async()=>{calls++;return {ok:allowed};}}}});
+const ctx=vm.createContext({host:{runtime:{sendMessage:async()=>{calls++;return {ok:allowed};}}}});
 const start=source.indexOf('let restorePanelAfterFullscreen =');
 vm.runInContext(source.slice(start,source.indexOf('liveListener(document, "fullscreenchange"',start)),ctx);
 ctx.restoreFullscreenPanel();assert.equal(calls,0);

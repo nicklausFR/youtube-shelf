@@ -5,39 +5,34 @@
 </p>
 
 <p align="center">
-  A private, local-first YouTube organizer for Chromium side panels.
+  English and French · GPL-3.0-or-later
 </p>
 
-<p align="center">
-  <strong>Version 3.3.19</strong> · English and French · GPL-3.0-or-later
-</p>
+YouTube Shelf brings channels, recent videos, favorites, and a watch-later list together in a compact interface with search, filtering, and sorting options. Channels and favorites can be organized into categories and subcategories, descriptions can be added, and videos can be grouped into series.
 
-YouTube Shelf keeps channels, recent uploads, favorite videos, and a personal watch-later list within reach while you browse YouTube. It runs as a narrow side panel or as a full-page workspace and does not require an account or a build step.
+Currently only available for Chromium-based browsers, it opens in a side panel or a full-page view with adjustable layouts. Subscriptions can be copied in either direction between Shelf and a YouTube account. Data is stored locally, with optional WebDAV synchronization across multiple computers.
 
 > All screenshots below show the current interface, using fictional channels, videos and placeholder thumbnails. The YouTube page in contextual captures is deliberately blurred.
 
-## Preview
+## Side panel
 
-The extension remains a compact **420 px side panel** beside the current YouTube video.
+The screenshot below shows the side panel at **420 px** width.
 
 ![YouTube Shelf displayed as a narrow side panel beside a blurred YouTube video](docs/screenshots/youtube-shelf-side-panel-context.png)
 
-## Highlights
+## Features
 
-- Browse recent uploads by week, channel, or category.
-- Search YouTube without leaving the extension and add channels from the results.
-- Organize channels and favorites with ordered categories and subcategories.
-- Save favorites, add notes, and merge videos by dropping one onto another favorite.
-- Find series/playlists by right-clicking a video; open the title badge for numbered episode cards and refresh for new parts.
-- Maintain a separate `Watch later` list.
-- Switch between thumbnails, columns, cards, titles, and compact-title layouts.
-- Sort channels and videos by name, date, subscribers, views, or date added.
-- Select multiple favorites for bulk category assignment or deletion.
-- Resume YouTube playback from locally saved positions for up to seven days.
-- Focus the YouTube player by hiding comments or suggestions.
-- Use the interface in English or French.
-- Export backups, import YouTube Shelf or FreeTube data, and export subscriptions for NewPipe.
-- Optionally synchronize content between browsers through WebDAV or Nextcloud.
+- Channel search and recent uploads filtered by week, channel, or category.
+- Ordered categories and subcategories for channels and favorites.
+- Favorites with notes, drag-and-drop grouping, and bulk category assignment or deletion.
+- Separate `Watch later` list.
+- Series and playlist discovery with numbered episode lists.
+- Configurable display modes and sorting by name, date, subscribers, views, or date added.
+- Local playback positions retained for up to seven days.
+- YouTube page controls for hiding comments or suggestions.
+- English and French interface translations.
+- JSON backup and restore, FreeTube subscription import, and NewPipe subscription export.
+- Optional WebDAV/Nextcloud synchronization.
 
 ## Interface
 
@@ -73,14 +68,14 @@ Each list can use thumbnails only, adaptive columns, a single column, titles onl
 | --- | --- |
 | <img src="docs/screenshots/youtube-shelf-panel-favorites.png" alt="Favorites with categories, subcategories and personal notes"> | <img src="docs/screenshots/youtube-shelf-panel-watch-later.png" alt="Watch later with personal notes and video cards"> |
 
-Favorites support large, ordered category trees. In this example, **Music** contains **Live sessions**, **Albums**, **Production**, and **Music theory**.
+Favorites use ordered categories and subcategories.
 
 Search, sorting, notes, bulk selection and drag-and-drop grouping complement these views. On YouTube, clicking the dimmed weekly label clears the search and returns to weekly uploads.
 
 <details>
 <summary>Series and playlist discovery</summary>
 
-Right-click a video to discover related parts, then open its title badge to view numbered episodes. Refresh the list as new parts appear.
+Right-click a video to search for related parts, then open its title badge to view numbered episodes.
 
 <img src="docs/screenshots/youtube-shelf-current-series.png" width="600" alt="Series list with numbers over thumbnails">
 
@@ -97,7 +92,9 @@ YouTube Shelf adapts from a narrow browser panel to a wide layout. The four icon
 
 ## Installation
 
-YouTube Shelf currently supports Chromium-based browsers. Firefox compatibility is planned.
+The current target is Chromium (Brave, Chrome, Edge). Firefox support is not implemented.
+
+The project is structured to allow future versions for other browsers or a web/PWA version.
 
 1. Download or clone this repository.
 2. Open the extension management page for your browser:
@@ -111,14 +108,14 @@ YouTube Shelf currently supports Chromium-based browsers. Firefox compatibility 
 
 Updates installed from this repository are manual: replace the files, then use **Reload** on the browser's extension management page.
 
-## Quick start
+## Usage
 
 1. Open YouTube Shelf from the browser toolbar.
 2. Search for a channel or paste a supported YouTube channel URL.
 3. Add the channel and optionally assign one or more categories.
 4. Open **YouTube** to browse recent videos.
 5. Use the star action to save a video under **Favorites**, or add it to **Watch later**.
-6. Use the display and sorting controls above each list to tailor the view.
+6. Configure display mode and sorting using the controls above each list.
 
 YouTube fullscreen hides Shelf and restores it on exit; if the browser requires a gesture, the next page click restores it.
 
@@ -141,9 +138,7 @@ Keep exported backups private if they contain personal notes or viewing organiza
 
 ### YouTube account (optional)
 
-The **YouTube account** dialog compares **YouTube ← → Shelf** in compact rows. Shelf appears immediately; **Check subscriptions** fills YouTube progressively. Arrows copy one or all missing channels without removing the source. Right-click to unsubscribe on YouTube, or remove/classify a Shelf channel. Checks use your existing YouTube session without accessing your password; optional history stays local.
-
-Shelf channels appear immediately; YouTube channels arrive as the check progresses. Hover a channel for the right-click hint. Repeated additions are deduplicated.
+The **YouTube account** dialog compares Shelf channels with subscriptions retrieved from the existing YouTube session. **Check subscriptions** loads YouTube channels progressively. Copy actions add one or all missing channels without removing the source; repeated additions are deduplicated. The context menu supports unsubscribing on YouTube or removing/classifying a Shelf channel. The extension does not access the YouTube password; optional history remains local.
 
 <img src="docs/screenshots/youtube-shelf-current-account.png" width="680" alt="YouTube and Shelf subscription columns with copy arrows">
 
@@ -175,12 +170,6 @@ The extension permissions are used to:
 - read account subscriptions from an explicitly opened, signed-in YouTube tab;
 - check GitHub release metadata;
 - connect to an explicitly configured HTTPS WebDAV server.
-
-## Development
-
-No compilation or bundling is required. Edit the source files, then reload the unpacked extension from the browser's extension management page.
-
-The screenshot harness (`tools/snapshot-server.mjs` and `tools/capture-readme.cjs`, using Playwright) loads the real extension interface with fictional local data. It exists only for documentation captures and is not part of the installed extension runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 

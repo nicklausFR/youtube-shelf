@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { numberedSeriesPart } from "../public/video-series.js";
 
 const source = readFileSync(new URL("../public/app.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const definition = (name) => {
@@ -13,6 +14,7 @@ let saves = 0;
 let favoriteRenders = 0;
 let watchLaterRenders = 0;
 const h = {
+  numberedSeriesPart,
   favorites: {},
   watchLater: {
     first: { title: "Part 1", savedAt: "2026-09-01" },
@@ -69,6 +71,23 @@ assert.equal(h.watchLater.third.videoGroupId, undefined);
 assert.equal(saves, 5);
 assert.equal(watchLaterRenders, 5);
 assert.equal(favoriteRenders, 0);
+
+h.favorites = {
+  one: { title: "Crane Project | Part 1", note: "keep" },
+  two: { title: "Crane Project | Part 2" },
+  three: { title: "Crane Project | Part 3" },
+  four: { title: "Crane Project | Part 4" }
+};
+const ids = () => Array.from(h.storedVideoGroupIds("favorites", h.favorites.one.videoGroupId));
+await h.groupStoredVideos("favorites", "one", "three", "after");
+assert.deepEqual(ids(), ["one", "three"]);
+await h.groupStoredVideos("favorites", "two", "three", "after");
+assert.deepEqual(ids(), ["one", "two", "three"]);
+await h.groupStoredVideos("favorites", "three", "one", "before");
+assert.deepEqual(ids(), ["three", "one", "two"], "later manual ordering is preserved");
+await h.groupStoredVideos("favorites", "four", "one", "before");
+assert.deepEqual(ids(), ["one", "two", "three", "four"], "new integration checks the entire order");
+assert.equal(h.favorites.one.note, "keep");
 
 assert.match(source, /WATCH_LATER_VIDEO_GROUP_DRAG_TYPE/);
 assert.match(source, /videoGroupSize: watchLaterVideoGroupSizes\.get/);

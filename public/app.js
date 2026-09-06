@@ -7,8 +7,9 @@ import { mergeSynchronizationData, synchronizationContentChanged } from "./sync-
 import { synchronizableConfig } from "./sync-schema.js";
 import { formatNetworkBytes, installNetworkMeter } from "./network-meter.js";
 import { platform } from "./platform.js";
+import { validatePlatform } from "./platform-contract.js";
 import { createYoutubeShortsLookup } from "./youtube-shorts.js";
-import { annotateVideoSeries } from "./video-series.js";
+import { annotateVideoSeries, numberedSeriesPart } from "./video-series.js";
 import {
   YOUTUBE_ACCOUNT_STORAGE_KEY,
   compareSubscriptionSets,
@@ -17,9 +18,10 @@ import {
   subscriptionsMissingFromShelf,
 } from "./youtube-account.js";
 
-const chrome = platform.chrome;
+const host = platform.host;
+validatePlatform(platform);
 platform.initialize();
-const networkMeter = installNetworkMeter();
+const networkMeter = installNetworkMeter({ storage: host.storage?.session });
 const interfaceI18n = await createI18n(localStorage.getItem("youtubeChannelShelfInterfaceLanguage") || "auto");
 const VIDEO_PROGRESS_KEY = "youtubeChannelShelfVideoProgress";
 const VIDEO_PROGRESS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -145,6 +147,7 @@ const metadataCheckIntervalOptionEl = document.querySelector("#metadataCheckInte
 const feedCheckConcurrencyOptionEl = document.querySelector("#feedCheckConcurrencyOption");
 const closeYoutubeDataOptionsEl = document.querySelector("#closeYoutubeDataOptions");
 const youtubeAccountEl = document.querySelector("#youtubeAccount");
+if (youtubeAccountEl) youtubeAccountEl.hidden = !platform.capabilities.youtubeCompanion;
 const youtubeAccountPromptEl = document.querySelector("#youtubeAccountPrompt");
 const youtubeAccountStatusEl = document.querySelector("#youtubeAccountStatus");
 const youtubeTrackingEnabledEl = document.querySelector("#youtubeTrackingEnabled");
@@ -182,13 +185,14 @@ const addCategoryParentEl = document.querySelector("#addCategoryParent");
 const addCategoryNameEl = document.querySelector("#addCategoryName");
 const closeAddCategoryEl = document.querySelector("#closeAddCategory");
 const APP_PAGE_MODE = platform.isWeb || new URLSearchParams(window.location.search).get("mode") === "page";
-const PAGE_MODE_TAB = APP_PAGE_MODE && globalThis.chrome?.tabs?.getCurrent
-  ? await chrome.tabs.getCurrent().catch(() => null)
+const PAGE_MODE_TAB = APP_PAGE_MODE && host?.tabs?.getCurrent
+  ? await host.tabs.getCurrent().catch(() => null)
   : null;
 
 document.body.classList.toggle("pageMode", APP_PAGE_MODE);
 document.body.classList.toggle("webMode", platform.isWeb);
 toggleAppModeEl.classList.toggle("is-active", APP_PAGE_MODE);
+toggleAppModeEl.hidden = !platform.capabilities.panel;
 toggleAppModeEl.title = interfaceI18n.translateText(APP_PAGE_MODE ? "Return to side panel" : "Open full-page mode");
 toggleAppModeEl.setAttribute("aria-label", toggleAppModeEl.title);
 if (APP_PAGE_MODE) {
@@ -423,7 +427,7 @@ function renderNetworkMeter() {
 }
 
 networkMeter.subscribe(renderNetworkMeter);
-chrome.runtime?.onMessage?.addListener?.((message) => {
+host.runtime?.onMessage?.addListener?.((message) => {
   if (message?.type !== "YOUTUBE_SHELF_THUMBNAIL_NETWORK") return;
   networkMeter.recordExternal(message);
 });
@@ -779,10 +783,10 @@ let webDavSyncRecoveryRequired = false;
 let panelPresencePort = null;
 let panelPresenceOpen = null;
 function setPanelOpenState(open, options = {}) {
-  if (!chrome.runtime?.connect) return;
+  if (!host.runtime?.connect) return;
   if (!panelPresencePort) {
     try {
-      panelPresencePort = chrome.runtime.connect({ name: "youtube-shelf-presence" });
+      panelPresencePort = host.runtime.connect({ name: "youtube-shelf-presence" });
       panelPresencePort.onDisconnect.addListener(() => {
         panelPresencePort = null;
         panelPresenceOpen = null;
@@ -1006,7 +1010,7 @@ function makeCategoryZoomButton(direction) {
 
 function readDisplayOptionState() {
   return new Promise((resolve) => {
-    if (!globalThis.chrome?.storage?.local) {
+    if (!host?.storage?.local) {
       resolve({
         hideComments: Boolean(hideCommentsOptionEl?.checked),
         hideSuggestions: hideSuggestionsOptionEl ? Boolean(hideSuggestionsOptionEl.checked) : true,
@@ -1015,7 +1019,7 @@ function readDisplayOptionState() {
       return;
     }
 
-    chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY], (result) => {
+    host.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY, FOCUS_PLAYER_MODE_KEY], (result) => {
       resolve({
         hideComments: Boolean(result[COMMENTS_MODE_KEY]),
         hideSuggestions: result[SUGGESTIONS_MODE_KEY] === undefined ? true : Boolean(result[SUGGESTIONS_MODE_KEY]),
@@ -1026,44 +1030,37 @@ function readDisplayOptionState() {
 }
 
 async function broadcastDisplayOptions(overrides = {}) {
-  if (!globalThis.chrome?.tabs?.query) return;
+  if (!host?.tabs?.query) return;
   const state = await readDisplayOptionState();
   const message = {
     type: "youtubeChannelShelfDisplayOptions",
     ...state,
     ...overrides
   };
-  chrome.tabs.query({ url: ["*://www.youtube.com/*", "*://youtube.com/*"] }, (tabs = []) => {
+  host.tabs.query({ url: ["*://www.youtube.com/*", "*://youtube.com/*"] }, (tabs = []) => {
     for (const tab of tabs) {
       if (tab.id === undefined) continue;
       ensureYoutubeCompanion(tab.id).finally(() => {
-        chrome.tabs.sendMessage(tab.id, message).catch?.(() => {});
+        host.tabs.sendMessage(tab.id, message).catch?.(() => {});
       });
     }
   });
 }
 
 async function ensureYoutubeCompanion(tabId) {
-  if (!globalThis.chrome?.scripting || tabId === undefined) return;
-  await chrome.scripting.insertCSS({
-    target: { tabId },
-    files: ["youtube-clean.css"]
-  }).catch(() => {});
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["youtube-live.js"]
-  }).catch(() => {});
+  if (!platform.capabilities.youtubeCompanion || tabId === undefined) return;
+  await host.companion.ensure(tabId);
 }
 
 function setDisplayOption(key, value) {
-  if (!globalThis.chrome?.storage?.local) return;
+  if (!host?.storage?.local) return;
   const checked = Boolean(value);
   if (key === COMMENTS_MODE_KEY && hideCommentsOptionEl) hideCommentsOptionEl.checked = checked;
   if (key === SUGGESTIONS_MODE_KEY && hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = checked;
   if (key === FOCUS_PLAYER_MODE_KEY) {
     document.querySelectorAll(".pathFocusButton").forEach((button) => button.classList.toggle("is-active", checked));
   }
-  chrome.storage.local.set({ [key]: checked });
+  host.storage.local.set({ [key]: checked });
   const overrides = {};
   if (key === COMMENTS_MODE_KEY) overrides.hideComments = checked;
   if (key === SUGGESTIONS_MODE_KEY) overrides.hideSuggestions = checked;
@@ -1072,8 +1069,8 @@ function setDisplayOption(key, value) {
 }
 
 function toggleDisplayOption(key, fallback = false, onChanged = null) {
-  if (!globalThis.chrome?.storage?.local) return;
-  chrome.storage.local.get(key, (result) => {
+  if (!host?.storage?.local) return;
+  host.storage.local.get(key, (result) => {
     const current = result[key] === undefined ? fallback : Boolean(result[key]);
     const next = !current;
     setDisplayOption(key, next);
@@ -1082,8 +1079,8 @@ function toggleDisplayOption(key, fallback = false, onChanged = null) {
 }
 
 async function cycleYoutubeViewMode() {
-  if (!globalThis.chrome?.storage?.local) return;
-  const state = await chrome.storage.local.get([
+  if (!host?.storage?.local) return;
+  const state = await host.storage.local.get([
     FOCUS_PLAYER_MODE_KEY,
     FOCUS_FULLSCREEN_EXITED_KEY
   ]);
@@ -1091,7 +1088,7 @@ async function cycleYoutubeViewMode() {
   const returnedFromFullscreen = Boolean(state[FOCUS_FULLSCREEN_EXITED_KEY]);
 
   if (!clean) {
-    await chrome.storage.local.set({
+    await host.storage.local.set({
       [FOCUS_PLAYER_MODE_KEY]: true,
       [FOCUS_FULLSCREEN_EXITED_KEY]: false
     });
@@ -1101,7 +1098,7 @@ async function cycleYoutubeViewMode() {
   }
 
   if (returnedFromFullscreen) {
-    await chrome.storage.local.set({
+    await host.storage.local.set({
       [FOCUS_PLAYER_MODE_KEY]: false,
       [FOCUS_FULLSCREEN_EXITED_KEY]: false
     });
@@ -1110,7 +1107,7 @@ async function cycleYoutubeViewMode() {
     return;
   }
 
-  const [youtubeTab] = await chrome.tabs.query({
+  const [youtubeTab] = await host.tabs.query({
     active: true,
     currentWindow: true,
     url: ["*://www.youtube.com/*", "*://youtube.com/*"]
@@ -1120,7 +1117,7 @@ async function cycleYoutubeViewMode() {
     return;
   }
   await ensureYoutubeCompanion(youtubeTab.id);
-  const response = await chrome.tabs.sendMessage(youtubeTab.id, {
+  const response = await host.tabs.sendMessage(youtubeTab.id, {
     type: "YOUTUBE_SHELF_ENTER_FULLSCREEN"
   });
   if (!response?.ok) {
@@ -1137,8 +1134,8 @@ function syncFocusPlayerButtonState() {
     buttons.forEach((button) => button.classList.remove("is-active"));
     return;
   }
-  if (!globalThis.chrome?.storage?.local) return;
-  chrome.storage.local.get(FOCUS_PLAYER_MODE_KEY, (result) => {
+  if (!host?.storage?.local) return;
+  host.storage.local.get(FOCUS_PLAYER_MODE_KEY, (result) => {
     const enabled = Boolean(result[FOCUS_PLAYER_MODE_KEY]);
     buttons.forEach((button) => button.classList.toggle("is-active", enabled));
   });
@@ -1154,8 +1151,8 @@ function syncDisplayOptionsAvailability() {
 
 function syncDisplayOptionsDialog() {
   syncDisplayOptionsAvailability();
-  if (!globalThis.chrome?.storage?.local) return;
-  chrome.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY], (result) => {
+  if (!host?.storage?.local) return;
+  host.storage.local.get([COMMENTS_MODE_KEY, SUGGESTIONS_MODE_KEY], (result) => {
     if (hideCommentsOptionEl) hideCommentsOptionEl.checked = Boolean(result[COMMENTS_MODE_KEY]);
     if (hideSuggestionsOptionEl) hideSuggestionsOptionEl.checked = result[SUGGESTIONS_MODE_KEY] === undefined ? true : Boolean(result[SUGGESTIONS_MODE_KEY]);
   });
@@ -1373,18 +1370,18 @@ function randomSyncId() {
 }
 
 function readWebDavSyncSettings() {
-  if (!globalThis.chrome?.storage?.local) return Promise.resolve(null);
+  if (!host?.storage?.local) return Promise.resolve(null);
   return new Promise((resolve) => {
-    chrome.storage.local.get(WEBDAV_SYNC_SETTINGS_KEY, (result) => resolve(result[WEBDAV_SYNC_SETTINGS_KEY] || null));
+    host.storage.local.get(WEBDAV_SYNC_SETTINGS_KEY, (result) => resolve(result[WEBDAV_SYNC_SETTINGS_KEY] || null));
   });
 }
 
 function writeWebDavSyncSettings(value) {
   webDavSyncSettings = value;
-  if (!globalThis.chrome?.storage?.local) return Promise.resolve();
+  if (!host?.storage?.local) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    chrome.storage.local.set({ [WEBDAV_SYNC_SETTINGS_KEY]: value }, () => {
-      const error = chrome.runtime?.lastError;
+    host.storage.local.set({ [WEBDAV_SYNC_SETTINGS_KEY]: value }, () => {
+      const error = host.runtime?.lastError;
       if (error) reject(new Error(error.message));
       else resolve();
     });
@@ -1431,10 +1428,10 @@ function webDavOriginPermission(settings) {
 }
 
 async function ensureWebDavHostPermission(settings, requestPermission = false) {
-  if (!globalThis.chrome?.permissions) return true;
+  if (!host?.permissions) return true;
   const permission = webDavOriginPermission(settings);
-  if (requestPermission) return chrome.permissions.request(permission);
-  return chrome.permissions.contains(permission);
+  if (requestPermission) return host.permissions.request(permission);
+  return host.permissions.contains(permission);
 }
 
 async function webDavFetch(url, options = {}, settings = webDavSyncSettings) {
@@ -1914,8 +1911,8 @@ async function disconnectWebDavSynchronization() {
     enabled: false,
     deviceId: previous?.deviceId || randomSyncId()
   });
-  if (previous?.url && globalThis.chrome?.permissions) {
-    await chrome.permissions.remove(webDavOriginPermission(previous)).catch(() => false);
+  if (previous?.url && host?.permissions) {
+    await host.permissions.remove(webDavOriginPermission(previous)).catch(() => false);
   }
   populateWebDavDialog();
   setWebDavStatus("Disconnected - application password forgotten");
@@ -1932,7 +1929,7 @@ async function initializeWebDavSynchronization() {
   if (!webDavSyncSettings.deviceId) {
     await writeWebDavSyncSettings({ ...webDavSyncSettings, deviceId: randomSyncId() });
   }
-  chrome.storage?.local?.remove?.("youtubeChannelShelfFileSyncMeta");
+  host.storage?.local?.remove?.("youtubeChannelShelfFileSyncMeta");
   globalThis.indexedDB?.deleteDatabase?.("youtubeChannelShelfFileSync");
   refreshWebDavDialog();
   if (webDavSyncSettings.enabled && await ensureWebDavHostPermission(webDavSyncSettings)) {
@@ -1971,13 +1968,13 @@ function normalizedYoutubeAccountState(value) {
 }
 
 async function readYoutubeAccountState() {
-  const result = await chrome.storage.local.get(YOUTUBE_ACCOUNT_STORAGE_KEY);
+  const result = await host.storage.local.get(YOUTUBE_ACCOUNT_STORAGE_KEY);
   return normalizedYoutubeAccountState(result?.[YOUTUBE_ACCOUNT_STORAGE_KEY]);
 }
 
 async function writeYoutubeAccountState(nextState) {
   youtubeAccountState = normalizedYoutubeAccountState(nextState);
-  await chrome.storage.local.set({ [YOUTUBE_ACCOUNT_STORAGE_KEY]: youtubeAccountState });
+  await host.storage.local.set({ [YOUTUBE_ACCOUNT_STORAGE_KEY]: youtubeAccountState });
   renderYoutubeAccountDialog();
 }
 
@@ -2187,7 +2184,7 @@ function waitForYoutubeTab(milliseconds) {
 
 async function openYoutubeSubscriptionsTab() {
   const url = "https://www.youtube.com/feed/channels";
-  const tabs = await chrome.tabs.query({
+  const tabs = await host.tabs.query({
     currentWindow: true,
     url: ["https://www.youtube.com/*", "https://youtube.com/*"]
   });
@@ -2199,12 +2196,12 @@ async function openYoutubeSubscriptionsTab() {
     }
   });
   tab = tab?.id === undefined
-    ? await chrome.tabs.create({ url, active: true })
-    : await chrome.tabs.update(tab.id, { active: true });
+    ? await host.tabs.create({ url, active: true })
+    : await host.tabs.update(tab.id, { active: true });
   if (tab?.id === undefined) throw new Error("Unable to open YouTube subscriptions");
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    const current = await chrome.tabs.get(tab.id).catch(() => null);
+    const current = await host.tabs.get(tab.id).catch(() => null);
     if (current?.status === "complete") break;
     await waitForYoutubeTab(250);
   }
@@ -2248,11 +2245,11 @@ async function readSubscriptionsFromYoutubeTab(onProgress = () => {}) {
     if (message?.type === "YOUTUBE_SHELF_SUBSCRIPTIONS_PROGRESS"
         && message.requestId === requestId && sender.tab?.id === tab.id) enqueue(message.channels);
   };
-  chrome.runtime.onMessage.addListener(progress);
+  host.runtime.onMessage.addListener(progress);
   try {
     let response = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      response = await chrome.tabs.sendMessage(tab.id, {
+      response = await host.tabs.sendMessage(tab.id, {
         type: "YOUTUBE_SHELF_READ_SUBSCRIPTIONS_PAGE", requestId
       }).catch(() => null);
       if (response) break;
@@ -2265,7 +2262,7 @@ async function readSubscriptionsFromYoutubeTab(onProgress = () => {}) {
     return snapshot();
   } finally {
     active = false;
-    chrome.runtime.onMessage.removeListener(progress);
+    host.runtime.onMessage.removeListener(progress);
   }
 }
 
@@ -2367,7 +2364,7 @@ async function disconnectYoutubeAccount() {
   youtubeAccountBusy = true;
   renderYoutubeAccountDialog();
   try {
-    await chrome.storage.local.remove(YOUTUBE_ACCOUNT_STORAGE_KEY);
+    await host.storage.local.remove(YOUTUBE_ACCOUNT_STORAGE_KEY);
     youtubeAccountState = normalizedYoutubeAccountState(null);
     currentYoutubeSubscriptions = [];
     youtubeSubscriptionsLoaded = false;
@@ -2379,6 +2376,7 @@ async function disconnectYoutubeAccount() {
 }
 
 async function initializeYoutubeAccount() {
+  if (!platform.capabilities.youtubeCompanion) return;
   youtubeAccountState = await readYoutubeAccountState();
   renderYoutubeAccountDialog();
 }
@@ -2405,10 +2403,10 @@ async function openNextYoutubeSubscriptionPopup() {
   renderYoutubeAccountDialog();
   setYoutubeAccountStatus(uiMessage(channel.subscriptionAction === "unsubscribe" ? "accountUnsubscribing" : "confirmYoutubeSubscription", [channel.title || channel.id]));
   try {
-    const currentWindow = await chrome.windows.getCurrent().catch(() => null);
+    const currentWindow = await host.windows.getCurrent().catch(() => null);
     const width = 560;
     const height = 720;
-    const popup = await chrome.windows.create({
+    const popup = await host.windows.create({
       url: youtubeSubscriptionConfirmationUrl(channel),
       type: "popup",
       focused: true,
@@ -2422,7 +2420,7 @@ async function openNextYoutubeSubscriptionPopup() {
     youtubeSubscriptionPopupWindowId = popup?.id ?? null;
     const popupTabId = popup?.tabs?.[0]?.id;
     if (!Number.isInteger(popupTabId)) throw new Error("Unable to identify the YouTube subscription popup");
-    const registration = await chrome.runtime.sendMessage({
+    const registration = await host.runtime.sendMessage({
       type: "YOUTUBE_SHELF_REGISTER_SUBSCRIPTION_AUTOMATION",
       tabId: popupTabId,
       channelId: channel.id,
@@ -2435,7 +2433,7 @@ async function openNextYoutubeSubscriptionPopup() {
     youtubeSubscriptionCurrentChannel = null;
     youtubeSubscriptionQueue = [];
     renderYoutubeAccountDialog();
-    if (failedPopupWindowId !== null) await chrome.windows.remove(failedPopupWindowId).catch(() => {});
+    if (failedPopupWindowId !== null) await host.windows.remove(failedPopupWindowId).catch(() => {});
     setYoutubeAccountStatus(error.message || "Unable to open YouTube subscription confirmation", true);
   }
 }
@@ -2470,17 +2468,17 @@ async function finishYoutubeSubscriptionStep(status, channelId) {
   youtubeSubscriptionPopupWindowId = null;
   youtubeSubscriptionCurrentChannel = null;
   renderYoutubeAccountDialog();
-  if (popupWindowId !== null) await chrome.windows.remove(popupWindowId).catch(() => {});
+  if (popupWindowId !== null) await host.windows.remove(popupWindowId).catch(() => {});
   window.setTimeout(openNextYoutubeSubscriptionPopup, 200);
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+host.runtime.onMessage.addListener((message) => {
   if (message?.type !== "YOUTUBE_SHELF_SUBSCRIPTION_RESULT_RELAY") return;
   finishYoutubeSubscriptionStep(message.status, message.channelId)
     .catch((error) => setYoutubeAccountStatus(error.message, true));
 });
 
-chrome.windows?.onRemoved?.addListener((windowId) => {
+host.windows?.onRemoved?.addListener((windowId) => {
   if (windowId !== youtubeSubscriptionPopupWindowId || !youtubeSubscriptionCurrentChannel) return;
   youtubeSubscriptionPopupWindowId = null;
   youtubeSubscriptionCurrentChannel = null;
@@ -2517,7 +2515,7 @@ function dataContextActions() {
 
 function settingsContextActions() {
   return [
-    { label: "YouTube account", action: openYoutubeAccountDialog },
+    ...(platform.capabilities.youtubeCompanion ? [{ label: "YouTube account", action: openYoutubeAccountDialog }] : []),
     {
       label: "Data",
       submenu: dataContextActions()
@@ -2698,7 +2696,7 @@ function normalizeStoredVideoGroup(collection, groupId) {
 
 async function groupDroppedFavorite(video, targetId, placement = "after") {
   if (!video?.id || video.id === targetId || !favorites[targetId]) return;
-  if (!favorites[video.id]) await addVideoToFavorites(video, activeFavoriteCategoryId, { silent: true });
+  if (!favorites[video.id]) await addVideoToFavorites(video, activeFavoriteCategoryId, { silent: true, groupSeries: false });
   await groupStoredVideos("favorites", video.id, targetId, placement);
 }
 
@@ -2731,6 +2729,16 @@ async function groupStoredVideos(collection, sourceVideoId, targetVideoId, place
     orderedIds.splice(targetIndex + (placement === "before" ? 0 : 1), 0, ...sourceIds);
   }
 
+  if (collection === "favorites" && !reorderingSameGroup) {
+    const position = (id) => Number(items[id].playlistIndex || 0)
+      || numberedSeriesPart(items[id].title)?.position || 0;
+    // Sort numbered episodes in their existing slots, leaving unnumbered items
+    // in place. Later drags within the same group remain manual reordering.
+    const numberedIds = orderedIds.filter((id) => position(id) > 0)
+      .sort((a, b) => position(a) - position(b));
+    let next = 0;
+    orderedIds = orderedIds.map((id) => position(id) > 0 ? numberedIds[next++] : id);
+  }
   orderedIds.forEach((videoId, index) => {
     items[videoId] = {
       ...items[videoId],
@@ -4317,17 +4325,17 @@ function youtubeUrl(videoId) {
 }
 
 async function openYoutubeCleanView(videoId = activeVideoId, options = {}) {
-  if (!globalThis.chrome?.tabs) return;
+  if (!host?.tabs) return;
 
   const sourceTabId = Number.parseInt(
     new URLSearchParams(window.location.search).get("sourceTab") || "",
     10
   );
   const sourceTab = Number.isInteger(sourceTabId)
-    ? await chrome.tabs.get(sourceTabId).catch(() => null)
+    ? await host.tabs.get(sourceTabId).catch(() => null)
     : null;
-  const currentTab = await chrome.tabs.getCurrent().catch(() => null);
-  const youtubeTabs = await chrome.tabs.query({
+  const currentTab = await host.tabs.getCurrent().catch(() => null);
+  const youtubeTabs = await host.tabs.query({
     windowId: currentTab?.windowId,
     url: ["*://www.youtube.com/*", "*://youtube.com/*"]
   });
@@ -4338,13 +4346,13 @@ async function openYoutubeCleanView(videoId = activeVideoId, options = {}) {
   const targetUrl = videoId ? youtubeUrl(videoId) : targetTab?.url || "https://www.youtube.com/";
 
   if (targetTab?.id !== undefined) {
-    await chrome.tabs.update(targetTab.id, { active: true, url: targetUrl });
+    await host.tabs.update(targetTab.id, { active: true, url: targetUrl });
     return;
   }
   if (options.existingOnly) {
     throw new Error("The original YouTube tab is no longer available.");
   }
-  await chrome.tabs.create({ url: targetUrl });
+  await host.tabs.create({ url: targetUrl });
 }
 
 async function openOfficialYoutube(video, options = {}) {
@@ -4378,8 +4386,8 @@ async function openOfficialYoutube(video, options = {}) {
   }
 
   if (options.newTab) {
-    if (globalThis.chrome?.tabs) {
-      const tab = await chrome.tabs.create({ url: youtubeUrl(videoId) });
+    if (host?.tabs) {
+      const tab = await host.tabs.create({ url: youtubeUrl(videoId) });
       if (currentWatchLaterVideoId === videoId) currentWatchLaterTabId = tab?.id ?? null;
     } else {
       window.open(youtubeUrl(videoId), "_blank", "noopener");
@@ -4389,7 +4397,7 @@ async function openOfficialYoutube(video, options = {}) {
   }
 
   if (options.popup) {
-    const response = await chrome.runtime.sendMessage({
+    const response = await host.runtime.sendMessage({
       type: "YOUTUBE_SHELF_OPEN_VIDEO_POPUP",
       videoId,
       title: typeof video === "object" ? video.title || "" : ""
@@ -4399,11 +4407,11 @@ async function openOfficialYoutube(video, options = {}) {
     return;
   }
 
-  if (globalThis.chrome?.tabs) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (host?.tabs) {
+    const [tab] = await host.tabs.query({ active: true, currentWindow: true });
     if (tab?.id !== undefined) {
       if (currentWatchLaterVideoId === videoId) currentWatchLaterTabId = tab.id;
-      await chrome.tabs.update(tab.id, { url: youtubeUrl(videoId) });
+      await host.tabs.update(tab.id, { url: youtubeUrl(videoId) });
     } else {
       window.location.href = youtubeUrl(videoId);
     }
@@ -4559,7 +4567,7 @@ function currentModeHandoffEntry() {
 
 async function writeModeHandoff(target, options = {}) {
   if (!platform.isExtension) return;
-  await chrome.storage.local.set({
+  await host.storage.local.set({
     [MODE_HANDOFF_KEY]: {
       target,
       createdAt: Date.now(),
@@ -4574,12 +4582,12 @@ async function writeModeHandoff(target, options = {}) {
 async function consumeModeHandoff() {
   if (!platform.isExtension) return null;
   const expectedTarget = APP_PAGE_MODE ? "page" : "panel";
-  const result = await chrome.storage.local.get(MODE_HANDOFF_KEY);
+  const result = await host.storage.local.get(MODE_HANDOFF_KEY);
   const handoff = result[MODE_HANDOFF_KEY];
   if (!handoff || handoff.target !== expectedTarget || Date.now() - Number(handoff.createdAt || 0) > 10000) {
     return null;
   }
-  await chrome.storage.local.remove(MODE_HANDOFF_KEY);
+  await host.storage.local.remove(MODE_HANDOFF_KEY);
   return handoff;
 }
 
@@ -4589,7 +4597,7 @@ function isYoutubeTabUrl(value = "") {
 
 async function readYoutubeVideoFromTab(tabId) {
   if (!platform.isExtension || tabId === undefined || tabId === null) return null;
-  const injection = await chrome.scripting.executeScript({
+  const injection = await host.scripting.executeScript({
     target: { tabId },
     func: () => {
       const url = new URL(window.location.href);
@@ -4611,9 +4619,9 @@ async function readYoutubeVideoFromTab(tabId) {
 }
 
 async function switchAppMode() {
-  if (!platform.isExtension) return;
+  if (!platform.capabilities.panel) return;
   if (APP_PAGE_MODE) {
-    const currentTab = PAGE_MODE_TAB || await chrome.tabs.getCurrent();
+    const currentTab = PAGE_MODE_TAB || await host.tabs.getCurrent();
     const windowId = currentTab?.windowId;
     if (windowId === undefined) throw new Error("Unable to identify the browser window");
     const pageParameters = new URLSearchParams(window.location.search);
@@ -4623,23 +4631,23 @@ async function switchAppMode() {
       : /^https?:\/\//.test(originalYoutubeUrl) ? originalYoutubeUrl : "https://www.youtube.com/";
     // Opening the side panel must be the first extension API called from the
     // click gesture or Chrome may reject it and strand the page-mode tab.
-    const opening = chrome.sidePanel.open({ windowId });
+    const opening = host.panel.open({ windowId });
     // Page mode is the video-only Shelf view. Returning to the side panel must
     // restore normal YouTube; comments and suggestions then follow only their
     // explicit settings in Options > Display.
     document.querySelectorAll(".pathFocusButton").forEach((button) => button.classList.remove("is-active"));
-    const normalYoutubeView = chrome.storage.local
+    const normalYoutubeView = host.storage.local
       .set({ [FOCUS_PLAYER_MODE_KEY]: false })
       .then(() => broadcastDisplayOptions({ focusPlayer: false }));
     const handoff = writeModeHandoff("panel");
     await Promise.all([handoff, normalYoutubeView, opening]);
     if (currentTab?.id !== undefined) {
-      await chrome.tabs.update(currentTab.id, { active: true, url: returnUrl });
+      await host.tabs.update(currentTab.id, { active: true, url: returnUrl });
     }
     return;
   }
 
-  const windowTabs = await chrome.tabs.query({ currentWindow: true });
+  const windowTabs = await host.tabs.query({ currentWindow: true });
   const youtubeTabs = windowTabs.filter((tab) => isYoutubeTabUrl(tab.url || ""));
   const activeBrowserTab = windowTabs.find((tab) => tab.active) || null;
   const activeTab = youtubeTabs.find((tab) => tab.active)
@@ -4656,7 +4664,7 @@ async function switchAppMode() {
     videoStart: activeYoutubeVideo?.videoStart || 0,
     videoTitle: activeYoutubeVideo?.videoTitle || ""
   });
-  const pageUrl = new URL(chrome.runtime.getURL("public/index.html"));
+  const pageUrl = new URL(host.runtime.getURL("public/index.html"));
   pageUrl.searchParams.set("mode", "page");
   if (activeTab?.id !== undefined) {
     pageUrl.searchParams.set("sourceTab", String(activeTab.id));
@@ -4687,16 +4695,16 @@ async function switchAppMode() {
   const duplicatePageTabIds = existingPageTabs
     .filter((tab) => tab.id !== reusableTabId && tab.id !== undefined)
     .map((tab) => tab.id);
-  if (duplicatePageTabIds.length) await chrome.tabs.remove(duplicatePageTabIds);
+  if (duplicatePageTabIds.length) await host.tabs.remove(duplicatePageTabIds);
   if (reusableTabId === undefined) {
     throw new Error("No active browser tab is available for page mode.");
   }
-  const pageTab = await chrome.tabs.update(reusableTabId, {
+  const pageTab = await host.tabs.update(reusableTabId, {
     active: true,
     url: pageUrl.toString()
   });
-  if (pageTab.windowId !== undefined && chrome.sidePanel.close) {
-    await chrome.sidePanel.close({ windowId: pageTab.windowId });
+  if (pageTab.windowId !== undefined && host.panel.close) {
+    await host.panel.close({ windowId: pageTab.windowId });
   }
 }
 
@@ -4931,14 +4939,14 @@ async function checkCurrentWatchLaterVisibility() {
     !currentWatchLaterVideoId
     || currentWatchLaterPlaybackContext !== "youtube-tab"
     || !Number.isInteger(currentWatchLaterTabId)
-    || !globalThis.chrome?.tabs
+    || !host?.tabs
     || seenPromptResolve
   ) return;
   if (Date.now() - currentWatchLaterStartedAt < 2500) return;
 
   const trackedVideoId = currentWatchLaterVideoId;
   const trackedTabId = currentWatchLaterTabId;
-  const tab = await chrome.tabs.get(trackedTabId).catch(() => null);
+  const tab = await host.tabs.get(trackedTabId).catch(() => null);
   if (
     currentWatchLaterVideoId !== trackedVideoId
     || currentWatchLaterTabId !== trackedTabId
@@ -5327,12 +5335,9 @@ function openVideoSeries(seed) {
   close.type = "button";
   close.textContent = uiMessage("seriesClose");
   close.addEventListener("click", () => dialog.close());
-  const refresh = document.createElement("button");
-  refresh.type = "button";
-  refresh.textContent = uiMessage("seriesRefresh");
   const toolbar = document.createElement("div");
   toolbar.className = "seriesToolbar";
-  toolbar.append(refresh, close);
+  toolbar.append(heading, close);
   const status = document.createElement("p");
   status.role = "status";
   const spinner = document.createElement("span");
@@ -5344,11 +5349,19 @@ function openVideoSeries(seed) {
   loadingStatus.append(spinner, status);
   const list = document.createElement("ol");
   list.className = "seriesEpisodeList";
-  dialog.append(heading, toolbar, loadingStatus, list);
+  dialog.append(toolbar, loadingStatus, list);
   dialog.addEventListener("close", () => dialog.remove(), { once: true });
   document.body.append(dialog);
   dialog.showModal();
   let catalog = seriesCatalog();
+  const seedChannelId = seed.channelId || catalog.find((video) => video.id === seed.id)?.channelId;
+  // Detection only needs this channel, not every saved video and feed.
+  const relevantCatalog = () => seriesCatalog().filter((video) => video.id === seed.id || (
+    seed.playlistId ? video.playlistId === seed.playlistId : (
+      seedChannelId ? video.channelId === seedChannelId : video.channel === seed.channel
+    )
+  ));
+  catalog = relevantCatalog();
   let playlistVideos = [];
   let playlistLoaded = false;
   function render() {
@@ -5362,6 +5375,7 @@ function openVideoSeries(seed) {
       const row = document.createElement("li");
       row.value = video.playlistIndex || video.seriesPosition || index + 1;
       row.classList.toggle("is-current", video.id === seed.id);
+      row.classList.toggle("is-seen", Boolean(seenVideos[video.id]));
       const link = document.createElement("a");
       const url = new URL(`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`);
       if (seed.playlistId) url.searchParams.set("list", seed.playlistId);
@@ -5382,22 +5396,72 @@ function openVideoSeries(seed) {
       const title = document.createElement("span");
       title.className = "seriesEpisodeTitle";
       title.textContent = video.title || video.id;
-      link.append(frame, title);
-      row.append(link);
+      link.className = "seriesEpisodeImageLink";
+      link.setAttribute("aria-label", video.title || video.id);
+      link.append(frame);
+      const titleLink = document.createElement("a");
+      titleLink.className = "seriesEpisodeTitleLink";
+      titleLink.href = link.href;
+      titleLink.target = link.target;
+      titleLink.rel = link.rel;
+      titleLink.append(title);
+      row.append(link, titleLink);
+      const actions = document.createElement("div");
+      actions.className = "seriesEpisodeActions";
+      const favoriteButton = document.createElement("button");
+      favoriteButton.type = "button";
+      favoriteButton.className = "favoriteButton";
+      favoriteButton.dataset.videoId = video.id;
+      favoriteButton.textContent = favorites[video.id] ? "★" : "☆";
+      favoriteButton.classList.toggle("is-active", Boolean(favorites[video.id]));
+      favoriteButton.title = favorites[video.id] ? "Remove from Favorites" : "Add to Favorites";
+      favoriteButton.setAttribute("aria-label", favoriteButton.title);
+      const watchButton = document.createElement("button");
+      watchButton.type = "button";
+      watchButton.className = "watchLaterButton";
+      watchButton.textContent = "Watch later";
+      watchButton.classList.toggle("is-active", Boolean(watchLater[video.id]));
+      watchButton.setAttribute("aria-pressed", String(Boolean(watchLater[video.id])));
+      applyWatchLaterButtonProgress(watchButton, video.id);
+      const perform = async (button, action) => {
+        button.disabled = true;
+        try {
+          await action();
+          if (dialog.open) render();
+        } catch (error) {
+          status.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      };
+      favoriteButton.addEventListener("click", () => perform(favoriteButton, () => toggleFavorite(video)));
+      watchButton.addEventListener("click", () => perform(watchButton, () => watchLater[video.id]
+        ? toggleWatchLater(video) : addVideoToWatchLater(video)));
+      actions.append(favoriteButton, watchButton);
+      row.append(actions);
       return row;
     }));
     return members.length;
   }
   async function update() {
-    refresh.disabled = true;
     spinner.hidden = false;
     list.setAttribute("aria-busy", "true");
     status.textContent = uiMessage("seriesLoading");
     playlistVideos = [];
     let continuation = "";
     const tokens = new Set();
+    let scanned = 0;
+    let pages = 0;
+    let count = render();
+    const started = Date.now();
+    const showProgress = () => {
+      status.textContent = uiMessage("seriesLoadingCount", [count, scanned, pages, Math.floor((Date.now() - started) / 1000)]);
+    };
+    const progressTimer = setInterval(showProgress, 1000);
+    const stopProgress = () => clearInterval(progressTimer);
+    dialog.addEventListener("close", stopProgress, { once: true });
     try {
-      const channelId = seed.channelId || catalog.find((video) => video.id === seed.id)?.channelId;
+      const channelId = seedChannelId;
       if (!seed.playlistId && !channelId) throw new Error(uiMessage("seriesMissingChannel"));
       do {
         const page = seed.playlistId
@@ -5411,25 +5475,27 @@ function openVideoSeries(seed) {
         playlistLoaded = true;
         playlistVideos.push(...incoming);
         for (const video of incoming) discoveredSeriesVideos.set(video.id, video);
-        catalog = seriesCatalog();
-        const count = render();
-        status.textContent = uiMessage("seriesLoadingCount", [count]);
+        catalog = relevantCatalog();
+        scanned += incoming.length;
+        pages += 1;
+        count = render();
+        showProgress();
         continuation = page.continuation;
         if (continuation && tokens.has(continuation)) throw new Error(uiMessage("seriesIncomplete"));
         tokens.add(continuation);
       } while (continuation && dialog.open);
-      const count = render();
+      count = render();
       status.textContent = uiMessage(seed.playlistId ? "seriesPlaylistComplete" : "seriesDetectedComplete", [count]);
     } catch (error) {
       if (dialog.open) status.textContent = uiMessage("seriesLoadError", [error.message]);
     } finally {
-      refresh.disabled = false;
+      clearInterval(progressTimer);
+      dialog.removeEventListener("close", stopProgress);
       spinner.hidden = true;
       list.setAttribute("aria-busy", "false");
       cardSeriesAnnotations = null;
     }
   }
-  refresh.addEventListener("click", update);
   render();
   update();
 }
@@ -6477,10 +6543,10 @@ async function unsubscribeChannel(channel) {
 async function openChannelVideosOnYouTube(channel) {
   if (!channel?.id) return;
   const url = `https://www.youtube.com/channel/${encodeURIComponent(channel.id)}/videos`;
-  if (globalThis.chrome?.tabs) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (host?.tabs) {
+    const [tab] = await host.tabs.query({ active: true, currentWindow: true });
     if (tab?.id !== undefined) {
-      await chrome.tabs.update(tab.id, { url });
+      await host.tabs.update(tab.id, { url });
       return;
     }
   }
@@ -6489,7 +6555,7 @@ async function openChannelVideosOnYouTube(channel) {
 function openSubscribeOnYouTube(channel) {
   if (!channel?.id) return;
   const url = `https://www.youtube.com/channel/${encodeURIComponent(channel.id)}?sub_confirmation=1`;
-  chrome.tabs?.create?.({ url });
+  host.tabs?.create?.({ url });
 }
 
 function channelContextActions(channel) {
@@ -7293,8 +7359,8 @@ function renderWatchLater() {
 }
 
 async function loadVideoProgress() {
-  if (!globalThis.chrome?.storage?.local) return;
-  const stored = await chrome.storage.local.get(VIDEO_PROGRESS_KEY);
+  if (!host?.storage?.local) return;
+  const stored = await host.storage.local.get(VIDEO_PROGRESS_KEY);
   videoProgress = stored[VIDEO_PROGRESS_KEY] && typeof stored[VIDEO_PROGRESS_KEY] === "object"
     ? stored[VIDEO_PROGRESS_KEY]
     : {};
@@ -7575,7 +7641,28 @@ async function addVideoToWatchLater(video) {
   return true;
 }
 
-async function addVideoToFavorites(video, categoryId = "", { silent = false } = {}) {
+function mergeFavoriteSeries(video) {
+  const saved = Object.entries(favorites).map(([id, item]) => ({ ...item, id }));
+  const annotated = annotateVideoSeries(saved, seriesCatalog());
+  const seriesId = annotated.find((item) => item.id === video.id)?.seriesId;
+  if (!seriesId) return;
+  const members = annotated.filter((item) => item.seriesId === seriesId)
+    .sort((a, b) => a.seriesPosition - b.seriesPosition || a.id.localeCompare(b.id));
+  if (members.length < 2) return;
+  const memberIds = new Set(members.map((item) => item.id));
+  const oldGroups = new Set(members.map((item) => item.videoGroupId).filter(Boolean));
+  const groupId = [...oldGroups].find((id) => saved.filter((item) => item.videoGroupId === id)
+    .every((item) => memberIds.has(item.id)))
+    || `favorites-video-group-${crypto.randomUUID()}`;
+  members.forEach((item, index) => {
+    favorites[item.id] = { ...favorites[item.id], videoGroupId: groupId, videoGroupOrder: index + 1 };
+  });
+  for (const oldGroup of oldGroups) {
+    if (oldGroup !== groupId) normalizeFavoriteVideoGroup(oldGroup);
+  }
+}
+
+async function addVideoToFavorites(video, categoryId = "", { silent = false, groupSeries = true } = {}) {
   if (!video?.id) return false;
   video = await completeDroppedVideoMetadata(video);
   const targetCategoryId = favoriteCategories.some((category) => category.id === categoryId) ? categoryId : "";
@@ -7603,8 +7690,13 @@ async function addVideoToFavorites(video, categoryId = "", { silent = false } = 
     tags: video.tags || video.keywords || video.topics || [],
     views: video.views || video.viewCountText || "",
     channel: video.channel || "",
-    categories: targetCategoryId ? [targetCategoryId] : []
+    categories: targetCategoryId ? [targetCategoryId] : [],
+    playlistId: video.playlistId || "",
+    playlistTitle: video.playlistTitle || "",
+    playlistIndex: Number(video.playlistIndex || 0),
+    playlistSize: Number(video.playlistSize || 0)
   };
+  if (groupSeries) mergeFavoriteSeries(video);
   await saveConfig();
   if (activeView === "favorites") renderFavoritesHome();
   syncFavoriteButtons(video.id);
@@ -8202,7 +8294,7 @@ async function fetchYoutubeScopedChannelSearch(channel, rawQuery, signal, onPage
 }
 
 async function fetchYoutubeSearchHtml(url, signal) {
-  if (!globalThis.chrome?.runtime?.sendMessage) {
+  if (!host?.runtime?.sendMessage) {
     const response = await fetch(url, { cache: "no-store", credentials: "omit", signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.text();
@@ -8215,7 +8307,7 @@ async function fetchYoutubeSearchHtml(url, signal) {
     signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
   });
   const result = await Promise.race([
-    chrome.runtime.sendMessage({ type: "YOUTUBE_SHELF_SEARCH_PAGE", url: String(url) }),
+    host.runtime.sendMessage({ type: "YOUTUBE_SHELF_SEARCH_PAGE", url: String(url) }),
     abortPromise
   ]);
   if (!result?.ok) throw new Error(result?.error || "YouTube search failed");
@@ -8223,7 +8315,7 @@ async function fetchYoutubeSearchHtml(url, signal) {
 }
 
 async function fetchYoutubeSearchContinuation(body, { clientVersion, visitorData = "", signal } = {}) {
-  if (!globalThis.chrome?.runtime?.sendMessage) {
+  if (!host?.runtime?.sendMessage) {
     const response = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
       method: "POST",
       cache: "no-store",
@@ -8248,7 +8340,7 @@ async function fetchYoutubeSearchContinuation(body, { clientVersion, visitorData
     signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
   });
   const result = await Promise.race([
-    chrome.runtime.sendMessage({
+    host.runtime.sendMessage({
       type: "YOUTUBE_SHELF_SEARCH_CONTINUATION",
       body,
       clientVersion,
@@ -10214,9 +10306,9 @@ function localeForYoutubeLanguage(language) {
 }
 
 async function detectYoutubeSearchLocale(query) {
-  if (!globalThis.chrome?.i18n?.detectLanguage) return localeForYoutubeLanguage(fallbackSearchLanguage(query));
+  if (!host?.i18n?.detectLanguage) return localeForYoutubeLanguage(fallbackSearchLanguage(query));
   const detected = await new Promise((resolve) => {
-    chrome.i18n.detectLanguage(String(query || ""), (result) => resolve(result || null));
+    host.i18n.detectLanguage(String(query || ""), (result) => resolve(result || null));
   });
   const candidate = detected?.languages
     ?.filter((item) => item?.language && item.language !== "und")
@@ -10713,8 +10805,8 @@ applyListLayout();
 applyListZoom();
 syncPanelVisibilityState({ broadcast: true });
 loadVideoProgress().catch(() => {});
-if (globalThis.chrome?.storage?.onChanged) {
-  chrome.storage.onChanged.addListener((changes, areaName) => {
+if (host?.storage?.onChanged) {
+  host.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
     if (changes[STORAGE_KEY]?.newValue) {
       const nextConfig = changes[STORAGE_KEY].newValue;
@@ -10744,8 +10836,8 @@ async function handleIncomingDataCommand(payload) {
 }
 
 async function handlePendingDataCommand() {
-  if (!globalThis.chrome?.storage?.local) return;
-  const result = await new Promise((resolve) => chrome.storage.local.get(DATA_COMMAND_KEY, resolve));
+  if (!host?.storage?.local) return;
+  const result = await new Promise((resolve) => host.storage.local.get(DATA_COMMAND_KEY, resolve));
   const payload = result[DATA_COMMAND_KEY];
   if (payload?.createdAt && Date.now() - payload.createdAt < 8000) {
     await handleIncomingDataCommand(payload);
@@ -10790,6 +10882,22 @@ if (expectsTransferredVideo) {
 }
 
 loadChannels().then(async () => {
+  const settingsActions = {
+    youtubeAccount: openYoutubeAccountDialog,
+    importExportDialog: openImportExportDialog,
+    synchronization: openWebDavSyncDialog,
+    youtubeData: openYoutubeDataOptionsDialog,
+    appearance: openAppearanceOptionsDialog,
+    language: openLanguageOptionsDialog,
+    about: openAboutDialog
+  };
+  const requestedSettings = initialPageParameters.get("settings");
+  if (Object.hasOwn(settingsActions, requestedSettings)) {
+    settingsActions[requestedSettings]();
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("settings");
+    window.history.replaceState(window.history.state, "", cleanUrl.href);
+  }
   const modeHandoff = initialModeHandoff;
   if (modeHandoff?.entry) {
     historyStack = [modeHandoff.entry];

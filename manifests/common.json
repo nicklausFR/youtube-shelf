@@ -26,8 +26,7 @@
     "scripting",
     "contextMenus",
     "webRequest",
-    "declarativeNetRequestWithHostAccess",
-    "sidePanel"
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -39,36 +38,5 @@
   ],
   "optional_host_permissions": [
     "https://*/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "side_panel": {
-    "default_path": "public/index.html"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.youtube.com/*",
-        "https://youtube.com/*"
-      ],
-      "css": [
-        "youtube-clean.css"
-      ],
-      "js": [
-        "public/platform-chromium.js",
-        "youtube-live.js"
-      ],
-      "run_at": "document_idle"
-    }
-  ],
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "youtube_origin",
-        "enabled": true,
-        "path": "rules/youtube-origin.json"
-      }
-    ]
-  }
+  ]
 }

@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const app=readFileSync('public/app.js','utf8');
 let listener,resolveFinal,removed=false;const progress=[];
 const final=new Promise(resolve=>resolveFinal=resolve);
-const ctx=vm.createContext({crypto:{randomUUID:()=> 'scan-1'},openYoutubeSubscriptionsTab:async()=>({id:42}),normalizeYoutubeSubscription:item=>item.id?item:null,resolveDroppedChannelId:async()=> 'UC_resolved',waitForYoutubeTab:async()=>{},ensureYoutubeCompanion:async()=>{},chrome:{runtime:{onMessage:{addListener:fn=>listener=fn,removeListener:fn=>{assert.equal(fn,listener);removed=true;}}},tabs:{sendMessage:async()=>final}}});
+const ctx=vm.createContext({crypto:{randomUUID:()=> 'scan-1'},openYoutubeSubscriptionsTab:async()=>({id:42}),normalizeYoutubeSubscription:item=>item.id?item:null,resolveDroppedChannelId:async()=> 'UC_resolved',waitForYoutubeTab:async()=>{},ensureYoutubeCompanion:async()=>{},host:{runtime:{onMessage:{addListener:fn=>listener=fn,removeListener:fn=>{assert.equal(fn,listener);removed=true;}}},tabs:{sendMessage:async()=>final}}});
 const start=app.indexOf('async function readSubscriptionsFromYoutubeTab(');
 vm.runInContext(app.slice(start,app.indexOf('async function checkYoutubeAccount(',start)),ctx);
 const reading=ctx.readSubscriptionsFromYoutubeTab(items=>progress.push(items));

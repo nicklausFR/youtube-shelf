@@ -1,3 +1,5 @@
+import { platform } from "./platform.js";
+const host = platform.host;
 import { newPipeSubscriptionData, newPipeSubscriptionFilename } from "./newpipe-export.js";
 import { createI18n } from "./i18n.js";
 
@@ -30,14 +32,14 @@ function emptyConfig() {
 
 function readConfig() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(STORAGE_KEY, (result) => resolve(result[STORAGE_KEY] || emptyConfig()));
+    host.storage.local.get(STORAGE_KEY, (result) => resolve(result[STORAGE_KEY] || emptyConfig()));
   });
 }
 
 function writeConfig(config) {
   return new Promise((resolve, reject) => {
-    chrome.storage.local.set({ [STORAGE_KEY]: config }, () => {
-      const error = chrome.runtime?.lastError;
+    host.storage.local.set({ [STORAGE_KEY]: config }, () => {
+      const error = host.runtime?.lastError;
       if (error) reject(new Error(error.message));
       else resolve();
     });
@@ -283,7 +285,7 @@ async function exportNative() {
 
 async function exportNewPipe() {
   const config = await readConfig();
-  const data = newPipeSubscriptionData(config.channels, chrome.runtime?.getManifest?.().version || "");
+  const data = newPipeSubscriptionData(config.channels, host.runtime?.getManifest?.().version || "");
   downloadText(newPipeSubscriptionFilename(), JSON.stringify(data, null, 2));
   setStatus(`${data.subscriptions.length} subscriptions exported for NewPipe.`);
 }

@@ -860,7 +860,7 @@
     "message": "Looking for episodes on YouTube…"
   },
   "seriesLoadingCount": {
-    "message": "$1 videos found — loading…"
+    "message": "$1 episodes found · $2 videos scanned · $3 pages · $4 s — searching…"
   },
   "seriesMissingChannel": {
     "message": "Channel unknown: add the video with its channel to find further episodes."
@@ -872,7 +872,7 @@
     "message": "$1 available videos · updated from YouTube."
   },
   "seriesDetectedComplete": {
-    "message": "$1 videos detected by title · membership is inferred. Refresh or reopen to find new episodes."
+    "message": "$1 videos detected by title · membership is inferred. Reopen to find new episodes."
   },
   "seriesLoadError": {
     "message": "Partial or cached list — update failed: $1"

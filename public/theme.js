@@ -2,7 +2,8 @@
   const STORAGE_KEY = "youtubeChannelShelfTheme";
   const THEMES = new Set(["auto", "light", "dark"]);
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-  const extensionStorage = globalThis.chrome?.storage?.local;
+  let extensionStorage;
+  let changedLocally = false;
 
   function normalizeTheme(value) {
     return THEMES.has(value) ? value : "auto";
@@ -41,20 +42,26 @@
       return preference;
     },
     set(value) {
+      changedLocally = true;
       preference = setTheme(value);
       return preference;
     }
   };
 
-  extensionStorage?.get(STORAGE_KEY, (result) => {
-    if (result[STORAGE_KEY] === undefined) return;
-    preference = applyTheme(result[STORAGE_KEY]);
-    localStorage.setItem(STORAGE_KEY, preference);
-  });
+  import("./platform.js").then(({ platform }) => {
+    extensionStorage = platform.host.storage?.local;
+    if (changedLocally) extensionStorage?.set({ [STORAGE_KEY]: preference });
+    extensionStorage?.get(STORAGE_KEY, (result) => {
+      if (changedLocally) return;
+      if (result[STORAGE_KEY] === undefined) return;
+      preference = applyTheme(result[STORAGE_KEY]);
+      localStorage.setItem(STORAGE_KEY, preference);
+    });
 
-  globalThis.chrome?.storage?.onChanged?.addListener((changes, areaName) => {
-    if (areaName !== "local" || !changes[STORAGE_KEY]?.newValue) return;
-    preference = applyTheme(changes[STORAGE_KEY].newValue);
-    localStorage.setItem(STORAGE_KEY, preference);
-  });
+    platform.host.storage?.onChanged?.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes[STORAGE_KEY]?.newValue) return;
+      preference = applyTheme(changes[STORAGE_KEY].newValue);
+      localStorage.setItem(STORAGE_KEY, preference);
+    });
+  }).catch(() => {});
 })();

@@ -11,6 +11,7 @@ const PROCESS_WORDS = new Set([
 ]);
 
 function sameSeriesSubject(left, right) {
+  if (left.season || right.season) return left.key === right.key;
   if (left.key === right.key) return true;
   const a = left.words.filter((word) => !PROCESS_WORDS.has(word));
   const b = right.words.filter((word) => !PROCESS_WORDS.has(word));
@@ -36,9 +37,20 @@ function normalizedWords(value) {
 
 function numberedSeriesPart(title) {
   const text = String(title || "");
+  const seasonEpisode = /\b(?:s|season\s*|saison\s*)(\d{1,3})\s*[,|:._–—-]?\s*(?:ep(?:isode)?|épisode)\.?\s*#?\s*(\d{1,3})\b/iu.exec(text);
+  if (seasonEpisode) {
+    const season = Number(seasonEpisode[1]);
+    return { position: Number(seasonEpisode[2]), season, words: [], key: `season ${season}` };
+  }
   const match = PART_PATTERN.exec(text);
   if (!match) return null;
-  const before = normalizedWords(text.slice(0, match.index));
+  const prefix = text.slice(0, match.index);
+  // Prefer an explicitly named project/series over its changing episode subject.
+  // Other suffixes (e.g. "Zayer Upgrades") may instead describe a wider topic.
+  const segments = prefix.split("|").map((segment) => normalizedWords(segment)).filter((words) => words.length);
+  const before = segments.length > 1 && segments.at(-1).length >= 3
+    && segments.at(-1).some((word) => ["project", "projet", "series", "serie"].includes(word))
+    ? segments.at(-1) : normalizedWords(prefix);
   const after = normalizedWords(text.slice(match.index + match[0].length));
   const baseWords = before.length >= 2 ? before : after;
   // Creators may append a completion label to the subject of the last part.
@@ -124,7 +136,7 @@ export function annotateVideoSeries(videos = [], contextVideos = videos) {
     // Some creators name the first instalment only after publishing Parts 2+.
     // Attach one unnumbered, same-channel candidate when its subject clearly
     // overlaps and the numbered sequence starts after episode 1.
-    if (members.some(({ part }) => part.position === 1)) continue;
+    if (members[0].part.season || members.some(({ part }) => part.position === 1)) continue;
     const referenceWords = new Set(members[0].part.words);
     const referenceChannel = channelKey(catalog[members[0].index]);
     const candidate = catalog

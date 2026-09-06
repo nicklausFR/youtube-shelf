@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-const source=readFileSync('background.js','utf8');
+const source=readFileSync('background-core.js','utf8');
 const start=source.indexOf('  if (message?.type === "YOUTUBE_SHELF_NATIVE_FULLSCREEN")');
 const end=source.indexOf('  if (message?.type === "YOUTUBE_SHELF_SUBSCRIPTION_RESULT")',start);
-const closed=[];const context=vm.createContext({openWindows:new Set([7]),chrome:{sidePanel:{close:async options=>closed.push(options)}}});
+const closed=[];const context=vm.createContext({openWindows:new Set([7]),host:{panel:{close:async options=>closed.push(options)}}});
 vm.runInContext('function handle(message,sender,sendResponse){'+source.slice(start,end)+'}',context);
 const msg={type:'YOUTUBE_SHELF_NATIVE_FULLSCREEN'};
 const sender={url:'https://www.youtube.com/watch?v=test',tab:{id:42,active:true,windowId:7}};

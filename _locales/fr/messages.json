@@ -858,7 +858,7 @@
     "message": "Recherche des épisodes sur YouTube…"
   },
   "seriesLoadingCount": {
-    "message": "$1 vidéos trouvées — chargement…"
+    "message": "$1 épisodes trouvés · $2 vidéos analysées · $3 pages · $4 s — recherche en cours…"
   },
   "seriesMissingChannel": {
     "message": "Chaîne inconnue : ajoutez la vidéo avec sa chaîne pour rechercher les autres épisodes."
@@ -870,7 +870,7 @@
     "message": "$1 vidéos accessibles · liste actualisée depuis YouTube."
   },
   "seriesDetectedComplete": {
-    "message": "$1 vidéos détectées par titre · appartenance déduite, à vérifier. Actualisez ou rouvrez pour rechercher les nouveaux épisodes."
+    "message": "$1 vidéos détectées par titre · appartenance déduite, à vérifier. Rouvrez pour rechercher les nouveaux épisodes."
   },
   "seriesLoadError": {
     "message": "Liste partielle ou en cache — échec de l’actualisation : $1"

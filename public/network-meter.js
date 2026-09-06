@@ -35,10 +35,10 @@ export function formatNetworkBytes(bytes, compact = false, locale = "en") {
   return `${amount.toFixed(digits).replace(/\.0+$|(\.\d*[1-9])0+$/, "$1")}${compact ? "" : " "}${units[unit]}`;
 }
 
-export function installNetworkMeter() {
+export function installNetworkMeter(options = {}) {
   const originalFetch = globalThis.fetch.bind(globalThis);
   const listeners = new Set();
-  const storage = globalThis.chrome?.storage?.session;
+  const storage = options.storage;
   // V4 drops totals produced before embedded-player resources were excluded.
   const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV4";
   let persistenceReady = !storage;

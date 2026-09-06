@@ -1,3 +1,4 @@
+const host = globalThis.YouTubeShelfHosts.createHost();
 const APP_HEADER_ID = "yt-minimal-header";
 const APP_SIDEBAR_ID = "yt-minimal-sidebar";
 const STORAGE_KEY = "youtubeChannelShelfConfig";
@@ -7,7 +8,7 @@ if (!window.__ytMinimalOverlayInjected) {
   window.__ytMinimalOverlayInjected = true;
 
   function appUrl(hash = "") {
-    return chrome.runtime.getURL(`public/index.html${hash}`);
+    return host.runtime.getURL(`public/index.html${hash}`);
   }
 
   function currentVideoTitle() {
@@ -20,7 +21,7 @@ if (!window.__ytMinimalOverlayInjected) {
 
   function storedConfig() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(STORAGE_KEY, (result) => resolve(result[STORAGE_KEY] || null));
+      host.storage.local.get(STORAGE_KEY, (result) => resolve(result[STORAGE_KEY] || null));
     });
   }
 
@@ -31,7 +32,7 @@ if (!window.__ytMinimalOverlayInjected) {
     let lastError = null;
     for (const path of CONFIG_PATHS) {
       try {
-        const response = await fetch(chrome.runtime.getURL(path));
+        const response = await fetch(host.runtime.getURL(path));
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       } catch (error) {

@@ -10,6 +10,22 @@ assert.deepEqual(numberedSeriesPart("Massive Repair on BROKEN Bulldozer Blade | 
 assert.equal(numberedSeriesPart("THE SAMURAI WOOD CHISEL!!!!! | Part 1").position, 1);
 assert.equal(numberedSeriesPart("A standalone documentary"), null);
 
+// Travel episodes have different subjects but share a season/episode marker.
+const travel = annotateVideoSeries([
+  { id: "china", channelId: "travel", title: "Motorcycles are forbidden in so many cities in China CN |S8, EP157" },
+  { id: "mountain", channelId: "travel", title: "Crossing the mountains | S8, EP156" },
+  { id: "start", channelId: "travel", title: "A new adventure | Season 8 Episode 1" },
+  { id: "previous", channelId: "travel", title: "Crossing the mountains | S7, EP156" },
+  { id: "other", channelId: "other", title: "A new adventure | S8, EP1" },
+  { id: "standalone", channelId: "travel", title: "Season 8 highlights" }
+]);
+assert.equal(travel[0].seriesId, travel[1].seriesId);
+assert.equal(travel[0].seriesId, travel[2].seriesId);
+assert.equal(travel[0].seriesPosition, 157);
+assert.notEqual(travel[0].seriesId, travel[3].seriesId);
+assert.notEqual(travel[0].seriesId, travel[4].seriesId);
+assert.equal(travel[5].seriesId, undefined);
+
 const bulldozerParts = [
   { id: "GHNwchzyx0c", channelId: "engineering", title: "Massive Repair on BROKEN Bulldozer Blade | Part 1 | Gouging & Welding" },
   { id: "blade-2", channelId: "engineering", title: "Massive Repair on BROKEN Bulldozer Blade | Part 2 | Drilling, Gouging & Welding" },

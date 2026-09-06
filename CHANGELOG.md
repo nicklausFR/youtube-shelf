@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.3.20 - 2026-09-06
+
+- Separate browser-specific APIs from application logic to prepare future browser and web/PWA ports; Chromium remains the only implemented target.
+- Restore the standard favorite and watch-later colors in series lists.
+- Improve series detection, loading progress, and episode-list scrolling.
+- Add direct access to settings dialogs from the extension context menu.
+- Update the README to describe search, organization, YouTube subscription transfers, and synchronization across computers.
+
 ## 3.3.19 - 2026-09-06
 
 - Hide Shelf for YouTube fullscreen and restore it on exit, with a click fallback when required by the browser.
