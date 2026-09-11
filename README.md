@@ -12,6 +12,24 @@ YouTube Shelf brings channels, recent videos, favorites, and a watch-later list 
 
 Currently only available for Chromium-based browsers, it opens in a side panel or a full-page view with adjustable layouts. Subscriptions can be copied in either direction between Shelf and a YouTube account. Data is stored locally, with optional WebDAV synchronization across multiple computers.
 
+## Installation
+
+The current target is Chromium (Brave, Chrome, Edge). Firefox support is not implemented.
+
+The project is structured to allow future versions for other browsers or a web/PWA version.
+
+1. Download or clone this repository.
+2. Open the extension management page for your browser:
+   - Brave: `brave://extensions`
+   - Chrome: `chrome://extensions`
+   - Edge: `edge://extensions`
+3. Enable **Developer mode**.
+4. Select **Load unpacked**.
+5. Choose the repository folder containing `manifest.json`.
+6. Pin YouTube Shelf if you want quick access, then click its toolbar icon to open the side panel.
+
+Updates installed from this repository are manual: replace the files, then use **Reload** on the browser's extension management page.
+
 > All screenshots below show the current interface, using fictional channels, videos and placeholder thumbnails. The YouTube page in contextual captures is deliberately blurred.
 
 ## Side panel
@@ -89,24 +107,6 @@ YouTube Shelf adapts from a narrow browser panel to a wide layout. The four icon
   <img src="docs/screenshots/youtube-shelf-wide.png" width="62%" alt="YouTube Shelf wide split layout">
   <img src="docs/screenshots/youtube-shelf-narrow.png" width="28%" alt="YouTube Shelf narrow side-panel layout">
 </p>
-
-## Installation
-
-The current target is Chromium (Brave, Chrome, Edge). Firefox support is not implemented.
-
-The project is structured to allow future versions for other browsers or a web/PWA version.
-
-1. Download or clone this repository.
-2. Open the extension management page for your browser:
-   - Brave: `brave://extensions`
-   - Chrome: `chrome://extensions`
-   - Edge: `edge://extensions`
-3. Enable **Developer mode**.
-4. Select **Load unpacked**.
-5. Choose the repository folder containing `manifest.json`.
-6. Pin YouTube Shelf if you want quick access, then click its toolbar icon to open the side panel.
-
-Updates installed from this repository are manual: replace the files, then use **Reload** on the browser's extension management page.
 
 ## Usage
 
