@@ -153,7 +153,8 @@ export function extractYoutubeVideosFromData(data) {
 }
 
 function videosTabContent(response) {
-  const tabs = response?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+  const tabs = response?.contents?.twoColumnBrowseResultsRenderer?.tabs
+    || response?.contents?.singleColumnBrowseResultsRenderer?.tabs || [];
   const videosTab = tabs
     .map((tab) => tab?.tabRenderer)
     .find((tab) => tab?.endpoint?.commandMetadata?.webCommandMetadata?.url?.endsWith("/videos"))
@@ -174,7 +175,6 @@ function continuationContent(response) {
 }
 
 function sortContinuation(response, sort) {
-  if (sort === "latest") return "";
   // Follow YouTube's server-provided command, as NewPipe does for channel pagination,
   // instead of guessing an undocumented browse parameter for each sort order.
   const header = videosTabContent(response)?.richGridRenderer?.header;
@@ -182,6 +182,7 @@ function sortContinuation(response, sort) {
   const selectedChip = chips
     .map((item) => item?.chipViewModel)
     .find((chip) => String(chip?.text || chip?.accessibilityLabel || "").trim().toLocaleLowerCase() === sort);
+  if (sort === "latest" && selectedChip?.isSelected) return "";
   const modernToken = selectedChip?.tapCommand?.innertubeCommand?.continuationCommand?.token;
   if (modernToken) return modernToken;
 
@@ -190,6 +191,7 @@ function sortContinuation(response, sort) {
   const legacyChip = legacyChips
     .map((item) => item?.chipCloudChipRenderer)
     .find((chip) => textFrom(chip?.text).toLocaleLowerCase() === sort);
+  if (sort === "latest" && legacyChip?.isSelected) return "";
   return legacyChip?.navigationEndpoint?.continuationCommand?.token || "";
 }
 
@@ -273,9 +275,13 @@ async function fetchYoutubeChannelVideosPageOnce({
       if (!redirectId.startsWith("UC")) throw new Error("YouTube redirected to something other than a channel");
       resolvedChannelId = redirectId;
     }
-    if (normalizedSort !== "latest") {
-      const sortToken = sortContinuation(response, normalizedSort);
-      if (!sortToken) throw new Error(`YouTube returned no ${normalizedSort} video filter`);
+    const sortToken = sortContinuation(response, normalizedSort);
+    if (!sortToken && normalizedSort !== "latest") {
+      throw new Error(`YouTube returned no ${normalizedSort} video filter`);
+    }
+    // A channel can open on recommendations. "Latest" is an explicit filter
+    // when supplied, not an assumption about the first browse response.
+    if (sortToken) {
       response = await postBrowse(fetchImpl, requestBody(clientVersion, resolvedChannelId, sortToken), clientVersion);
       responseIsContinuation = true;
     }

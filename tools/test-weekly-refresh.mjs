@@ -22,6 +22,7 @@ function harness() {
     weeklyFeedFailures: new Set(), document: { visibilityState: "visible" }, navigator: { onLine: true },
     AbortController, setTimeout, clearTimeout, Date, Intl, interfaceI18n: { locale: "en" },
     weeklyVideoSummary,
+    configurationStore: { rememberChannels: async () => {} },
     fetchWeeklyChannelVideos: (options) => fetchWeeklyChannelVideos({
       ...options, fetchImpl: (...args) => state.fetch(...args),
       fetchPage: async () => ({ videos: [], continuation: "" }), timeoutMs: 20

@@ -7,12 +7,14 @@ import { mergeSynchronizationData, synchronizationContentChanged } from "./sync-
 import { synchronizableConfig } from "./sync-schema.js";
 import { formatNetworkBytes, installNetworkMeter } from "./network-meter.js";
 import { platform } from "./platform.js";
+import { createConfigurationStore } from "./web-feed-cache.js";
 import { validatePlatform } from "./platform-contract.js";
 import { createYoutubeShortsLookup } from "./youtube-shorts.js";
 import { annotateVideoSeries, numberedSeriesPart } from "./video-series.js";
 import {
   YOUTUBE_ACCOUNT_STORAGE_KEY,
   compareSubscriptionSets,
+  normalizeYoutubeChannelTitle,
   normalizeYoutubeSubscription,
   shelfChannelsMissingFromSubscriptions,
   subscriptionsMissingFromShelf,
@@ -40,6 +42,7 @@ const appLoadingEl = document.querySelector("#appLoading");
 const topOptionsEl = document.querySelector("#topOptions");
 const primaryTabEls = [...document.querySelectorAll(".primaryTab[data-section]")];
 const sortResultsEl = document.querySelector("#sortResults");
+const toggleShortsEl = document.querySelector("#toggleShorts");
 const youtubeThisWeekEl = document.querySelector("#youtubeThisWeek");
 const youtubeThisWeekRefreshEl = document.querySelector("#youtubeThisWeekRefresh");
 const contentToolbarEl = document.querySelector(".contentToolbar");
@@ -251,6 +254,7 @@ let channelVideoSearchRequestId = 0;
 let channelVideoSearchQueryKey = "";
 let channelVideoSearchResults = [];
 let channelVideoSearchLoading = false;
+let channelListLoading = null;
 let channelVideoSearchError = "";
 let channelVideoSearchUsedYoutube = false;
 let currentWatchLaterStartedAt = 0;
@@ -316,6 +320,13 @@ let draggedFavoriteCategoryId = "";
 let draggedFavoriteVideoId = "";
 let draggedWatchLaterVideoId = "";
 const STORAGE_KEY = "youtubeChannelShelfConfig";
+// Keep platform I/O explicit at the application boundary: the private PWA
+// validates these calls before preparing a compatible public release.
+const configurationStore = createConfigurationStore({
+  isWeb: platform.isWeb,
+  readConfiguration: (key) => platform.readConfiguration(key),
+  writeConfiguration: (key, value) => platform.writeConfiguration(key, value)
+}, STORAGE_KEY);
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
 const MODE_HANDOFF_KEY = "youtubeChannelShelfModeHandoff";
@@ -410,6 +421,7 @@ let weeklyCategoryExclusions = (() => {
   }
 })();
 let weeklyGroupByChannel = localStorage.getItem(YOUTUBE_WEEKLY_GROUP_BY_CHANNEL_KEY) !== "false";
+// Keep the original preference key; Shorts visibility now applies to every tab.
 let weeklyShowShorts = localStorage.getItem(YOUTUBE_WEEKLY_SHOW_SHORTS_KEY) !== "false";
 let weeklyShortsRenderTimer = null;
 let translationEditorLoadId = 0;
@@ -422,11 +434,6 @@ function uiMessage(key, substitutions = []) {
   return interfaceI18n.getMessage(key, substitutions);
 }
 
-function renderNetworkMeter() {
-  syncListRefreshButton();
-}
-
-networkMeter.subscribe(renderNetworkMeter);
 host.runtime?.onMessage?.addListener?.((message) => {
   if (message?.type !== "YOUTUBE_SHELF_THUMBNAIL_NETWORK") return;
   networkMeter.recordExternal(message);
@@ -466,6 +473,7 @@ function setActivePrimarySection(section) {
   if (section !== "channels") document.body.classList.remove("isChannelDropTarget");
   if (section !== "watchLater") document.body.classList.remove("isWatchLaterDropTarget");
   if (section !== "favorites") document.body.classList.remove("isFavoriteDropTarget");
+  if (section !== "youtube") document.body.classList.remove("isYoutubeSearchDropTarget");
   document.body.classList.toggle("primarySectionYoutube", section === "youtube");
   document.body.classList.toggle("primarySectionChannels", section === "channels");
   document.body.classList.toggle("primarySectionWatchLater", section === "watchLater");
@@ -547,6 +555,7 @@ function sortOptionsForCurrentScope() {
 }
 
 function syncSortButton() {
+  syncShortsButton();
   if (!sortResultsEl) return;
   const scope = currentSortScope();
   const mode = currentSortMode();
@@ -576,10 +585,13 @@ function setSortMode(scope, key, mode) {
 }
 
 function relativeDateValue(value = "") {
-  const text = String(value || "").trim().toLocaleLowerCase();
-  if (!text) return null;
-  const absolute = Date.parse(text);
+  const original = String(value || "").trim();
+  if (!original) return null;
+  // Preserve ISO's T/Z separators. Lowercase variants are not portable and
+  // make chronological sorting fall back to titles in stricter mobile engines.
+  const absolute = Date.parse(original);
   if (Number.isFinite(absolute)) return absolute;
+  const text = original.toLocaleLowerCase();
   const match = text.match(/(\d+(?:[.,]\d+)?)\s+(second|minute|hour|day|week|month|year|seconde|heure|jour|semaine|mois|an|année)s?/u);
   if (!match) return null;
   const amount = Number(match[1].replace(",", "."));
@@ -2281,6 +2293,21 @@ async function checkYoutubeAccount({ interactive = false } = {}) {
       renderYoutubeAccountComparison();
     });
     currentYoutubeSubscriptions = subscriptions;
+    const subscriptionsById = new Map(subscriptions.map((channel) => [channel.id, channel]));
+    let repaired = false;
+    allChannels = allChannels.map((channel) => {
+      const subscription = subscriptionsById.get(channel.id);
+      if (!subscription) return channel;
+      const title = subscription.title && subscription.title !== channel.id ? subscription.title : channel.title;
+      const thumbnail = subscription.thumbnail || channel.thumbnail;
+      if (title === channel.title && thumbnail === channel.thumbnail) return channel;
+      repaired = true;
+      return { ...channel, title, thumbnail };
+    });
+    if (repaired) {
+      await saveConfig();
+      refreshSortedView();
+    }
     youtubeSubscriptionsLoaded = true;
     let baseline = [];
     let history = [];
@@ -3750,12 +3777,24 @@ function weeklyRefreshStatusText() {
   return `${uiMessage("lastWeeklyRefresh")} ${relative}`;
 }
 
+function beginChannelListLoading(channel) {
+  const operation = { channelId: channel.id };
+  channelListLoading = operation;
+  syncListRefreshButton();
+  return () => {
+    // An older request must not stop the indicator for its replacement.
+    if (channelListLoading !== operation) return;
+    channelListLoading = null;
+    syncListRefreshButton();
+  };
+}
+
 function syncListRefreshButton() {
   if (!youtubeThisWeekRefreshEl) return;
   const weekly = activePrimarySection === "youtube" && activeView === "youtubeHome";
   const channel = activePrimarySection === "channels" && Boolean(activeChannel);
-  const loading = networkMeter.snapshot().active > 0 || (weekly && newVideosRefreshPending)
-    || (channel && channelVideoSearchLoading);
+  const loading = (weekly && newVideosRefreshPending)
+    || (channel && (channelVideoSearchLoading || channelListLoading?.channelId === activeChannel.id));
   const label = loading ? uiMessage("listLoading") : weekly ? uiMessage("refreshThisWeek")
     : channel ? uiMessage("refreshChannelList") : uiMessage("listUpToDate");
   youtubeThisWeekRefreshEl.hidden = false;
@@ -3914,10 +3953,6 @@ function newVideosContextActions() {
     {
       label: uiMessage(weeklyGroupByChannel ? "ungroupWeeklyVideosByChannel" : "groupWeeklyVideosByChannel"),
       action: toggleWeeklyGroupByChannel
-    },
-    {
-      label: uiMessage(weeklyShowShorts ? "hideWeeklyShorts" : "showWeeklyShorts"),
-      action: toggleWeeklyShorts
     }
   ];
 }
@@ -4423,11 +4458,11 @@ async function openOfficialYoutube(video, options = {}) {
 }
 
 async function readStoredConfig() {
-  return platform.readConfiguration(STORAGE_KEY);
+  return configurationStore.read();
 }
 
 async function writeStoredConfig(value) {
-  await platform.writeConfiguration(STORAGE_KEY, value);
+  await configurationStore.write(value);
   if (platform.isExtension && value?.updatedAt !== webDavSyncIgnoreUpdatedAt) scheduleWebDavSynchronization();
 }
 
@@ -4495,6 +4530,17 @@ function playlistFromInput(value) {
   }
 }
 
+function videoFromYoutubeSearchInput(value) {
+  const id = videoIdFromInput(String(value || ""));
+  if (!id) return null;
+  return {
+    id,
+    title: id,
+    thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+    ...playlistFromInput(value)
+  };
+}
+
 function pushHistory(entry) {
   if (suppressHistory) return;
   const current = historyStack[historyIndex];
@@ -4507,7 +4553,9 @@ function pushHistory(entry) {
 }
 
 function videoChannelTitle(video) {
-  return video.channel || allChannels.find((channel) => channel.id === video.channelId)?.title || (activeChannel?.id === video.channelId ? activeChannel.title : "");
+  return video.channel
+    || allChannels.find((channel) => channel.id === video.channelId)?.title
+    || (video.channelId && activeChannel?.id === video.channelId ? activeChannel.title : "");
 }
 
 function videoDateText(video) {
@@ -5245,21 +5293,34 @@ function syncVisibleVideoProgress() {
   });
 }
 
+function syncShortsButton() {
+  if (!toggleShortsEl) return;
+  const label = uiMessage(weeklyShowShorts ? "hideWeeklyShorts" : "showWeeklyShorts");
+  toggleShortsEl.title = label;
+  toggleShortsEl.setAttribute("aria-label", label);
+  toggleShortsEl.setAttribute("aria-pressed", String(weeklyShowShorts));
+}
+
+function filterVisibleShorts(videos) {
+  return weeklyShowShorts ? videos : videos.filter((video) => youtubeShorts.known(video) !== true);
+}
+
 function toggleWeeklyShorts() {
   weeklyShowShorts = !weeklyShowShorts;
   localStorage.setItem(YOUTUBE_WEEKLY_SHOW_SHORTS_KEY, String(weeklyShowShorts));
-  if (activeView === "newVideos" || activeView === "youtubeHome") renderNewVideos();
+  syncShortsButton();
+  refreshSortedView();
 }
 
 function scheduleWeeklyShortsRender() {
   if (weeklyShowShorts || weeklyShortsRenderTimer !== null) return;
   weeklyShortsRenderTimer = window.setTimeout(() => {
     weeklyShortsRenderTimer = null;
-    if (weeklyShowShorts || !["newVideos", "youtubeHome"].includes(activeView)) return;
+    if (weeklyShowShorts) return;
     const expandedIds = new Set([...document.querySelectorAll(".weeklyChannelVideoGroup.is-expanded")]
       .map((group) => group.dataset.channelId));
     const scrollTop = channelsEl.scrollTop;
-    renderNewVideos();
+    refreshSortedView();
     for (const group of document.querySelectorAll(".weeklyChannelVideoGroup")) {
       if (expandedIds.has(group.dataset.channelId)) group.querySelector(".weeklyChannelGroupToggle")?.click();
     }
@@ -5835,6 +5896,7 @@ function createWatchMoreCard(channel, options = {}) {
 }
 
 function renderVideos(videos, target = videosEl, options = {}) {
+  if (!options.includeShorts) videos = filterVisibleShorts(videos);
   const displayVideos = options.preserveOrder ? videos : sortVideosForDisplay(videos);
   const items = displayVideos.map(createVideoCard);
   if (options.watchMoreChannel?.id) {
@@ -6355,7 +6417,7 @@ function renderChannelAssignmentList() {
       checkbox.checked = Boolean((channel.categories || []).includes(channelAssignCategory.id));
 
       const name = document.createElement("span");
-      name.textContent = channel.title;
+      name.textContent = normalizeYoutubeChannelTitle(channel.title);
 
       label.append(checkbox, name);
       return label;
@@ -6948,13 +7010,13 @@ function renderSearchedVideos() {
   }
 }
 
-function renderWatchLaterVideoResults(videos) {
+function renderWatchLaterVideoResults(videos, options = {}) {
   const watchLaterList = document.createElement("div");
   watchLaterList.className = "videos watchLaterVideos";
   channelsEl.classList.add("videoListHost");
   channelsEl.replaceChildren(watchLaterList);
   if (activePrimarySection === "watchLater") renderStoredVideoResults(videos, watchLaterList, "watchLater");
-  else renderVideos(videos, watchLaterList);
+  else renderVideos(videos, watchLaterList, options);
 }
 
 function renderFavoriteVideoResults(videos) {
@@ -6968,7 +7030,7 @@ function renderFavoriteVideoResults(videos) {
 }
 
 function renderStoredVideoResults(videos, target, collection) {
-  const sortedVideos = sortVideosForDisplay(videos);
+  const sortedVideos = sortVideosForDisplay(filterVisibleShorts(videos));
   const visibleGroups = new Map();
   for (const video of sortedVideos) {
     if (!video.videoGroupId) continue;
@@ -7259,13 +7321,15 @@ async function saveConfig() {
     : config.updatedAt || new Date().toISOString();
   config = nextConfig;
 
-  await writeStoredConfig(config);
+  // Normalize before yielding. Feed refreshes and user edits can replace these
+  // collections while storage is pending; never restore the older snapshot.
   allCategories = config.categories || [];
   favoriteCategories = config.favoriteCategories || [];
   allChannels = uniqueChannels(config.channels || []);
   favorites = config.favorites || {};
   seenVideos = config.seenVideos || {};
   watchLater = config.watchLater || {};
+  await writeStoredConfig(config);
 }
 
 function renderCategories() {
@@ -7925,7 +7989,7 @@ function renderChannels(channels) {
       titleRow.className = "channelTitleRow";
       const name = document.createElement("div");
       name.className = "channelName";
-      name.textContent = channel.title;
+      name.textContent = normalizeYoutubeChannelTitle(channel.title);
       titleRow.append(name);
       const ageLabel = newVideoAgeLabel(channel);
       if (ageLabel) {
@@ -8209,6 +8273,7 @@ async function loadChannelVideosForYoutubeOrder(sort) {
   channelVideosLoadedSort = "local";
   setStatus();
   refreshEl.disabled = true;
+  const finishLoading = beginChannelListLoading(channel);
 
   try {
     const page = await fetchYoutubeChannelVideosPage({ channelId: channel.id, sort });
@@ -8228,6 +8293,7 @@ async function loadChannelVideosForYoutubeOrder(sort) {
     setStatus(`YouTube ${sort} order unavailable: ${error.message}`, true);
   } finally {
     if (requestId === channelVideoLoadRequestId) refreshEl.disabled = false;
+    finishLoading();
   }
 }
 
@@ -8365,6 +8431,7 @@ async function loadMoreChannelVideos() {
   const loadedSort = channelVideosLoadedSort;
   const requestId = channelVideoLoadRequestId;
   channelVideosLoadingMore = true;
+  const finishLoading = beginChannelListLoading(channel);
   renderChannelVideos(currentVideos);
   try {
     const page = await fetchYoutubeChannelVideosPage({
@@ -8387,6 +8454,7 @@ async function loadMoreChannelVideos() {
     if (requestId !== channelVideoLoadRequestId || activeChannel?.id !== channel.id) return;
     setStatus(`Unable to load more videos: ${error.message}`, true);
   } finally {
+    finishLoading();
     if (requestId === channelVideoLoadRequestId && activeChannel?.id === channel.id) {
       channelVideosLoadingMore = false;
       if (channelSearchQuery.trim() && isSelectedChannelSearchScope()) renderSearchedVideos();
@@ -8416,6 +8484,7 @@ async function loadFeed() {
   channelVideosInnertubeFailed = false;
   setStatus();
   refreshEl.disabled = true;
+  const finishLoading = beginChannelListLoading(channel);
 
   try {
     let rssVideos = [];
@@ -8522,6 +8591,7 @@ async function loadFeed() {
     videosEl.replaceChildren(message);
   } finally {
     if (requestId === channelVideoLoadRequestId) refreshEl.disabled = false;
+    finishLoading();
   }
 }
 
@@ -8655,6 +8725,7 @@ async function performChannelSummaryRefresh(options = {}) {
         const summaryChanged = feedSummaryChanged(channel, next);
         feedChanged = true;
         replaceChannelSummary(next);
+        await configurationStore.rememberChannels([next]);
         if (summaryChanged && (activeView === "youtubeHome" || activeView === "newVideos")) renderNewVideos();
       } catch {
         // Keep cached videos and the last successful date, and retry on the next poll.
@@ -8766,7 +8837,9 @@ function renderYoutubeSearchError(message) {
 function renderYoutubeSearchResults() {
   youtubeSearchLoadObserver?.disconnect();
   youtubeSearchLoadObserver = null;
-  renderWatchLaterVideoResults(currentVideos);
+  renderWatchLaterVideoResults(currentVideos, {
+    includeShorts: Boolean(videoFromYoutubeSearchInput(youtubeSearchResultsQuery))
+  });
   if (youtubeSearchExhausted || (!youtubeSearchContinuation && !youtubeSearchPendingResults.length)) return;
 
   const list = channelsEl.querySelector(".videos");
@@ -8836,6 +8909,7 @@ async function loadMoreYoutubeSearchResults() {
 async function searchYoutube(query, options = {}) {
   const trimmed = query.trim();
   if (!trimmed) return;
+  const directVideo = videoFromYoutubeSearchInput(trimmed);
   setActivePrimarySection("youtube");
   youtubeSearchQuery = trimmed;
   await maybePromptSeenForWatchLater();
@@ -8856,6 +8930,36 @@ async function searchYoutube(query, options = {}) {
   setStatus();
 
   if (!options.skipHistory) pushHistory({ type: "search", id: trimmed });
+
+  if (directVideo) {
+    youtubeSearchLoadObserver?.disconnect();
+    youtubeSearchLoadObserver = null;
+    youtubeSearchResultsQuery = trimmed;
+    youtubeSearchResultsCache = [directVideo];
+    youtubeSearchPendingResults = [];
+    youtubeSearchContinuation = "";
+    youtubeSearchApiKey = "";
+    youtubeSearchClientVersion = "";
+    youtubeSearchLoadingMore = false;
+    youtubeSearchExhausted = true;
+    currentVideos = [directVideo];
+    renderYoutubeSearchResults();
+    syncVideoLayoutAvailability();
+    setStatus();
+
+    const completedVideo = await completeDroppedVideoMetadata(directVideo);
+    if (activeView !== "search" || youtubeSearchResultsQuery !== trimmed) return;
+    const result = {
+      ...directVideo,
+      ...completedVideo,
+      thumbnail: completedVideo.thumbnail || directVideo.thumbnail
+    };
+    youtubeSearchResultsCache = [result];
+    currentVideos = [result];
+    renderYoutubeSearchResults();
+    syncVideoLayoutAvailability();
+    return;
+  }
 
   if (youtubeSearchResultsQuery === trimmed && (youtubeSearchResultsCache.length || youtubeSearchExhausted)) {
     currentVideos = [...youtubeSearchResultsCache];
@@ -9499,6 +9603,7 @@ topOptionsEl?.addEventListener("click", (event) => {
   event.stopPropagation();
   showContextMenu(event, settingsContextActions());
 });
+toggleShortsEl?.addEventListener("click", toggleWeeklyShorts);
 sortResultsEl?.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
@@ -9699,7 +9804,7 @@ function clearVideoDropIndicators() {
   draggedFavoriteVideoId = "";
   draggedWatchLaterVideoId = "";
   clearCategoryDropExpansion();
-  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget", "isYoutubeSearchDropTarget");
   document.querySelectorAll(".is-favorite-group-drop-target").forEach((item) => {
     item.classList.remove("is-favorite-group-drop-target");
     delete item.dataset.favoriteDropPlacement;
@@ -9843,6 +9948,7 @@ favoritesTabEl?.addEventListener("drop", async (event) => {
 
 searchInputEl.addEventListener("input", () => {
   hideGlobalSearchSuggestions();
+  if (videoFromYoutubeSearchInput(searchInputEl.value)) setActivePrimarySection("youtube");
   if (activePrimarySection === "youtube") {
     window.clearTimeout(globalSearchTimer);
     const query = searchInputEl.value.trim();
@@ -9874,6 +9980,52 @@ searchInputEl.addEventListener("keydown", (event) => {
   }
 });
 
+function youtubeVideoSearchValueFromTransfer(dataTransfer) {
+  const droppedText = droppedTextFromDataTransfer(dataTransfer);
+  if (videoIdFromInput(droppedText)) return droppedText;
+  const youtubeUrl = youtubeUrlFromDroppedText(droppedText);
+  if (videoIdFromInput(youtubeUrl)) return youtubeUrl;
+  const droppedVideo = droppedVideoFromDataTransfer(dataTransfer);
+  return droppedVideo?.id || "";
+}
+
+function showDroppedYoutubeVideoInSearch(dataTransfer, value = youtubeVideoSearchValueFromTransfer(dataTransfer)) {
+  if (!value) return false;
+  searchInputEl.value = value;
+  searchYoutube(value, { skipHistory: true })
+    .then(() => recordYoutubeSearchHistory(value))
+    .catch((error) => setStatus(uiMessage("youtubeSearchFailed", [error.message]), true));
+  return true;
+}
+
+searchInputEl.addEventListener("paste", (event) => {
+  const value = youtubeVideoSearchValueFromTransfer(event.clipboardData);
+  if (!value) return;
+  event.preventDefault();
+  showDroppedYoutubeVideoInSearch(event.clipboardData, value);
+});
+
+searchInputEl.addEventListener("dragover", (event) => {
+  const types = [...event.dataTransfer?.types || []];
+  if (!types.some((type) => ["application/x-youtube-channel-shelf-video", "text/uri-list", "text/plain", "text/html"].includes(type))) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.remove("isChannelDropTarget", "isWatchLaterDropTarget", "isFavoriteDropTarget");
+  document.body.classList.add("isYoutubeSearchDropTarget");
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+});
+
+searchInputEl.addEventListener("dragleave", () => {
+  document.body.classList.remove("isYoutubeSearchDropTarget");
+});
+
+searchInputEl.addEventListener("drop", (event) => {
+  if (!showDroppedYoutubeVideoInSearch(event.dataTransfer)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  clearVideoDropIndicators();
+});
+
 document.addEventListener("pointerdown", (event) => {
   if (!(event.target instanceof Element) || !event.target.closest(".globalYoutubeSearch")) {
     hideGlobalSearchSuggestions();
@@ -9885,6 +10037,7 @@ searchFormEl.addEventListener("submit", async (event) => {
   window.clearTimeout(globalSearchTimer);
   const value = searchInputEl.value;
   hideGlobalSearchSuggestions();
+  if (videoFromYoutubeSearchInput(value)) setActivePrimarySection("youtube");
 
   if (activePrimarySection !== "youtube") {
     channelSearchQuery = value;
@@ -9894,19 +10047,8 @@ searchFormEl.addEventListener("submit", async (event) => {
     return;
   }
 
-  const videoId = videoIdFromInput(value);
-
-  if (videoId) {
-    await maybePromptSeenForWatchLater();
-    activeView = "direct";
-    activeChannel = null;
-    activeSearchQuery = "";
-    setActiveChannelButton();
-    play(videoId);
-    return;
-  }
-
-  searchYoutube(value);
+  await searchYoutube(value, { skipHistory: true });
+  recordYoutubeSearchHistory(value);
 });
 
 document.addEventListener("keydown", (event) => {
@@ -9915,6 +10057,12 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("dragover", (event) => {
+  if (activePrimarySection === "youtube") {
+    if (!hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
+    document.body.classList.add("isYoutubeSearchDropTarget");
+    return;
+  }
   if (activePrimarySection === "favorites") {
     if (!hasVideoDropType(event.dataTransfer)) return;
     event.preventDefault();
@@ -9942,6 +10090,12 @@ document.addEventListener("dragleave", (event) => {
 
 document.addEventListener("drop", async (event) => {
   clearVideoDropIndicators();
+  if (activePrimarySection === "youtube") {
+    if (!hasVideoDropType(event.dataTransfer)) return;
+    event.preventDefault();
+    showDroppedYoutubeVideoInSearch(event.dataTransfer);
+    return;
+  }
   if (activePrimarySection === "favorites") {
     if (!hasVideoDropType(event.dataTransfer)) return;
     event.preventDefault();
@@ -9997,7 +10151,7 @@ function channelIdFromDroppedText(value = "") {
 
 function handleUrlFromDroppedText(value = "") {
   const text = String(value).trim();
-  const handle = text.match(/(?:youtube\.com\/|^)(@[-_.a-zA-Z0-9]+)/)?.[1];
+  const handle = text.match(/(?:youtube\.com\/|^)(@[^\s/?#]+)/u)?.[1];
   return handle ? `https://www.youtube.com/${handle}` : "";
 }
 

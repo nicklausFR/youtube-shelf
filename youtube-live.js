@@ -298,10 +298,12 @@ function youtubeShelfSubscriptionFromCard(card) {
   const data = card?.data || card?.__data?.data || {};
   const dataId = data.channelId
     || data.navigationEndpoint?.browseEndpoint?.browseId
+    || data.rendererContext?.commandContext?.onTap?.innertubeCommand?.browseEndpoint?.browseId
     || data.contentId
     || "";
   const links = [...card.querySelectorAll("a[href]")];
-  const link = links.find((item) => /\/(?:channel\/UC[-_a-zA-Z0-9]+|@[-_.a-zA-Z0-9]+|c\/|user\/)/.test(item.getAttribute("href") || ""));
+  const link = links.find((item) => /\/channel\/UC[-_a-zA-Z0-9]+/.test(item.getAttribute("href") || ""))
+    || links.find((item) => /\/(?:@[^/?#]+|c\/[^/?#]+|user\/[^/?#]+)/u.test(item.getAttribute("href") || ""));
   if (!link && !/^UC[-_a-zA-Z0-9]+$/.test(dataId)) return null;
   const url = link ? new URL(link.getAttribute("href"), location.origin).href : `https://www.youtube.com/channel/${dataId}`;
   const id = /^UC[-_a-zA-Z0-9]+$/.test(dataId)
@@ -309,8 +311,10 @@ function youtubeShelfSubscriptionFromCard(card) {
     : url.match(/\/channel\/(UC[-_a-zA-Z0-9]+)/)?.[1] || "";
   const title = String(
     data.title?.simpleText
-    || data.title?.runs?.[0]?.text
-    || card.querySelector("#channel-title, #text-container, .yt-lockup-metadata-view-model__title")?.textContent
+    || data.title?.runs?.map((run) => run.text || "").join("")
+    || data.metadata?.lockupMetadataViewModel?.title?.content
+    || card.querySelector("#channel-title #text, #channel-title yt-formatted-string, .yt-lockup-metadata-view-model__title")?.textContent
+    || card.querySelector("#channel-title")?.textContent
     || link?.getAttribute("title")
     || link?.textContent
     || id
@@ -320,7 +324,7 @@ function youtubeShelfSubscriptionFromCard(card) {
     id,
     url,
     title,
-    thumbnail: image?.currentSrc || image?.src || ""
+    thumbnail: data.thumbnail?.thumbnails?.slice(-1)[0]?.url || image?.currentSrc || image?.src || ""
   };
 }
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.22 - 2026-09-11
+
+- Show an exact video result when a YouTube video URL or ID is pasted, dropped, or submitted in the main search field.
+- Make video drags over YouTube search as visible as channel, Favorites, and Watch later drop targets.
+- Add a shared Shorts visibility button across video lists.
+- Correct latest-video selection, chronological sorting, and loading indicators.
+- Preserve concurrently refreshed videos and cache derived feeds for the web adapter.
+- Improve subscription card parsing and repair duplicated channel titles.
+
 ## 3.3.21 - 2026-09-06
 
 - Keep the active tab and selected category when switching between the side panel and full-page mode, including during video transfer.

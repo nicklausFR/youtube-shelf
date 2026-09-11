@@ -62,22 +62,62 @@ const harness = {
   weeklyShowShorts: true, weeklyGroupByChannel: true, activeView: "youtubeHome",
   youtubeShorts: lookup, channelMatchesWeeklyCategories: () => true, isVideoNewForChannel: () => true,
   videoWithChannel: (video, channel) => ({ ...video, channelId: channel.id }), shouldGroupWeeklyVideos: () => true,
-  localStorage: storage, YOUTUBE_WEEKLY_SHOW_SHORTS_KEY: "showShorts", renderNewVideos: () => { renders++; },
+  localStorage: storage, YOUTUBE_WEEKLY_SHOW_SHORTS_KEY: "showShorts", refreshSortedView: () => { renders++; },
+  toggleShortsEl: { setAttribute(name, value) { this[name] = value; } },
   uiMessage: key => key, setYoutubeTabHomePreference() {}, resetNewVideoCounters() {}, restoreWeeklyVideoList() {},
   openExcludedNewVideosDialog() {}, openWeeklyCategoryDialog() {}, toggleWeeklyGroupByChannel() {}
 };
 vm.createContext(harness);
-for (const name of ["collectNewVideos", "toggleWeeklyShorts", "newVideosContextActions"]) vm.runInContext(definition(name), harness);
+for (const name of ["collectNewVideos", "syncShortsButton", "filterVisibleShorts", "toggleWeeklyShorts", "newVideosContextActions"]) vm.runInContext(definition(name), harness);
 assert.equal(harness.collectNewVideos().length, 3);
-assert.equal(harness.newVideosContextActions().at(-1).label, "hideWeeklyShorts");
-harness.newVideosContextActions().at(-1).action();
+assert.ok(harness.newVideosContextActions().every(item => !/Shorts/.test(item.label)));
+harness.toggleWeeklyShorts();
 assert.equal(stored.get("showShorts"), "false");
 assert.equal(harness.collectNewVideos().length, 2);
 assert.equal(harness.collectNewVideos()[0].weeklyChannelGroupSize, 2);
 assert.equal(harness.collectNewVideos()[0].weeklyChannelGroupOrder, 1);
-assert.equal(harness.newVideosContextActions().at(-1).label, "showWeeklyShorts");
+assert.equal(harness.toggleShortsEl.title, "showWeeklyShorts");
+assert.equal(harness.toggleShortsEl["aria-pressed"], "false");
 harness.toggleWeeklyShorts();
 assert.equal(stored.get("showShorts"), "true");
 assert.equal(harness.collectNewVideos().length, 3);
 assert.equal(renders, 2);
-console.log("Shorts detection, caching, request limits and weekly filter tests passed");
+assert.equal(harness.toggleShortsEl["aria-pressed"], "true");
+
+// Shared renderers cover channels, YouTube search, favorites and watch later.
+Object.assign(harness, {
+  videosEl: {}, sortVideosForDisplay: videos => videos,
+  createVideoCard: video => video,
+  createStoredVideoGroup: members => ({ members }),
+  setActiveVideoButton() {}, syncVideoLayoutAvailability() {}
+});
+for (const name of ["renderVideos", "renderStoredVideoResults"]) vm.runInContext(definition(name), harness);
+const videos = harness.allChannels[0].feedVideos.map(video => ({ ...video, videoGroupId: "group" }));
+const target = { replaceChildren(...items) { this.items = items; } };
+for (const show of [false, true]) {
+  harness.weeklyShowShorts = show;
+  harness.renderVideos(videos, target);
+  assert.equal(target.items.length, show ? 3 : 2);
+  for (const collection of ["favorites", "watchLater"]) {
+    harness.renderStoredVideoResults(videos, target, collection);
+    assert.equal(target.items[0].members.length, show ? 3 : 2);
+  }
+}
+assert.equal(videos.length, 3, "Filtering must preserve source videos for restoring Shorts");
+
+// Newly detected Shorts update the current tab, with one render per batch.
+let callback;
+Object.assign(harness, {
+  weeklyShowShorts: false, weeklyShortsRenderTimer: null, activeView: "favorites",
+  window: { setTimeout(fn) { callback = fn; return 1; } },
+  document: { querySelectorAll: () => [] }, channelsEl: { scrollTop: 123 }
+});
+vm.runInContext(definition("scheduleWeeklyShortsRender"), harness);
+harness.scheduleWeeklyShortsRender();
+harness.scheduleWeeklyShortsRender();
+callback();
+assert.equal(renders, 3);
+assert.equal(harness.channelsEl.scrollTop, 123);
+const toolbarHtml = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+assert.ok(toolbarHtml.indexOf('id="toggleShorts"') < toolbarHtml.indexOf('id="channelZoomOut"'));
+console.log("Shorts detection, caching, shared toggle, all list renderers and async filtering passed");

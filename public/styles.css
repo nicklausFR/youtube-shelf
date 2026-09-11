@@ -691,6 +691,13 @@ body.webMode .globalYoutubeSearch.channelSearch {
   animation: refreshButtonSpin 0.75s linear infinite;
 }
 
+.shortsToggleButton[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.shortsToggleButton .shortsHiddenSlash { display: none; }
+.shortsToggleButton[aria-pressed="false"] .shortsHiddenSlash { display: block; }
+
 @keyframes refreshButtonSpin {
   to {
     transform: rotate(360deg);
@@ -2776,6 +2783,34 @@ body.isFavoriteDropTarget::after {
   pointer-events: none;
   position: fixed;
   z-index: 100;
+}
+
+body.isYoutubeSearchDropTarget::after {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  color: var(--text);
+  content: "Drop a YouTube video to search";
+  display: flex;
+  font-size: 14px;
+  inset: 10px;
+  justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+  position: fixed;
+  text-align: center;
+  z-index: 100;
+}
+
+body.isYoutubeSearchDropTarget .globalYoutubeSearch.channelSearch {
+  z-index: 102;
+}
+
+body.isYoutubeSearchDropTarget .topSearchForm input {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 38%, transparent);
+  outline: 0;
 }
 /* Extension side panel layout: keep the compact panel UI even when Chrome widens the side panel. */
 .mainbar {

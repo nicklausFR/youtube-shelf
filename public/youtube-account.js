@@ -1,10 +1,17 @@
 export const YOUTUBE_ACCOUNT_STORAGE_KEY = "youtubeChannelShelfYoutubeAccountV1";
+export function normalizeYoutubeChannelTitle(value = "") {
+  const title = String(value).replace(/\s+/gu, " ").trim();
+  // Some YouTube containers expose the same long label twice (visible + hidden).
+  const repeated = title.match(/^(.{10,}?)\s*\1$/u);
+  return repeated ? repeated[1] : title;
+}
+
 export function normalizeYoutubeSubscription(item = {}) {
   const channelId = String(item.id || "").trim();
   if (!/^UC[-_a-zA-Z0-9]+$/.test(channelId)) return null;
   return {
     id: channelId,
-    title: String(item.title || channelId).trim(),
+    title: normalizeYoutubeChannelTitle(item.title || channelId),
     thumbnail: String(item.thumbnail || "").trim()
   };
 }
