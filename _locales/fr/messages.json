@@ -62,6 +62,15 @@
   "showWeeklyShorts": {
     "message": "Afficher les Shorts"
   },
+  "excludedContent": {
+    "message": "Contenus masqués"
+  },
+  "shorts": {
+    "message": "Shorts"
+  },
+  "privateVideosIncludingMembers": {
+    "message": "Vidéos privées (y compris celles réservées aux membres)"
+  },
   "extensionName": {
     "message": "YouTube Shelf"
   },
@@ -118,6 +127,48 @@
   },
   "favorites": {
     "message": "Favoris"
+  },
+  "history": {
+    "message": "Historique"
+  },
+  "searchHistory": {
+    "message": "Rechercher dans l’historique"
+  },
+  "localWatchHistory": {
+    "message": "Historique de visionnage local"
+  },
+  "enableLocalWatchHistory": {
+    "message": "Activer l’historique de visionnage local"
+  },
+  "disableWatchHistory": {
+    "message": "Désactiver l’historique"
+  },
+  "localWatchHistoryHint": {
+    "message": "Ajoute un onglet Historique et enregistre les sessions de visionnage uniquement sur cet appareil. Les sessions de moins de 15 secondes sont ignorées."
+  },
+  "resetWatchHistory": {
+    "message": "Réinitialiser l’historique…"
+  },
+  "resetWatchHistoryConfirmation": {
+    "message": "Supprimer tout l’historique local de visionnage ? Cette action est irréversible."
+  },
+  "emptyWatchHistorySearch": {
+    "message": "Aucune vidéo trouvée dans l’historique."
+  },
+  "emptyWatchHistory": {
+    "message": "L’historique de visionnage est vide."
+  },
+  "removeWatchHistoryEntry": {
+    "message": "Supprimer cette entrée de l’historique"
+  },
+  "historyViewed": {
+    "message": "Visionnée pendant $1"
+  },
+  "historyViewedPercent": {
+    "message": "Visionnée pendant $1 · $2 %"
+  },
+  "historyViewedCompleted": {
+    "message": "Visionnée pendant $1 · terminée"
   },
   "expandFavoriteGroup": {
     "message": "Afficher les $1 favoris groupés"
@@ -260,6 +311,9 @@
   "language": {
     "message": "Langue"
   },
+  "languageAndTranslations": {
+    "message": "Langue et traductions"
+  },
   "youtubeVideoTitles": {
     "message": "Titres des vidéos YouTube"
   },
@@ -356,6 +410,12 @@
   "youtubeOptions": {
     "message": "Sniff YouTube"
   },
+  "channelUpdates": {
+    "message": "Actualisation des chaînes"
+  },
+  "watchHistoryOptions": {
+    "message": "Historique de visionnage"
+  },
   "sniffYoutubeMetadata": {
     "message": "Analyser les métadonnées YouTube"
   },
@@ -382,6 +442,18 @@
   },
   "data": {
     "message": "Données"
+  },
+  "interfaceSettings": {
+    "message": "Interface"
+  },
+  "accountAndSubscriptions": {
+    "message": "Compte et abonnements YouTube"
+  },
+  "backupAndRestore": {
+    "message": "Sauvegarde et restauration"
+  },
+  "resetShelfContent": {
+    "message": "Réinitialiser le contenu de Shelf…"
   },
   "synchronization": {
     "message": "Synchronisation"

@@ -33,6 +33,56 @@ assert.equal(second.videos[0].id, "b");
 assert.equal(second.videos[0].playlistIndex, 2);
 assert.equal(second.continuation, "");
 assert.equal(requests[1].continuation, "next");
+
+const modernItem = (id) => ({ lockupViewModel: {
+  contentType: "LOCKUP_CONTENT_TYPE_VIDEO",
+  contentId: id,
+  metadata: { lockupMetadataViewModel: { title: { content: "Modern playlist item" } } },
+  rendererContext: { commandContext: { onTap: { innertubeCommand: { watchEndpoint: {
+    videoId: id, playlistId: "PLmodern", index: 7
+  } } } } }
+} });
+const modernContinuation = { continuationItemViewModel: {
+  continuationCommand: { innertubeCommand: { continuationCommand: { token: "modern-next" } } }
+} };
+const modernPage = await fetchYoutubePlaylistPage({
+  playlistId: "PLmodern",
+  fetchImpl: async (url, options) => options?.body
+    ? { ok: true, json: async () => ({
+      metadata: { playlistMetadataRenderer: { title: "Modern course" } },
+      contents: { twoColumnBrowseResultsRenderer: { tabs: [{ expandableTabRenderer: {
+        selected: true,
+        content: { sectionListRenderer: { contents: [modernItem("modern00001"), modernContinuation] } }
+      } }] } }
+    }) }
+    : { ok: true, text: async () => '"INNERTUBE_CONTEXT_CLIENT_VERSION":"2.20260911.01.00"' }
+});
+assert.equal(modernPage.videos[0].id, "modern00001");
+assert.equal(modernPage.videos[0].playlistIndex, 7);
+assert.equal(modernPage.continuation, "modern-next");
+
+const actionOnlyPage = await fetchYoutubePlaylistPage({
+  playlistId: "PLaction",
+  fetchImpl: async (url, options) => options?.body
+    ? { ok: true, json: async () => ({
+      onResponseReceivedEndpoints: [{ appendContinuationItemsAction: {
+        continuationItems: [item("action00001", 1), modernContinuation]
+      } }]
+    }) }
+    : { ok: true, text: async () => '"INNERTUBE_CONTEXT_CLIENT_VERSION":"2.20260911.01.00"' }
+});
+assert.equal(actionOnlyPage.videos[0].id, "action00001");
+assert.equal(actionOnlyPage.continuation, "modern-next");
+
+const terminalPage = await fetchYoutubePlaylistPage({
+  playlistId: "PLmodern",
+  continuation: "terminal-modern-continuation",
+  fetchImpl: async (url, options) => options?.body
+    ? { ok: true, json: async () => ({ responseContext: {}, trackingParams: "done" }) }
+    : { ok: true, text: async () => '"INNERTUBE_CONTEXT_CLIENT_VERSION":"2.20260911.01.00"' }
+});
+assert.deepEqual(terminalPage, { videos: [], continuation: "", playlistTitle: "" });
+
 await assert.rejects(fetchYoutubePlaylistPage({ playlistId: "invalid/id", fetchImpl }));
 await assert.rejects(fetchYoutubePlaylistPage({ playlistId: "PLprivate", fetchImpl: async () => ({ ok: true, json: async () => ({}) }) }), /unavailable/);
 const seed = { id: "one", channelId: "creator", title: "Building a workshop | Part 1" };

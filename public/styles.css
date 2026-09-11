@@ -247,6 +247,10 @@ body.webMode .globalYoutubeSearch.channelSearch {
   z-index: 49;
 }
 
+body.historyEnabled .primaryTabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .primaryTabs::after {
   background: light-dark(#b8bec7, #444);
   bottom: 5px;
@@ -690,13 +694,6 @@ body.webMode .globalYoutubeSearch.channelSearch {
 .refreshButton:disabled svg {
   animation: refreshButtonSpin 0.75s linear infinite;
 }
-
-.shortsToggleButton[aria-pressed="true"] {
-  color: var(--accent);
-}
-
-.shortsToggleButton .shortsHiddenSlash { display: none; }
-.shortsToggleButton[aria-pressed="false"] .shortsHiddenSlash { display: block; }
 
 @keyframes refreshButtonSpin {
   to {
@@ -1422,6 +1419,38 @@ body.videoCompactTitleMode .youtubeShortsBadge {
   display: none;
 }
 
+.historyProgress {
+  background: light-dark(rgb(75 134 217 / 16%), rgb(75 134 217 / 24%));
+  border: 1px solid light-dark(rgb(75 134 217 / 45%), rgb(75 134 217 / 58%));
+  border-radius: 999px;
+  height: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  width: 96px;
+}
+
+.historyProgressFill {
+  background: rgb(75 134 217 / 78%);
+  display: block;
+  height: 100%;
+}
+
+.historyProgress.is-indeterminate .historyProgressFill {
+  background: rgb(75 134 217 / 48%);
+  width: 100% !important;
+}
+
+.channels.videoListHost > .historyVideos .video {
+  grid-template-rows: auto !important;
+}
+
+.channels.videoListHost > .historyVideos .thumbFrame {
+  align-self: start;
+  grid-row: 1 !important;
+  height: 84px !important;
+  min-height: 84px !important;
+}
+
 button.videoChannelMeta {
   background: transparent;
   border: 0;
@@ -1926,6 +1955,15 @@ body.sidePanelVideos .favoriteButton {
 
 .youtubeCheckOptions .modalSelectField {
   margin: 10px 0 0;
+}
+
+.watchHistoryOption {
+  margin-bottom: 8px;
+}
+
+.watchHistoryReset {
+  margin-top: 10px;
+  width: 100%;
 }
 
 .webDavSyncModal {
@@ -2712,6 +2750,35 @@ body.sidePanelVideos .favoriteButton {
   padding: 0 10px;
   text-align: left;
   white-space: nowrap;
+}
+
+.contextMenu button.is-checkable {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 15px 1fr;
+}
+
+.contextMenuCheck {
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  display: block;
+  height: 14px;
+  opacity: 0.72;
+  position: relative;
+  width: 14px;
+}
+
+.contextMenu button.is-checked .contextMenuCheck::after {
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  content: "";
+  height: 7px;
+  left: 4px;
+  position: absolute;
+  top: 1px;
+  transform: rotate(45deg);
+  width: 3px;
 }
 
 .contextMenu button:hover {
@@ -4353,6 +4420,127 @@ body.sidePanelVideos .channels {
   z-index: 1;
 }
 
+.videoAgeIconOnly {
+  display: none;
+}
+
+.videoHoverPanel {
+  position: fixed;
+  z-index: 190;
+  width: 350px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid light-dark(#d6dae0, #404044);
+  border-radius: 14px;
+  background: light-dark(#fff, #202023);
+  background-image: linear-gradient(135deg, light-dark(#f8f9fb, #29292d), transparent 75%);
+  color: var(--text);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 35%), 0 2px 8px rgb(0 0 0 / 15%);
+  text-align: left;
+  cursor: default;
+  animation: videoHoverAppear 120ms ease-out;
+}
+
+.videoHoverHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.videoHoverAvatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  height: 28px;
+  border: 1px solid light-dark(#dedee3, #505055);
+  border-radius: 50%;
+  background: light-dark(#eeeef2, #37373d);
+  color: light-dark(#54545e, #dedee6);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.videoHoverChannel {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: light-dark(#62626b, #bcbcc5);
+  overflow-wrap: anywhere;
+}
+
+.videoHoverAge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid light-dark(#badac1, #3d6647);
+  border-radius: 6px;
+  background: light-dark(#eaf5ed, #25372c);
+  color: light-dark(#28653a, #a3dfb2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.videoHoverTitle {
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: -.15px;
+  overflow-wrap: anywhere;
+}
+
+.videoHoverStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid light-dark(#e6e6eb, #3b3b40);
+}
+
+.videoHoverStat {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.videoHoverStatLabel {
+  color: light-dark(#72727c, #9999a5);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+}
+
+.videoHoverStatValue {
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.videoHoverNote {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-left: 2px solid #c7a35b;
+  border-radius: 0 4px 4px 0;
+  background: light-dark(#faf5e9, #373124);
+  color: light-dark(#756039, #dfc998);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@keyframes videoHoverAppear {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .videoHoverPanel { animation: none; }
+}
+
 .watchMoreCard {
   background: light-dark(#ffffff, #151515);
   border: 1px solid light-dark(#cfd3da, #343434);
@@ -4597,7 +4785,10 @@ body.primarySectionYoutube.virtualVideoListView .sidebar > .categoryResizeHandle
 body.primarySectionYoutube.virtualVideoListView .sidebar > .channelListSeparator,
 body.primarySectionWatchLater.virtualVideoListView .sidebar > .sidePanelPath,
 body.primarySectionWatchLater.virtualVideoListView .sidebar > .categoryResizeHandle,
-body.primarySectionWatchLater.virtualVideoListView .sidebar > .channelListSeparator {
+body.primarySectionWatchLater.virtualVideoListView .sidebar > .channelListSeparator,
+body.primarySectionHistory.virtualVideoListView .sidebar > .sidePanelPath,
+body.primarySectionHistory.virtualVideoListView .sidebar > .categoryResizeHandle,
+body.primarySectionHistory.virtualVideoListView .sidebar > .channelListSeparator {
   display: none !important;
 }
 
@@ -4765,8 +4956,7 @@ body.channelIconMode .channels.videoListHost .thumbFrame {
 }
 
 body.channelIconMode .channels.videoListHost .videoDetails,
-body.channelIconMode .channels.videoListHost .videoActions,
-body.channelIconMode .channels.videoListHost .freshAgeBadge {
+body.channelIconMode .channels.videoListHost .videoActions {
   display: none !important;
 }
 
@@ -4801,9 +4991,14 @@ body.sidePanelVideos.channelIconMode .content .thumbFrame {
 }
 
 body.sidePanelVideos.channelIconMode .content .videoDetails,
-body.sidePanelVideos.channelIconMode .content .videoActions,
-body.sidePanelVideos.channelIconMode .content .freshAgeBadge {
+body.sidePanelVideos.channelIconMode .content .videoActions {
   display: none !important;
+}
+
+body.channelIconMode .channels.videoListHost .videoFreshAgeBadge,
+body.sidePanelVideos.channelIconMode .content .videoFreshAgeBadge {
+  display: inline-block !important;
+  pointer-events: none;
 }
 
 /* Video titles only: one compact clickable row, without thumbnails, metadata or action buttons. */

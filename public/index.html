@@ -36,6 +36,7 @@
       <button class="primaryTab" type="button" data-section="channels" title="Channels" aria-label="Channels"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M7 21h10"/></svg></button>
       <button class="primaryTab" type="button" data-section="favorites" title="Favorites" aria-label="Favorites"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
       <button class="primaryTab" type="button" data-section="watchLater" title="Watch later" aria-label="Watch later"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+      <button id="watchHistoryTab" class="primaryTab" type="button" data-section="history" title="History" aria-label="History" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></button>
     </nav>
 
     <div id="appLoading" class="appLoading" role="status" aria-label="Loading…">
@@ -84,8 +85,8 @@
           <button id="sortResults" class="channelZoomButton resultsSortButton" type="button" title="Sort results" aria-label="Sort results">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h11M8 12h8M8 18h5M3 5v14M1 17l2 2 2-2"/></svg>
           </button>
-          <button id="toggleShorts" class="channelZoomButton shortsToggleButton" type="button" title="Hide Shorts" aria-label="Hide Shorts" aria-pressed="true">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18.931 9.99-1.441-.601 1.717-.913a4.48 4.48 0 0 0 1.874-6.078 4.506 4.506 0 0 0-6.09-1.874L4.792 5.929a4.504 4.504 0 0 0-2.402 4.193 4.521 4.521 0 0 0 2.666 3.904c.036.012 1.442.6 1.442.6l-1.706.901a4.51 4.51 0 0 0-2.369 3.967A4.528 4.528 0 0 0 6.93 24c.725 0 1.437-.174 2.08-.508l10.21-5.406a4.494 4.494 0 0 0 2.39-4.192 4.525 4.525 0 0 0-2.678-3.904Z"/><path d="m10 9 5 3-5 3Z"/><path class="shortsHiddenSlash" d="M2 2 22 22"/></svg>
+          <button id="toggleExcludedContent" class="channelZoomButton excludedContentButton" type="button" title="Hidden content" aria-label="Hidden content" aria-haspopup="menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/></svg>
           </button>
           <button id="channelZoomOut" class="channelZoomButton" type="button" title="Zoom out list" aria-label="Zoom out list">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5M7 10h6"/></svg>
@@ -228,7 +229,7 @@
 
     <div id="importExportPrompt" class="modalOverlay" hidden>
       <div class="modal importExportModal" role="dialog" aria-modal="true" aria-labelledby="importExportTitle">
-        <h2 id="importExportTitle">Import/export/save</h2>
+        <h2 id="importExportTitle">Backup and restore</h2>
         <div class="importExportGrid">
           <button id="exportNativeConfig" class="modalButton secondary" type="button">Export/Save YouTube Shelf datas</button>
           <button id="exportNewPipeConfig" class="modalButton secondary" type="button">Export for NewPipe</button>
@@ -351,7 +352,7 @@
 
     <div id="youtubeDataOptionsPrompt" class="modalOverlay" hidden>
       <div class="modal youtubeDataOptionsModal" role="dialog" aria-modal="true" aria-labelledby="youtubeDataOptionsTitle">
-        <h2 id="youtubeDataOptionsTitle">Sniff YouTube</h2>
+        <h2 id="youtubeDataOptionsTitle">Channel updates</h2>
         <section class="youtubeOptionsSection">
         <div class="youtubeCheckOptions">
           <h4>Check new channel videos</h4>
@@ -372,6 +373,21 @@
         </section>
         <div class="modalActions">
           <button id="closeYoutubeDataOptions" class="modalButton primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="watchHistoryOptionsPrompt" class="modalOverlay" hidden>
+      <div class="modal watchHistoryOptionsModal" role="dialog" aria-modal="true" aria-labelledby="watchHistoryOptionsTitle">
+        <h2 id="watchHistoryOptionsTitle">Watch history</h2>
+        <label class="modalCheckbox watchHistoryOption">
+          <input id="watchHistoryEnabledOption" type="checkbox" />
+          <span>Enable local watch history</span>
+        </label>
+        <p class="modalHint">Adds a History tab and records viewing sessions on this device only. Sessions shorter than 15 seconds are ignored.</p>
+        <button id="resetWatchHistory" class="modalButton secondary watchHistoryReset" type="button">Reset watch history…</button>
+        <div class="modalActions">
+          <button id="closeWatchHistoryOptions" class="modalButton primary" type="button">Close</button>
         </div>
       </div>
     </div>
@@ -482,6 +498,7 @@
         </div>
       </div>
     </div>
+    <script src="watch-history.js"></script>
     <script src="app.js" type="module"></script>
   </body>
 </html>

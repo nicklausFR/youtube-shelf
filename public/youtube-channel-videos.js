@@ -1,4 +1,4 @@
-import { rendererIsShort } from "./youtube-shorts.js";
+import { rendererIsShort, rendererRestriction } from "./youtube-shorts.js";
 
 const YOUTUBE_ORIGIN = "https://www.youtube.com";
 const BROWSE_URL = `${YOUTUBE_ORIGIN}/youtubei/v1/browse?prettyPrint=false`;
@@ -73,6 +73,7 @@ function videoFromRenderer(renderer) {
     ?.map((overlay) => textFrom(overlay?.thumbnailOverlayTimeStatusRenderer?.text))
     .find(Boolean) || "";
   const watchEndpoint = renderer.navigationEndpoint?.watchEndpoint || {};
+  const restriction = rendererRestriction(renderer);
   return {
     id,
     title: textFrom(renderer.title),
@@ -80,6 +81,8 @@ function videoFromRenderer(renderer) {
     publishedText,
     duration,
     ...(rendererIsShort(renderer) ? { isShort: true } : {}),
+    restriction,
+    restrictionCheckedAt: Date.now(),
     viewCountText: textFrom(renderer.viewCountText) || textFrom(renderer.shortViewCountText),
     thumbnail: normalizeThumbnailUrl(largestThumbnail(thumbnails) || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`),
     ...(watchEndpoint.playlistId ? {
@@ -101,6 +104,7 @@ function videoFromLockup(lockup) {
   const duration = badges.map((badge) => badge?.thumbnailBadgeViewModel?.text || "").find((value) => /\d/.test(value)) || "";
   const sources = lockup.contentImage?.thumbnailViewModel?.image?.sources || [];
   const watchEndpoint = lockup.rendererContext?.commandContext?.onTap?.innertubeCommand?.watchEndpoint || {};
+  const restriction = rendererRestriction(lockup);
   return {
     id,
     title: String(lockup.metadata?.lockupMetadataViewModel?.title?.content || "").trim(),
@@ -108,6 +112,8 @@ function videoFromLockup(lockup) {
     publishedText,
     duration,
     ...(rendererIsShort(lockup) ? { isShort: true } : {}),
+    restriction,
+    restrictionCheckedAt: Date.now(),
     viewCountText: metadataStrings.find((value) => /views?|watching/i.test(value)) || "",
     thumbnail: normalizeThumbnailUrl(largestThumbnail(sources) || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`),
     ...(watchEndpoint.playlistId ? {
@@ -133,7 +139,8 @@ function collectPageData(node, state = { videos: [], ids: new Set(), continuatio
     state.videos.push(video);
   }
 
-  const token = node.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+  const token = node.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token
+    || node.continuationItemViewModel?.continuationCommand?.innertubeCommand?.continuationCommand?.token;
   if (token) state.continuation = token;
 
   if (Array.isArray(node)) {
@@ -156,16 +163,17 @@ function videosTabContent(response) {
   const tabs = response?.contents?.twoColumnBrowseResultsRenderer?.tabs
     || response?.contents?.singleColumnBrowseResultsRenderer?.tabs || [];
   const videosTab = tabs
-    .map((tab) => tab?.tabRenderer)
+    .map((tab) => tab?.tabRenderer || tab?.expandableTabRenderer)
     .find((tab) => tab?.endpoint?.commandMetadata?.webCommandMetadata?.url?.endsWith("/videos"))
-    || tabs.map((tab) => tab?.tabRenderer).find((tab) => tab?.selected);
+    || tabs.map((tab) => tab?.tabRenderer || tab?.expandableTabRenderer).find((tab) => tab?.selected);
   return videosTab?.content || null;
 }
 
 function continuationContent(response) {
   const actions = [
     ...(response?.onResponseReceivedActions || []),
-    ...(response?.onResponseReceivedCommands || [])
+    ...(response?.onResponseReceivedCommands || []),
+    ...(response?.onResponseReceivedEndpoints || [])
   ];
   const itemGroups = actions
     .map((action) => action?.appendContinuationItemsAction?.continuationItems
@@ -324,7 +332,15 @@ export async function fetchYoutubePlaylistPage({ playlistId, continuation = "", 
   const body = requestBody(clientVersion, `VL${playlistId}`, continuation);
   delete body.params;
   const response = await postBrowse(fetchImpl, body, clientVersion);
-  const content = continuation ? continuationContent(response) : videosTabContent(response);
+  // Some YouTube experiments return the first playlist items through a
+  // continuation action instead of attaching content to the selected tab.
+  const content = continuation
+    ? continuationContent(response)
+    : videosTabContent(response) || continuationContent(response);
+  // The modern renderer can expose a final continuation that resolves to an
+  // otherwise empty response. Once a first page was loaded, that is the end of
+  // the playlist rather than an availability failure.
+  if (!content && continuation) return { videos: [], continuation: "", playlistTitle: "" };
   if (!content) throw new Error("Playlist unavailable");
   const page = extractYoutubeVideosFromData(content);
   const playlistTitle = textFrom(response.header?.playlistHeaderRenderer?.title)

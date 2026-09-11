@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { annotateVideoSeries, materializeDetectedSeriesGroups, numberedSeriesPart } from "../public/video-series.js";
+import {
+  annotateVideoSeries,
+  isBrowsableYoutubePlaylistId,
+  materializeDetectedSeriesGroups,
+  numberedSeriesPart
+} from "../public/video-series.js";
 
 assert.deepEqual(numberedSeriesPart("Massive Repair on BROKEN Bulldozer Blade | Part 2 | Drilling, Gouging & Welding"), {
   position: 2,
@@ -9,6 +14,13 @@ assert.deepEqual(numberedSeriesPart("Massive Repair on BROKEN Bulldozer Blade | 
 });
 assert.equal(numberedSeriesPart("THE SAMURAI WOOD CHISEL!!!!! | Part 1").position, 1);
 assert.equal(numberedSeriesPart("A standalone documentary"), null);
+assert.deepEqual(numberedSeriesPart("Le Dernier Trappeur - 06 - Premier Paysage d'été"), {
+  position: 6,
+  words: ["dernier", "trappeur"],
+  key: "dernier trappeur"
+});
+assert.equal(isBrowsableYoutubePlaylistId("PL90RdWJmQYG8kbhgr_R1rvwHejwPt7SoN"), true);
+assert.equal(isBrowsableYoutubePlaylistId("RDIqiTJK_uzUY"), false);
 
 // Travel episodes have different subjects but share a season/episode marker.
 const travel = annotateVideoSeries([
@@ -89,6 +101,16 @@ const playlist = annotateVideoSeries([
   { id: "b", title: "Another", playlistId: "PL1", playlistTitle: "Course", playlistIndex: 5 }
 ]);
 assert.deepEqual(playlist.map((video) => [video.playlistTitle, video.seriesPosition, video.seriesSize]), [["Course", 4, 5], ["Course", 5, 5]]);
+
+const soundtrack = annotateVideoSeries([
+  { id: "_AY3L9brvK8", channelId: "poi", title: "Le Dernier Trappeur - 01 - Generique Debut", playlistId: "RD_AY3L9brvK8" },
+  { id: "6s770ULOrj4", channelId: "poi", title: "Le Dernier Trappeur - 06 - Premier Paysage d'été", playlistId: "RD6s770ULOrj4" },
+  { id: "0wmF8irphwE", channelId: "poi", title: "Le Dernier Trappeur - 20 - L'amitié", playlistId: "RD0wmF8irphwE" }
+]);
+assert.ok(soundtrack.every((video) => video.seriesId === soundtrack[0].seriesId));
+assert.ok(soundtrack.every((video) => !video.seriesId.startsWith("playlist:")));
+assert.deepEqual(soundtrack.map((video) => video.seriesPosition), [1, 6, 20]);
+assert.ok(soundtrack.every((video) => video.playlistId === ""));
 
 const appSource = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
 assert.match(appSource, /\["newVideos", "youtubeHome"\]\.includes\(activeView\)/);

@@ -6,6 +6,9 @@ const FOCUS_PLAYER_MODE_KEY = "youtubeChannelShelfFocusPlayer";
 const DATA_COMMAND_KEY = "youtubeChannelShelfDataCommand";
 const PANEL_OPEN_KEY = "youtubeChannelShelfPanelOpen";
 const PANEL_HEARTBEAT_KEY = "youtubeChannelShelfPanelHeartbeat";
+const WATCH_HISTORY_ENABLED_KEY = "youtubeChannelShelfWatchHistoryEnabled";
+const WATCH_HISTORY_KEY = "youtubeChannelShelfWatchHistory";
+let watchHistoryWrites = Promise.resolve();
 // Each extension view owns a connection. A hidden view cannot close another
 // view's session, and background timer throttling cannot expire an open tab.
 const panelPresenceSessions = new Map();
@@ -109,6 +112,27 @@ async function fetchYoutubeSearchWithRetry(url, options) {
 }
 
 host.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "YOUTUBE_SHELF_WATCH_HISTORY_UPDATE") {
+    const senderUrl = String(sender.url || "");
+    const allowedSender = senderUrl.startsWith(extensionOrigin)
+      || /^https:\/\/(?:www\.)?youtube\.com\//.test(senderUrl);
+    if (!allowedSender) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    watchHistoryWrites = watchHistoryWrites.catch(() => {}).then(async () => {
+      const stored = await host.storage.local.get([WATCH_HISTORY_ENABLED_KEY, WATCH_HISTORY_KEY]);
+      if (!stored[WATCH_HISTORY_ENABLED_KEY]) return { ok: true, recorded: false };
+      const previous = Array.isArray(stored[WATCH_HISTORY_KEY]) ? stored[WATCH_HISTORY_KEY] : [];
+      const next = globalThis.YouTubeShelfWatchHistory.updateHistory(previous, message.session || {});
+      if (next !== previous && JSON.stringify(next) !== JSON.stringify(previous)) {
+        await host.storage.local.set({ [WATCH_HISTORY_KEY]: next });
+      }
+      return { ok: true, recorded: next.length !== previous.length || Boolean(next.find((entry) => entry.id === message.session?.sessionId)) };
+    });
+    watchHistoryWrites.then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (message?.type === "YOUTUBE_SHELF_RESTORE_AFTER_FULLSCREEN") {
     const tab = sender.tab;
     if (!tab?.active || !Number.isInteger(tab.windowId)
@@ -329,20 +353,33 @@ host.action.onClicked.addListener(async (tab) => {
   openWindows.add(windowId);
 });
 
-const SHELF_SETTINGS_MENUS = {
-  youtubeAccount: "YouTube account",
-  importExportDialog: "Import / export / save",
-  synchronization: "Synchronization",
-  youtubeData: "Sniff YouTube",
-  appearance: "Display",
-  language: "Language",
-  about: "About"
-};
+function contextMenuTitle(messageKey, fallback) {
+  return host.i18n?.getMessage?.(messageKey) || fallback;
+}
+
+const SHELF_SETTINGS_MENU_ITEMS = [
+  { id: "settings-interface", title: contextMenuTitle("interfaceSettings", "Interface") },
+  { id: "language", title: contextMenuTitle("languageAndTranslations", "Language and translations"), parentId: "settings-interface", settings: "language" },
+  { id: "youtubeData", title: contextMenuTitle("channelUpdates", "Channel updates"), parentId: "settings-interface", settings: "youtubeData" },
+  { id: "appearance", title: contextMenuTitle("display", "Display"), settings: "appearance" },
+  { id: "history", title: contextMenuTitle("localWatchHistory", "Local watch history"), settings: "history" },
+  { id: "settings-data", title: contextMenuTitle("data", "Data") },
+  { id: "youtubeAccount", title: contextMenuTitle("accountAndSubscriptions", "YouTube account and subscriptions"), parentId: "settings-data", settings: "youtubeAccount" },
+  { id: "synchronization", title: contextMenuTitle("synchronization", "Synchronization"), parentId: "settings-data", settings: "synchronization" },
+  { id: "importExportDialog", title: contextMenuTitle("backupAndRestore", "Backup and restore"), parentId: "settings-data", settings: "importExportDialog" },
+  { id: "cleanSlate", title: contextMenuTitle("resetShelfContent", "Reset Shelf content…"), parentId: "settings-data", settings: "cleanSlate" },
+  { id: "about", title: contextMenuTitle("about", "About"), settings: "about" }
+];
+
+const SHELF_SETTINGS_DESTINATIONS = Object.fromEntries(
+  SHELF_SETTINGS_MENU_ITEMS.filter((item) => item.settings).map((item) => [item.id, item.settings])
+);
 
 function createContextMenus() {
   host.menus.removeAll(() => {
-    for (const [id, title] of Object.entries(SHELF_SETTINGS_MENUS)) {
-      host.menus.create({ id, title, contexts: ["action"] });
+    for (const item of SHELF_SETTINGS_MENU_ITEMS) {
+      const { settings: _settings, ...menuItem } = item;
+      host.menus.create({ ...menuItem, contexts: ["action"] });
     }
   });
 }
@@ -453,8 +490,9 @@ async function sendDataCommand(command) {
 }
 
 host.menus.onClicked.addListener(async (info) => {
-  if (!Object.hasOwn(SHELF_SETTINGS_MENUS, info.menuItemId)) return;
+  const settings = SHELF_SETTINGS_DESTINATIONS[info.menuItemId];
+  if (!settings) return;
   await host.tabs.create({
-    url: host.runtime.getURL(`public/index.html?mode=page&settings=${encodeURIComponent(info.menuItemId)}`)
+    url: host.runtime.getURL(`public/index.html?mode=page&settings=${encodeURIComponent(settings)}`)
   });
 });

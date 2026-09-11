@@ -100,14 +100,15 @@ for (const maxPages of [1, 10]) {
   };
   let saves = 0;
   const h = { allChannels: [{ id: "StarTalk", ...config }], activeChannel: null, weeklyVideoSummary,
-    weeklyShowShorts: true, youtubeShorts: { known: video => video.isShort },
+    weeklyShowShorts: true, showRestrictedVideos: true,
+    youtubeShorts: { known: video => video.isShort, restriction: video => video.restriction },
     saveConfig: async () => { saves++; }, renderCategories: () => {}, activeView: "channels",
     channelMatchesWeeklyCategories: () => true, shouldGroupWeeklyVideos: () => false,
     videoWithChannel: v => v, Date: class extends Date { static now() { return now; } }
   };
   vm.createContext(h);
   for (const name of ["rememberChannelWeeklyVideos", "replaceChannelSummary", "feedSummaryChanged",
-    "isWithinNewVideosRange", "isNewerThanReset", "isVideoNewForChannel", "collectNewVideos"]) {
+    "isWithinNewVideosRange", "isNewerThanReset", "isVideoNewForChannel", "videoIsExcluded", "collectNewVideos"]) {
     vm.runInContext(definition(name), h);
   }
   await h.rememberChannelWeeklyVideos("StarTalk", [periodic], [telescope]);

@@ -15,6 +15,8 @@ export function weeklyVideoSummary(channel, { rssVideos = [], youtubeVideos = []
       const previous = byId.get(video.id) || {};
       const keepDate = Number.isFinite(Date.parse(previous.published))
         && (approximate || !Number.isFinite(Date.parse(video.published)));
+      const restriction = video.restriction ?? previous.restriction;
+      const restrictionCheckedAt = video.restrictionCheckedAt ?? previous.restrictionCheckedAt;
       byId.set(video.id, {
         id: video.id,
         title: video.title || previous.title || "",
@@ -24,6 +26,8 @@ export function weeklyVideoSummary(channel, { rssVideos = [], youtubeVideos = []
         tags: video.tags?.length ? video.tags : previous.tags || [],
         duration: video.duration || previous.duration || "",
         ...(typeof (video.isShort ?? previous.isShort) === "boolean" ? { isShort: video.isShort ?? previous.isShort } : {}),
+        ...(typeof restriction === "string" ? { restriction } : {}),
+        ...(Number.isFinite(Number(restrictionCheckedAt)) ? { restrictionCheckedAt: Number(restrictionCheckedAt) } : {}),
         views: video.views || video.viewCountText || previous.views || "",
         thumbnail: video.thumbnail || previous.thumbnail || ""
       });

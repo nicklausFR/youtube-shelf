@@ -2,9 +2,13 @@
 
 ## 3.3.22 - 2026-09-11
 
+- Simplify History cards with compact thumbnails and progress bars, hide irrelevant Watch later and content-filter buttons, and add right-click actions to clear or disable local history.
+- Reorganize both settings menus into Interface, Display, Local watch history, Data, and About, with matching nested actions on the Chrome extension button.
+- Stop treating YouTube's per-video `RD...` radio identifiers as one-item playlists, and detect delimiter-numbered series such as soundtrack tracks.
+- Restore complete playlist loading with YouTube's current tab and continuation renderers.
 - Show an exact video result when a YouTube video URL or ID is pasted, dropped, or submitted in the main search field.
 - Make video drags over YouTube search as visible as channel, Favorites, and Watch later drop targets.
-- Add a shared Shorts visibility button across video lists.
+- Replace the Shorts button with a hidden-content menu for independently filtering Shorts and private videos, including members-only uploads, with fresh playability checks when a published video becomes private; channel age badges and date rankings now follow the latest visible upload.
 - Correct latest-video selection, chronological sorting, and loading indicators.
 - Preserve concurrently refreshed videos and cache derived feeds for the web adapter.
 - Improve subscription card parsing and repair duplicated channel titles.

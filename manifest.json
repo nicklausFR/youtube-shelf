@@ -57,6 +57,7 @@
       ],
       "js": [
         "public/platform-chromium.js",
+        "public/watch-history.js",
         "youtube-live.js"
       ],
       "run_at": "document_idle"

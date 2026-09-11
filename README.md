@@ -44,6 +44,7 @@ The screenshot below shows the side panel at **420 px** width.
 - Ordered categories and subcategories for channels and favorites.
 - Favorites with notes, drag-and-drop grouping, and bulk category assignment or deletion.
 - Separate `Watch later` list.
+- Optional local watch history with one chronological entry per viewing session, including repeated views of the same video.
 - Series and playlist discovery with numbered episode lists.
 - Configurable display modes and sorting by name, date, subscribers, views, or date added.
 - Local playback positions retained for up to seven days.
@@ -101,7 +102,7 @@ Right-click a video to search for related parts, then open its title badge to vi
 
 ### Responsive layouts
 
-YouTube Shelf adapts from a narrow browser panel to a wide layout. The four icon tabs share a single toolbar row when space allows.
+YouTube Shelf adapts from a narrow browser panel to a wide layout. The four standard icon tabs—and the optional fifth History tab—share a single toolbar row when space allows.
 
 <p align="center">
   <img src="docs/screenshots/youtube-shelf-wide.png" width="62%" alt="YouTube Shelf wide split layout">
@@ -117,6 +118,8 @@ YouTube Shelf adapts from a narrow browser panel to a wide layout. The four icon
 5. Use the star action to save a video under **Favorites**, or add it to **Watch later**.
 6. Configure display mode and sorting using the controls above each list.
 
+The prohibition icon opens the hidden-content menu. Shorts and private videos—including members-only uploads—can be filtered independently across video lists. Channel age badges and date-based rankings use the latest upload left visible by these filters.
+
 YouTube fullscreen hides Shelf and restores it on exit; if the browser requires a gesture, the next page click restores it.
 
 The back and forward buttons navigate within the extension. The expand button opens full-page mode; the adjacent focus control changes how much of the surrounding YouTube page remains visible.
@@ -125,7 +128,7 @@ The back and forward buttons navigate within the extension. The expand button op
 
 ### Local storage
 
-Channels, categories, favorites, watched state, `Watch later`, preferences, and recent playback positions are stored in the browser's local extension storage.
+Channels, categories, favorites, watched state, `Watch later`, preferences, recent playback positions, and the optional watch history are stored in the browser's local extension storage. Watch history is disabled by default, stays on the current device, and can be cleared from **Settings → Local watch history**.
 
 The import/export dialog can:
 
@@ -144,7 +147,7 @@ The **YouTube account** dialog compares Shelf channels with subscriptions retrie
 
 ### WebDAV synchronization
 
-Open **Settings → WebDAV synchronization**, then enter the full URL of the synchronization file, your Nextcloud username, and a dedicated application password. The default filename is:
+Open **Settings → Data → Synchronization**, then enter the full URL of the synchronization file, your Nextcloud username, and a dedicated application password. The default filename is:
 
 ```text
 youtube-shelf-synchronized-data.json
@@ -152,7 +155,7 @@ youtube-shelf-synchronized-data.json
 
 Use **Test connection** before enabling synchronization. Credentials remain in the extension's local browser storage and are never included in synchronized data or exports. **Disconnect** removes the stored application password.
 
-Synchronization includes content data—categories, channels, favorites, seen videos, and `Watch later`. Appearance, zoom, layout preferences, and regenerable YouTube feed caches remain local to each browser.
+Synchronization includes content data—categories, channels, favorites, seen videos, and `Watch later`. Appearance, zoom, layout preferences, watch history, and regenerable YouTube feed caches remain local to each browser.
 
 The newest configuration wins using its update timestamp, revision, and device identifier. Local changes are grouped for 10 seconds, remote changes are checked every 60 seconds while the panel is open, and conditional WebDAV writes use ETags to reduce overwrite conflicts.
 

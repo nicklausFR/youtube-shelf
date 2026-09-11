@@ -51,7 +51,7 @@
         async ensure(tabId) {
           await scripting.insertCSS({ target: { tabId }, files: ["youtube-clean.css"] }).catch(() => {});
           await scripting.executeScript({
-            target: { tabId }, files: ["public/platform-chromium.js", "youtube-live.js"]
+            target: { tabId }, files: ["public/platform-chromium.js", "public/watch-history.js", "youtube-live.js"]
           }).catch(() => {});
         }
       } : undefined,

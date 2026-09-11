@@ -12,7 +12,10 @@ const start = source.indexOf("function videoIdFromInput(");
 const end = source.indexOf("function pushHistory(", start);
 assert.ok(start >= 0 && end > start, "Direct video search helpers must exist");
 
-const context = vm.createContext({ URL });
+const context = vm.createContext({
+  URL,
+  isBrowsableYoutubePlaylistId: (value) => Boolean(value) && !String(value).startsWith("RD") && !["WL", "LL"].includes(value)
+});
 vm.runInContext(`${source.slice(start, end)}; this.helpers = { videoIdFromInput, videoFromYoutubeSearchInput };`, context);
 const { videoIdFromInput, videoFromYoutubeSearchInput } = context.helpers;
 
@@ -32,7 +35,29 @@ assert.deepEqual(
     playlistIndex: 4
   }
 );
+assert.deepEqual(
+  { ...videoFromYoutubeSearchInput(`https://www.youtube.com/watch?v=${videoId}&list=RD${videoId}`) },
+  { id: videoId, title: videoId, thumbnail: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` }
+);
 assert.equal(videoFromYoutubeSearchInput("ordinary search words"), null);
+
+vm.runInContext(`${definition("textFromRuns")}\n${definition("globalVideoResultFromRenderer")}; this.globalVideoResultFromRenderer = globalVideoResultFromRenderer;`, context);
+for (const radioId of ["6s770ULOrj4", "0wmF8irphwE", "IqiTJK_uzUY"]) {
+  const radioResult = context.globalVideoResultFromRenderer({
+    videoId: radioId,
+    title: { simpleText: "YouTube result with automatic radio" },
+    navigationEndpoint: { watchEndpoint: { videoId: radioId, playlistId: `RD${radioId}` } }
+  });
+  assert.equal(radioResult.playlistId, "");
+  assert.equal(radioResult.playlistIndex, 0);
+}
+const playlistResult = context.globalVideoResultFromRenderer({
+  videoId,
+  title: { simpleText: "Playlist member" },
+  navigationEndpoint: { watchEndpoint: { videoId, playlistId: "PL_test", index: 4 } }
+});
+assert.equal(playlistResult.playlistId, "PL_test");
+assert.equal(playlistResult.playlistIndex, 4);
 
 context.allChannels = [];
 context.activeChannel = null;

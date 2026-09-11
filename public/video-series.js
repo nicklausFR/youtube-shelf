@@ -10,6 +10,13 @@ const PROCESS_WORDS = new Set([
   "broken", "massive", "heavy", "duty", "workshop", "vintage", "upgrades", "re", "finished"
 ]);
 
+export function isBrowsableYoutubePlaylistId(value) {
+  const playlistId = String(value || "").trim();
+  return /^[a-zA-Z0-9_-]+$/.test(playlistId)
+    && !playlistId.startsWith("RD")
+    && !["WL", "LL"].includes(playlistId);
+}
+
 function sameSeriesSubject(left, right) {
   if (left.season || right.season) return left.key === right.key;
   if (left.key === right.key) return true;
@@ -42,7 +49,8 @@ function numberedSeriesPart(title) {
     const season = Number(seasonEpisode[1]);
     return { position: Number(seasonEpisode[2]), season, words: [], key: `season ${season}` };
   }
-  const match = PART_PATTERN.exec(text);
+  const match = PART_PATTERN.exec(text)
+    || /(?:^|\s)[|–—-]\s*0*(\d{1,3})\s*[|–—-](?:\s|$)/u.exec(text);
   if (!match) return null;
   const prefix = text.slice(0, match.index);
   // Prefer an explicitly named project/series over its changing episode subject.
@@ -67,7 +75,7 @@ function channelKey(video) {
 function playlistAnnotations(videos) {
   const groups = new Map();
   videos.forEach((video, index) => {
-    if (!video.playlistId) return;
+    if (!isBrowsableYoutubePlaylistId(video.playlistId)) return;
     if (!groups.has(video.playlistId)) groups.set(video.playlistId, []);
     groups.get(video.playlistId).push({ video, index });
   });
@@ -89,7 +97,9 @@ function playlistAnnotations(videos) {
 }
 
 export function annotateVideoSeries(videos = [], contextVideos = videos) {
-  const result = videos.map((video) => ({ ...video }));
+  const result = videos.map((video) => isBrowsableYoutubePlaylistId(video.playlistId)
+    ? { ...video }
+    : { ...video, playlistId: "", playlistTitle: "", playlistIndex: 0, playlistSize: 0 });
   const catalogById = new Map();
   for (const video of [...contextVideos, ...result]) {
     if (!video?.id) continue;

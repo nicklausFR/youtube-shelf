@@ -62,6 +62,15 @@
   "showWeeklyShorts": {
     "message": "Show Shorts"
   },
+  "excludedContent": {
+    "message": "Hidden content"
+  },
+  "shorts": {
+    "message": "Shorts"
+  },
+  "privateVideosIncludingMembers": {
+    "message": "Private videos (including members-only)"
+  },
   "extensionName": {
     "message": "YouTube Shelf",
     "description": "Extension name."
@@ -120,6 +129,48 @@
   },
   "favorites": {
     "message": "Favorites"
+  },
+  "history": {
+    "message": "History"
+  },
+  "searchHistory": {
+    "message": "Search history"
+  },
+  "localWatchHistory": {
+    "message": "Local watch history"
+  },
+  "enableLocalWatchHistory": {
+    "message": "Enable local watch history"
+  },
+  "disableWatchHistory": {
+    "message": "Disable watch history"
+  },
+  "localWatchHistoryHint": {
+    "message": "Adds a History tab and records viewing sessions on this device only. Sessions shorter than 15 seconds are ignored."
+  },
+  "resetWatchHistory": {
+    "message": "Reset watch history…"
+  },
+  "resetWatchHistoryConfirmation": {
+    "message": "Delete the entire local watch history? This cannot be undone."
+  },
+  "emptyWatchHistorySearch": {
+    "message": "No videos found in History."
+  },
+  "emptyWatchHistory": {
+    "message": "Watch history is empty."
+  },
+  "removeWatchHistoryEntry": {
+    "message": "Remove this history entry"
+  },
+  "historyViewed": {
+    "message": "Viewed $1"
+  },
+  "historyViewedPercent": {
+    "message": "Viewed $1 · $2%"
+  },
+  "historyViewedCompleted": {
+    "message": "Viewed $1 · completed"
   },
   "expandFavoriteGroup": {
     "message": "Show $1 grouped favorites"
@@ -262,6 +313,9 @@
   "language": {
     "message": "Language"
   },
+  "languageAndTranslations": {
+    "message": "Language and translations"
+  },
   "youtubeVideoTitles": {
     "message": "YouTube video titles"
   },
@@ -358,6 +412,12 @@
   "youtubeOptions": {
     "message": "Sniff YouTube"
   },
+  "channelUpdates": {
+    "message": "Channel updates"
+  },
+  "watchHistoryOptions": {
+    "message": "Watch history"
+  },
   "sniffYoutubeMetadata": {
     "message": "Sniff YouTube metadata"
   },
@@ -384,6 +444,18 @@
   },
   "data": {
     "message": "Data"
+  },
+  "interfaceSettings": {
+    "message": "Interface"
+  },
+  "accountAndSubscriptions": {
+    "message": "YouTube account and subscriptions"
+  },
+  "backupAndRestore": {
+    "message": "Backup and restore"
+  },
+  "resetShelfContent": {
+    "message": "Reset Shelf content…"
   },
   "synchronization": {
     "message": "Synchronization"
