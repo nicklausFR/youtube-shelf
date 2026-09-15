@@ -950,6 +950,15 @@
   "seriesContextSearch": {
     "message": "Rechercher une série / playlist"
   },
+  "copyVideoUrl": {
+    "message": "Copier l’URL de la vidéo"
+  },
+  "videoUrlCopied": {
+    "message": "URL de la vidéo copiée."
+  },
+  "videoUrlCopyFailed": {
+    "message": "Impossible de copier l’URL de la vidéo."
+  },
   "accountTableCaption": {
     "message": "Une chaîne par ligne. Gérez chaque côté indépendamment."
   },

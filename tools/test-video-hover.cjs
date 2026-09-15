@@ -18,7 +18,8 @@ const base = 'http://127.0.0.1:4178';
     browser = await chromium.launch({ headless: true,
       ...(process.env.CAPTURE_BROWSER ? { executablePath: process.env.CAPTURE_BROWSER } : {}) });
     for (const width of [320, 560, 1850]) {
-      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      const page = await browser.newPage({ viewport: { width, height: 900 },
+        permissions: ['clipboard-read', 'clipboard-write'] });
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/*', route => {
@@ -44,6 +45,18 @@ const base = 'http://127.0.0.1:4178';
                 list.replaceWith(replacement);
                 list = replacement;
               };
+            };
+            globalThis.prepareDetailedHoverQA = ({ section, view, mode }) => {
+              activePrimarySection = section;
+              activeView = view;
+              setListModeForScope(currentListLayoutScope(), mode);
+              applyListLayout();
+              document.querySelector('#detailedHoverQA')?.remove();
+              const fixture = createVideoCard({ id: \`detailed-\${section}\`, title: \`Detailed \${section}\`,
+                channel: 'Example channel', thumbnail: allChannels[0].thumbnail });
+              fixture.id = 'detailedHoverQA';
+              fixture.style.cssText = 'position:fixed;left:8px;top:8px;width:280px;z-index:1000';
+              document.body.append(fixture);
             };
           ` });
         return route.continue();
@@ -151,10 +164,38 @@ const base = 'http://127.0.0.1:4178';
       await page.locator('.newVideos .video').focus();
       await page.waitForTimeout(150);
       await checkBounds();
+      // A full card already shows its metadata, in every main section.
+      for (const [section, view, mode] of [
+        ['youtube', 'youtubeHome', 'columns'],
+        ['youtube', 'youtubeHome', 'icons'],
+        ['channels', 'newVideos', 'columns'],
+        ['favorites', 'favorites', 'single'],
+        ['watchLater', 'watchLater', 'columns'],
+        ['history', 'history', 'columns']
+      ]) {
+        await page.evaluate(options => prepareDetailedHoverQA(options), { section, view, mode });
+        const fixture = page.locator('#detailedHoverQA');
+        await fixture.hover();
+        await page.waitForTimeout(1100);
+        assert.equal(await panel.isVisible(), false, `${section}: detailed card must not open hover details`);
+        assert.equal(await fixture.getAttribute('aria-describedby'), null);
+        await fixture.focus();
+        assert.equal(await panel.isVisible(), false, `${section}: focus must not reopen hover details`);
+        await fixture.click({ button: 'right' });
+        const copyButton = page.locator('.contextMenu:not(.contextSubmenu) button').filter({ hasText: 'Copy video URL' });
+        assert.equal(await copyButton.count(), 1, `${section}: video URL must be available from the right-click menu`);
+        if (section === 'history') {
+          await copyButton.click();
+          assert.equal(await page.evaluate(() => navigator.clipboard.readText()),
+            'https://www.youtube.com/watch?v=detailed-history');
+        } else {
+          await page.keyboard.press('Escape');
+        }
+      }
       assert.deepEqual(errors, []);
       await page.close();
     }
-    console.log('Video hover: deliberate one-second dwell, cancelled brief visits, delayed switching, quick dismissal during loading, stable refreshes, metadata, keyboard and viewport edges passed at 320, 560 and 1850px.');
+    console.log('Compact video hover, no hover on detailed cards in every section, and right-click video URL copy passed at 320, 560 and 1850px.');
   } finally {
     await browser?.close();
     server.kill();

@@ -2905,6 +2905,11 @@ function videoContextActions(video) {
     label: uiMessage("seriesContextSearch"),
     action: () => openVideoSeries(video)
   };
+  const copyUrlAction = {
+    label: uiMessage("copyVideoUrl"),
+    action: () => copyVideoUrl(video),
+    skipSeenPrompt: true
+  };
   if (activePrimarySection === "favorites") {
     const selectedIds = selectedFavoriteVideoIds.has(video.id)
       ? [...selectedFavoriteVideoIds].filter((videoId) => favorites[videoId])
@@ -2919,6 +2924,7 @@ function videoContextActions(video) {
         label: "Open in a popup",
         action: () => openOfficialYoutube(video, { popup: true })
       },
+      copyUrlAction,
       {
         label: favorites[video.id]?.note ? "Edit personal note" : "Add personal note",
         action: () => openVideoNoteDialog(video, "favorites")
@@ -2941,7 +2947,7 @@ function videoContextActions(video) {
         action: () => ungroupFavoriteVideo(video.id)
       });
     }
-    actions.splice(2, 0, seriesAction);
+    actions.splice(3, 0, seriesAction);
     return actions;
   }
   if (activePrimarySection === "history") {
@@ -2954,6 +2960,7 @@ function videoContextActions(video) {
         label: "Open in a popup",
         action: () => openOfficialYoutube(video, { popup: true })
       },
+      copyUrlAction,
       seriesAction,
       {
         label: watchLater[video.id] ? "Remove from Watch later" : "Watch later",
@@ -2975,7 +2982,8 @@ function videoContextActions(video) {
     {
       label: "Open in a popup",
       action: () => openOfficialYoutube(video, { popup: true })
-    }
+    },
+    copyUrlAction
   ];
   if (activePrimarySection === "watchLater" && watchLater[video.id]) {
     actions.push({
@@ -3010,7 +3018,7 @@ function videoContextActions(video) {
       action: () => setChannelNewVideosExcluded(video.channelId, true)
     });
   }
-  actions.splice(2, 0, seriesAction);
+  actions.splice(3, 0, seriesAction);
   return actions;
 }
 
@@ -3052,7 +3060,7 @@ function contextMenuButtons(actions) {
         return;
       }
       hideContextMenu();
-      await maybePromptSeenForWatchLater();
+      if (!item.skipSeenPrompt) await maybePromptSeenForWatchLater();
       await Promise.resolve(item.action(clickEvent));
     });
     return button;
@@ -3745,6 +3753,7 @@ function setListModeForScope(scope, mode) {
 
 function applyListLayout() {
   channelListMode = listModeForScope();
+  if (!videoHoverDetailsEnabled()) hideVideoHoverDetails();
   document.body.classList.toggle("channelIconMode", channelListMode === "icons");
   document.body.classList.toggle("channelListColumns", channelListMode === "columns");
   document.body.classList.toggle("channelListSingleColumn", channelListMode === "single");
@@ -4517,6 +4526,15 @@ function youtubeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
+async function copyVideoUrl(video) {
+  try {
+    await navigator.clipboard.writeText(youtubeUrl(video.id));
+    showInfoPopup(uiMessage("videoUrlCopied"), "ok");
+  } catch {
+    showInfoPopup(uiMessage("videoUrlCopyFailed"), "error");
+  }
+}
+
 async function openYoutubeCleanView(videoId = activeVideoId, options = {}) {
   if (!host?.tabs) return;
 
@@ -4760,6 +4778,13 @@ function updateVideoHoverDetails(card, video) {
   if (videoHoverCard === card) renderVideoHoverDetails(video);
 }
 
+function videoHoverDetailsEnabled(card) {
+  // Use the card's rendered metadata: some views stay detailed even when another
+  // list in the current tab uses a compact layout.
+  if (card) return !card.querySelector(".meta")?.getClientRects().length;
+  return ["icons", "titles", "compactTitles"].includes(channelListMode);
+}
+
 let videoHoverPanel = null;
 let videoHoverCard = null;
 let videoHoverTimer = null;
@@ -4880,6 +4905,7 @@ function showVideoHoverDetails(card, video) {
   cancelVideoHoverHide();
   card = resolveVideoHoverCard(card);
   if (!card) return;
+  if (!videoHoverDetailsEnabled(card)) return hideVideoHoverDetails();
   video = videoHoverData.get(card).video;
   videoHoverCard?.removeAttribute("aria-describedby");
   if (!videoHoverPanel) {
@@ -6418,7 +6444,7 @@ function createVideoCard(video) {
       if (actions.childElementCount) card.append(actions);
       updateVideoHoverDetails(card, video);
       card.addEventListener("pointerenter", (event) => {
-        if (event.pointerType === "touch") return;
+        if (event.pointerType === "touch" || !videoHoverDetailsEnabled(card)) return;
         updateVideoHoverDetails(card, video);
         clearTimeout(videoHoverTimer);
         cancelVideoHoverHide();
@@ -6434,7 +6460,7 @@ function createVideoCard(video) {
       card.addEventListener("focus", () => {
         updateVideoHoverDetails(card, video);
         requestAnimationFrame(() => {
-          if (document.activeElement === card && card.matches(":focus-visible")) showVideoHoverDetails(card, video);
+          if (videoHoverDetailsEnabled(card) && document.activeElement === card && card.matches(":focus-visible")) showVideoHoverDetails(card, video);
         });
       });
       card.addEventListener("blur", hideVideoHoverDetails);

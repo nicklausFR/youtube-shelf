@@ -952,6 +952,15 @@
   "seriesContextSearch": {
     "message": "Find series / playlist"
   },
+  "copyVideoUrl": {
+    "message": "Copy video URL"
+  },
+  "videoUrlCopied": {
+    "message": "Video URL copied."
+  },
+  "videoUrlCopyFailed": {
+    "message": "Could not copy the video URL."
+  },
   "accountTableCaption": {
     "message": "One channel per row. Manage each side independently."
   },
