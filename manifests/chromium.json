@@ -1,6 +1,7 @@
 {
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background-module.js",
+    "type": "module"
   },
   "side_panel": {
     "default_path": "public/index.html"

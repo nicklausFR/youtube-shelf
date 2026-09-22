@@ -40,6 +40,7 @@ const THUMBNAIL_URLS = [
 ];
 const extensionOrigin = new URL(host.runtime.getURL("")).origin;
 const thumbnailResponseBytes = new Map();
+const activeThumbnailRequests = new Set();
 const VIDEO_POPUP_BOUNDS_KEY = "youtubeChannelShelfVideoPopupBounds";
 const SUBSCRIPTION_AUTOMATION_PREFIX = "youtubeShelfSubscriptionAutomation:";
 const fullPageTabsByWindow = new Map();
@@ -72,7 +73,8 @@ function reportThumbnailNetwork(value) {
 
 host.network.requests.onBeforeRequest.addListener((details) => {
   if (!isExtensionThumbnailRequest(details)) return;
-  reportThumbnailNetwork({ activeDelta: 1 });
+  activeThumbnailRequests.add(details.requestId);
+  reportThumbnailNetwork({ active: activeThumbnailRequests.size });
 }, { urls: THUMBNAIL_URLS, types: ["image"] });
 
 host.network.requests.onHeadersReceived.addListener((details) => {
@@ -90,28 +92,127 @@ host.network.requests.onCompleted.addListener((details) => {
   if (!isExtensionThumbnailRequest(details)) return;
   const receivedBytes = thumbnailResponseBytes.get(details.requestId) || 0;
   thumbnailResponseBytes.delete(details.requestId);
-  reportThumbnailNetwork({ requests: 1, activeDelta: -1, receivedBytes });
+  activeThumbnailRequests.delete(details.requestId);
+  reportThumbnailNetwork({ requests: 1, active: activeThumbnailRequests.size, receivedBytes });
 }, { urls: THUMBNAIL_URLS, types: ["image"] });
 
 host.network.requests.onErrorOccurred.addListener((details) => {
   if (!isExtensionThumbnailRequest(details)) return;
   thumbnailResponseBytes.delete(details.requestId);
-  reportThumbnailNetwork({ requests: 1, failures: 1, activeDelta: -1 });
+  activeThumbnailRequests.delete(details.requestId);
+  reportThumbnailNetwork({ requests: 1, failures: 1, active: activeThumbnailRequests.size });
 }, { urls: THUMBNAIL_URLS, types: ["image"] });
 
-async function fetchYoutubeSearchWithRetry(url, options) {
-  let lastError;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await fetch(url, options);
-    } catch (error) {
-      lastError = error;
-    }
+const YOUTUBE_DATA_REQUEST_TYPE = "YOUTUBE_SHELF_DATA_REQUEST";
+const youtubeRequestQueue = [];
+const youtubeRequestCache = new Map();
+let youtubeRequestsRunning = 0;
+let youtubeRequestConcurrency = 1;
+let youtubeLastRequestStartedAt = 0;
+let youtubeRequestPumpTimer = 0;
+const YOUTUBE_REQUEST_START_GAP_MS = 150;
+const YOUTUBE_REQUEST_DEDUPLICATION_MS = 5000;
+
+function youtubeResponseHeaders(response) {
+  return Object.fromEntries(["content-type", "content-length", "date"]
+    .map((name) => [name, response.headers.get(name)])
+    .filter(([, value]) => value !== null));
+}
+
+async function performYoutubeRequest(request) {
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    ...(request.body ? { body: request.body } : {}),
+    cache: request.cache,
+    credentials: "omit"
+  });
+  return {
+    transportOk: true,
+    status: response.status,
+    statusText: response.statusText,
+    headers: youtubeResponseHeaders(response),
+    body: await response.text()
+  };
+}
+
+function pumpYoutubeRequests() {
+  clearTimeout(youtubeRequestPumpTimer);
+  youtubeRequestPumpTimer = 0;
+  if (!youtubeRequestQueue.length || youtubeRequestsRunning >= youtubeRequestConcurrency) return;
+  const delay = Math.max(0, youtubeLastRequestStartedAt + YOUTUBE_REQUEST_START_GAP_MS - Date.now());
+  if (delay) {
+    youtubeRequestPumpTimer = setTimeout(pumpYoutubeRequests, delay);
+    return;
   }
-  throw lastError;
+  const queued = youtubeRequestQueue.shift();
+  youtubeRequestsRunning += 1;
+  youtubeLastRequestStartedAt = Date.now();
+  performYoutubeRequest(queued.request)
+    .then(queued.resolve, queued.reject)
+    .finally(() => {
+      youtubeRequestsRunning = Math.max(0, youtubeRequestsRunning - 1);
+      pumpYoutubeRequests();
+    });
+  pumpYoutubeRequests();
+}
+
+function queueYoutubeRequest(request, concurrency) {
+  if (Number.isFinite(Number(concurrency))) {
+    youtubeRequestConcurrency = Math.max(1, Math.min(3, Number(concurrency) || 1));
+  }
+  const key = JSON.stringify([request.method, request.url, request.headers, request.body]);
+  const existing = youtubeRequestCache.get(key);
+  if (existing && existing.expiresAt > Date.now()) return existing.promise;
+  const promise = new Promise((resolve, reject) => youtubeRequestQueue.push({ request, resolve, reject }));
+  const entry = { promise, expiresAt: Number.POSITIVE_INFINITY };
+  youtubeRequestCache.set(key, entry);
+  promise.finally(() => {
+    entry.expiresAt = Date.now() + YOUTUBE_REQUEST_DEDUPLICATION_MS;
+    setTimeout(() => {
+      if (youtubeRequestCache.get(key) === entry && entry.expiresAt <= Date.now()) youtubeRequestCache.delete(key);
+    }, YOUTUBE_REQUEST_DEDUPLICATION_MS + 50);
+  }).catch(() => {});
+  pumpYoutubeRequests();
+  return promise;
+}
+
+function normalizedYoutubeRequest(message) {
+  const url = new URL(String(message.url || ""));
+  if (url.protocol !== "https:" || !["youtube.com", "www.youtube.com"].includes(url.hostname)) {
+    throw new Error("Unsupported YouTube request URL");
+  }
+  const method = String(message.method || "GET").toUpperCase();
+  if (!["GET", "POST"].includes(method)) throw new Error("Unsupported YouTube request method");
+  const headers = Object.fromEntries(Object.entries(message.headers || {})
+    .filter(([name, value]) => /^[a-z0-9-]+$/i.test(name) && typeof value === "string"));
+  return {
+    url: url.href,
+    method,
+    headers,
+    body: method === "POST" ? String(message.body || "") : "",
+    cache: message.cache === "force-cache" ? "force-cache" : "no-store"
+  };
 }
 
 host.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === YOUTUBE_DATA_REQUEST_TYPE) {
+    if (!String(sender.url || "").startsWith(extensionOrigin)) {
+      sendResponse({ transportOk: false, error: "The shared YouTube channel only accepts extension requests" });
+      return false;
+    }
+    let request;
+    try {
+      request = normalizedYoutubeRequest(message);
+    } catch (error) {
+      sendResponse({ transportOk: false, error: error.message });
+      return false;
+    }
+    queueYoutubeRequest(request, message.concurrency)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ transportOk: false, error: error.message || "YouTube request failed" }));
+    return true;
+  }
   if (message?.type === "YOUTUBE_SHELF_WATCH_HISTORY_UPDATE") {
     const senderUrl = String(sender.url || "");
     const allowedSender = senderUrl.startsWith(extensionOrigin)
@@ -259,15 +360,15 @@ host.runtime.onMessage.addListener((message, sender, sendResponse) => {
     cache: "no-store",
     credentials: "omit"
   };
-  fetchYoutubeSearchWithRetry(url, options)
-    .then(async (response) => {
-      if (!response.ok) {
+  queueYoutubeRequest(normalizedYoutubeRequest({ url: url.href, ...options }))
+    .then((response) => {
+      if (response.status < 200 || response.status >= 300) {
         sendResponse({ ok: false, error: `HTTP ${response.status}` });
         return;
       }
       sendResponse(isContinuation
-        ? { ok: true, data: await response.json() }
-        : { ok: true, text: await response.text() });
+        ? { ok: true, data: JSON.parse(response.body || "{}") }
+        : { ok: true, text: response.body || "" });
     })
     .catch((error) => sendResponse({ ok: false, error: error.message || "YouTube search failed" }));
   return true;

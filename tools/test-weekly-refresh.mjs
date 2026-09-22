@@ -10,7 +10,7 @@ function definition(name) {
   const end = source.indexOf("\n}\n", start);
   return source.slice(start, end + 2);
 }
-const functions = ["checkIsDue", "channelFeedCacheMissing", "runConcurrent", "feedSummaryChanged",
+const functions = ["checkIsDue", "channelFeedCacheMissing", "rssFeedChanged", "feedRetryIsDue", "runConcurrent", "feedSummaryChanged",
   "replaceChannelSummary", "latestWeeklyRefreshAt", "weeklyFeedFailureText", "weeklyRefreshStatusText",
   "refreshDueChannelFeeds", "refreshChannelSummaries", "performChannelSummaryRefresh"];
 const noop = () => {};
@@ -19,13 +19,14 @@ function harness() {
     configLoaded: true, allChannels: [], activeChannel: null, activePrimarySection: "youtube",
     activeView: "youtubeHome", feedCheckIntervalMinutes: 30, metadataCheckIntervalDays: 7,
     feedCheckConcurrency: 2, newVideosRefreshPending: false, channelSummaryRefreshPromise: null,
+    INNERTUBE_SAFETY_INTERVAL_MS: 24 * 60 * 60 * 1000, FEED_RETRY_MINIMUM_MS: 15 * 60 * 1000,
     weeklyFeedFailures: new Set(), document: { visibilityState: "visible" }, navigator: { onLine: true },
     AbortController, setTimeout, clearTimeout, Date, Intl, interfaceI18n: { locale: "en" },
     weeklyVideoSummary,
     configurationStore: { rememberChannels: async () => {} },
     fetchWeeklyChannelVideos: (options) => fetchWeeklyChannelVideos({
       ...options, fetchImpl: (...args) => state.fetch(...args),
-      fetchPage: async () => ({ videos: [], continuation: "" }), timeoutMs: 20
+      fetchPage: (...args) => state.fetchPage(...args), timeoutMs: 20
     }),
     parseFeed: JSON.parse, videoWithChannel: (video) => video, renderCategories: noop,
     renderSidePanelPath: noop, syncYoutubeThisWeekButton: noop, renderChannels: noop,
@@ -35,6 +36,7 @@ function harness() {
     prioritizedChannelsForRefresh: () => [...state.allChannels],
     fetchChannelVideoCount: async () => 1, fetchChannelMetadata: async () => ({})
   };
+  state.fetchPage = async () => ({ videos: [], continuation: "" });
   vm.createContext(state);
   vm.runInContext(functions.map(definition).join("\n"), state);
   return state;
@@ -82,10 +84,26 @@ const response = (videos) => ({ ok: true, text: async () => JSON.stringify(video
   assert.equal(calls, 2);
   assert.equal(h.newVideosRefreshPending, false);
 }
-// Partial failures preserve cache/date, remain due, and cannot claim a full recent refresh.
+// Zero disables automatic feed checks but still permits an explicit refresh.
+{
+  const h = harness();
+  h.feedCheckIntervalMinutes = 0;
+  h.allChannels = [channel("disabled")];
+  let calls = 0;
+  h.fetch = async () => { calls++; return response([]); };
+  await h.refreshChannelSummaries({ feedsOnly: true });
+  assert.equal(calls, 0);
+  await h.refreshChannelSummaries({ forceFeeds: true, feedsOnly: true });
+  assert.equal(calls, 1);
+}
+// Total failures preserve cache/date and wait for the normal retry cadence.
 {
   const h = harness();
   h.allChannels = [channel("failed"), channel("ok")];
+  h.fetchPage = async ({ channelId }) => {
+    if (channelId === "failed") throw new Error("Innertube offline");
+    return { videos: [], continuation: "" };
+  };
   h.fetch = async (url) => {
     if (url.includes("failed")) throw new Error("offline");
     return response([{ id: "new", published: new Date().toISOString() }]);
@@ -95,7 +113,11 @@ const response = (videos) => ({ ok: true, text: async () => JSON.stringify(video
   assert.equal(h.allChannels[0].feedCheckedAt, oldDate);
   assert.equal(h.latestWeeklyRefreshAt(), Date.parse(oldDate));
   assert.equal(h.weeklyRefreshStatusText(), "weeklyFeedRefreshFailed:1");
+  assert.ok(Date.parse(h.allChannels[0].feedRetryAfter) > Date.now());
   h.fetch = async () => response([{ id: "recovered", published: oldDate }]);
+  h.fetchPage = async () => ({ videos: [], continuation: "" });
+  h.allChannels[0].feedRetryAfter = oldDate;
+  h.allChannels[0].feedCheckedAt = oldDate;
   await h.refreshChannelSummaries({ feedsOnly: true });
   assert.equal(h.weeklyFeedFailures.size, 0);
   assert.ok(h.allChannels[0].feedVideos.some((video) => video.id === "recovered"));
@@ -111,6 +133,7 @@ const response = (videos) => ({ ok: true, text: async () => JSON.stringify(video
   h.fetch = async (_, { signal }) => new Promise((_, reject) => {
     signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
   });
+  h.fetchPage = async () => { throw new Error("Innertube unavailable"); };
   await h.refreshChannelSummaries({ feedsOnly: true });
   assert.equal(h.newVideosRefreshPending, false);
   assert.equal(h.allChannels[0].feedCheckedAt, oldDate);
@@ -175,14 +198,22 @@ const response = (videos) => ({ ok: true, text: async () => JSON.stringify(video
     else assert.throws(() => h.parseFeed("xml"), /invalid video feed/);
   }
 }
-// A failed forced refresh of a fresh channel is retried on the next automatic check.
+// A failed forced refresh waits for its per-channel retry date, not the next minute tick.
 {
   const h = harness();
   h.allChannels = [{ ...channel("one"), feedCheckedAt: new Date().toISOString() }];
-  h.fetch = async () => ({ ok: false, status: 503 });
+  h.fetchPage = async () => { throw new Error("Innertube unavailable"); };
+  let calls = 0;
+  h.fetch = async () => { calls++; return { ok: false, status: 503 }; };
   await h.refreshChannelSummaries({ forceFeeds: true, feedsOnly: true });
   assert.equal(h.weeklyFeedFailures.size, 1);
+  assert.equal(calls, 1);
+  await h.refreshChannelSummaries({ feedsOnly: true });
+  assert.equal(calls, 1);
   h.fetch = async () => response([{ id: "retried", published: oldDate }]);
+  h.fetchPage = async () => ({ videos: [], continuation: "" });
+  h.allChannels[0].feedRetryAfter = oldDate;
+  h.allChannels[0].feedCheckedAt = oldDate;
   await h.refreshChannelSummaries({ feedsOnly: true });
   assert.equal(h.weeklyFeedFailures.size, 0);
   assert.ok(h.allChannels[0].feedVideos.some((video) => video.id === "retried"));

@@ -29,10 +29,19 @@ const base = 'http://127.0.0.1:4178';
           readFileSync(resolve(root, 'public/app.js'), 'utf8') + `
             globalThis.prepareHoverQA = () => {
               interfaceI18n.locale = 'fr';
+              setListModeForScope(currentListLayoutScope(), 'icons');
+              applyListLayout();
               const sample = { id: 'hoverqa0001', title: 'Comment fabriquer un outil de précision dans son atelier',
                 channel: 'Workshop & Engineering', published: new Date(Date.now() - 3600000).toISOString(),
                 views: '12345', durationText: '12:34', thumbnail: allChannels[0].thumbnail };
-              let list = document.querySelector('.newVideos');
+              let list = document.createElement('div');
+              list.className = 'newVideos';
+              list.id = 'hoverQaList';
+              const host = document.createElement('div');
+              host.className = 'channels videoListHost';
+              host.style.cssText = 'position:fixed;left:8px;top:120px;width:min(280px,calc(100vw - 16px));z-index:1';
+              host.append(list);
+              document.body.append(host);
               list.replaceChildren(createVideoCard(sample), createVideoCard({ ...sample, id: 'hoverqa0002',
                 title: 'Comprendre les éléments radioactifs', published: new Date(Date.now() - 86400000).toISOString() }));
               globalThis.updateHoverQA = () => { sample.title = 'Titre actualisé <b>sans HTML</b>'; updateVideoHoverDetails(list.firstChild, sample); };
@@ -41,6 +50,7 @@ const base = 'http://127.0.0.1:4178';
                 sample.views = String(Number(sample.views) + 1000);
                 const replacement = document.createElement('div');
                 replacement.className = list.className;
+                replacement.id = list.id;
                 replacement.append(createVideoCard(sample), createVideoCard({ ...sample, id: 'hoverqa0002' }));
                 list.replaceWith(replacement);
                 list = replacement;
@@ -64,7 +74,7 @@ const base = 'http://127.0.0.1:4178';
       await page.goto(base + '/public/index.html?layout=icons&mode=page');
       await page.locator('.newVideos .video').first().waitFor();
       await page.evaluate(() => prepareHoverQA());
-      const card = page.locator('.newVideos .video').first();
+      const card = page.locator('#hoverQaList .video').first();
       const panel = page.locator('#videoHoverDetails');
       await card.locator('.thumb').hover();
       await page.waitForTimeout(500);
@@ -80,10 +90,11 @@ const base = 'http://127.0.0.1:4178';
       assert.equal(await card.getAttribute('title'), null, 'No competing native tooltip');
       assert.equal(await card.getAttribute('aria-describedby'), 'videoHoverDetails');
       assert(Number(await panel.locator('.videoHoverTitle').evaluate(el => getComputedStyle(el).fontWeight)) >= 700);
-      assert((await panel.innerText()).includes('12.3k'));
+      const hoverText = await panel.innerText();
+      assert(hoverText.includes('12.3k'), hoverText);
       assert((await panel.innerText()).includes('12:34'));
       assert.equal(await card.locator('.videoFreshAgeBadge').innerText(), '1h');
-      assert.equal(await page.locator('.newVideos .video').nth(1).locator('.videoFreshAgeBadge').innerText(), '1J');
+      assert.equal(await page.locator('#hoverQaList .video').nth(1).locator('.videoFreshAgeBadge').innerText(), '1J');
       const checkBounds = async () => {
         const bounds = await panel.boundingBox();
         assert(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= width && bounds.y + bounds.height <= 900, JSON.stringify(bounds));
@@ -113,9 +124,11 @@ const base = 'http://127.0.0.1:4178';
         await page.screenshot({ path: process.env.HOVER_SCREENSHOT, clip: { x: 0, y: 50, width, height: 470 } });
       }
       await page.keyboard.press('Escape');
-      await page.locator('.newVideos .video').nth(1).hover();
+      const secondCard = page.locator('#hoverQaList .video').nth(1);
+      await secondCard.dispatchEvent('pointerenter', { pointerType: 'mouse' });
       await panel.waitFor({ state: 'visible' });
-      await card.hover();
+      await secondCard.dispatchEvent('pointerleave', { pointerType: 'mouse' });
+      await card.dispatchEvent('pointerenter', { pointerType: 'mouse' });
       await page.waitForTimeout(500);
       assert.equal(await panel.isVisible(), false, 'Switching videos must also wait before showing details');
       await panel.waitFor({ state: 'visible' });
@@ -133,7 +146,7 @@ const base = 'http://127.0.0.1:4178';
         return document.querySelector('#videoHoverDetails').hidden;
       });
       assert(dismissedWhileLoading, 'Leaving must close the panel quickly even while the list refreshes');
-      await card.hover();
+      await card.hover({ force: true });
       await panel.waitFor({ state: 'visible' });
       await page.keyboard.press('Escape');
       assert.equal(await panel.isVisible(), false);
@@ -146,22 +159,22 @@ const base = 'http://127.0.0.1:4178';
       await page.evaluate(() => document.dispatchEvent(new Event('scroll')));
       assert.equal(await panel.isVisible(), false);
       await page.mouse.move(0, 0);
-      await card.hover();
+      await card.hover({ force: true });
       await panel.waitFor({ state: 'visible' });
       await page.evaluate(() => missingHoverQA());
       await panel.waitFor({ state: 'hidden' });
-      await page.locator('.newVideos .video').focus();
+      await page.locator('#hoverQaList .video').focus();
       await panel.waitFor({ state: 'visible' });
       assert(await panel.isVisible());
       assert.equal(await panel.locator('.videoHoverStats').count(), 0);
       assert.equal(await panel.locator('.videoHoverAge').count(), 0);
       // Force the card to the bottom-right to check tooltip placement at viewport edges.
-      await page.locator('.newVideos .video').evaluate(el => {
+      await page.locator('#hoverQaList .video').evaluate(el => {
         el.style.setProperty('position', 'fixed'); el.style.setProperty('bottom', '10px');
         el.style.setProperty('right', '10px'); el.style.setProperty('width', '220px', 'important');
         el.blur();
       });
-      await page.locator('.newVideos .video').focus();
+      await page.locator('#hoverQaList .video').focus();
       await page.waitForTimeout(150);
       await checkBounds();
       // A full card already shows its metadata, in every main section.

@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.3.26 - 2026-09-18
+
+- Keep persistent network diagnostics advancing while traffic is idle, report thumbnail activity as an absolute total, and expire orphaned activity so long-running measurements complete reliably.
+
+## 3.3.25 - 2026-09-17
+
+- Persist throttled, session-scoped YouTube request and byte diagnostics so real automatic-refresh traffic can be measured without generating probe traffic.
+
+## 3.3.24 - 2026-09-17
+
+- Replace the classic cached worker with a versioned module entry point so an unpacked-extension reload installs a fresh top-level worker.
+
+## 3.3.23 - 2026-09-17
+
+- Version service-worker imports so Brave cannot reuse stale background code after an unpacked-extension reload.
+- Verify during packaging that every imported worker resource uses the manifest version as its cache revision.
+
 ## 3.3.22 - 2026-09-11
 
 - Simplify History cards with compact thumbnails and progress bars, hide irrelevant Watch later and content-filter buttons, and add right-click actions to clear or disable local history.

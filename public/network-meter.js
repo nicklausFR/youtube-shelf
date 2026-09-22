@@ -36,24 +36,52 @@ export function formatNetworkBytes(bytes, compact = false, locale = "en") {
 }
 
 export function installNetworkMeter(options = {}) {
-  const originalFetch = globalThis.fetch.bind(globalThis);
+  const previousFetch = globalThis.fetch;
+  const originalFetch = previousFetch.bind(globalThis);
+  const youtubeFetch = typeof options.youtubeFetch === "function" ? options.youtubeFetch : originalFetch;
   const listeners = new Set();
   const storage = options.storage;
-  // V4 drops totals produced before embedded-player resources were excluded.
-  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV4";
+  const diagnosticsStorage = options.diagnosticsStorage;
+  const diagnosticsKey = options.diagnosticsKey || "youtubeChannelShelfNetworkDiagnosticsV1";
+  const diagnosticsDelayMs = Math.max(0, Number(options.diagnosticsDelayMs) || 1000);
+  const diagnosticsHeartbeatMs = Math.max(1, Number(options.diagnosticsHeartbeatMs) || 30000);
+  const externalActiveTimeoutMs = Math.max(1, Number(options.externalActiveTimeoutMs) || 120000);
+  // V6 starts a clean baseline after making idle diagnostics time-based.
+  const storageKey = "youtubeChannelShelfYouTubeSessionMetricsV6";
   let persistenceReady = !storage;
   let persistenceTimer = 0;
+  let diagnosticsTimer = 0;
+  let directActive = 0;
+  let externalActive = 0;
+  let externalActiveUpdatedAt = 0;
   const state = {
     startedAt: Date.now(),
     requests: 0,
     failures: 0,
-    active: 0,
     receivedBytes: 0,
     sentBytes: 0
   };
 
   function snapshot() {
-    return { ...state, totalBytes: state.receivedBytes + state.sentBytes };
+    return {
+      ...state,
+      active: directActive + externalActive,
+      totalBytes: state.receivedBytes + state.sentBytes
+    };
+  }
+
+  function persistDiagnostics() {
+    if (!diagnosticsStorage) return;
+    Promise.resolve(diagnosticsStorage.set({
+      [diagnosticsKey]: { ...snapshot(), savedAt: Date.now() }
+    })).catch(() => {});
+  }
+
+  function expireStaleExternalActivity() {
+    if (!externalActive || Date.now() - externalActiveUpdatedAt < externalActiveTimeoutMs) return false;
+    externalActive = 0;
+    externalActiveUpdatedAt = 0;
+    return true;
   }
 
   function notify() {
@@ -73,7 +101,20 @@ export function installNetworkMeter(options = {}) {
         });
       }, 200);
     }
+    if (diagnosticsStorage) {
+      clearTimeout(diagnosticsTimer);
+      diagnosticsTimer = setTimeout(persistDiagnostics, diagnosticsDelayMs);
+    }
   }
+
+  const diagnosticsHeartbeatTimer = diagnosticsStorage ? setInterval(() => {
+    if (expireStaleExternalActivity()) {
+      const value = snapshot();
+      for (const listener of listeners) listener(value);
+    }
+    persistDiagnostics();
+  }, diagnosticsHeartbeatMs) : 0;
+  diagnosticsHeartbeatTimer?.unref?.();
 
   if (storage) {
     storage.get(storageKey, (result) => {
@@ -90,14 +131,14 @@ export function installNetworkMeter(options = {}) {
     });
   }
 
-  globalThis.fetch = async (input, options = {}) => {
+  const meteredFetch = async (input, options = {}) => {
     if (!countedYouTubeRequest(input)) return originalFetch(input, options);
     state.requests += 1;
-    state.active += 1;
+    directActive += 1;
     state.sentBytes += bodyBytes(options.body);
     notify();
     try {
-      const response = await originalFetch(input, options);
+      const response = await youtubeFetch(input, options);
       const contentLength = Number.parseInt(response.headers.get("Content-Length") || "", 10);
       if (Number.isFinite(contentLength) && contentLength >= 0) {
         state.receivedBytes += contentLength;
@@ -115,17 +156,27 @@ export function installNetworkMeter(options = {}) {
       state.failures += 1;
       throw error;
     } finally {
-      state.active = Math.max(0, state.active - 1);
+      directActive = Math.max(0, directActive - 1);
       notify();
     }
   };
+  globalThis.fetch = meteredFetch;
+
+  if (!storage) notify();
 
   return {
     snapshot,
-    recordExternal({ requests = 0, failures = 0, activeDelta = 0, receivedBytes = 0, sentBytes = 0 } = {}) {
+    recordExternal(event = {}) {
+      const { requests = 0, failures = 0, activeDelta = 0, receivedBytes = 0, sentBytes = 0 } = event;
       state.requests += Math.max(0, Number(requests) || 0);
       state.failures += Math.max(0, Number(failures) || 0);
-      state.active = Math.max(0, state.active + (Number(activeDelta) || 0));
+      if (Object.hasOwn(event, "active") && Number.isFinite(Number(event.active))) {
+        externalActive = Math.max(0, Number(event.active));
+      } else {
+        externalActive = Math.max(0, externalActive + (Number(activeDelta) || 0));
+      }
+      if (externalActive) externalActiveUpdatedAt = Date.now();
+      else externalActiveUpdatedAt = 0;
       state.receivedBytes += Math.max(0, Number(receivedBytes) || 0);
       state.sentBytes += Math.max(0, Number(sentBytes) || 0);
       notify();
@@ -134,6 +185,13 @@ export function installNetworkMeter(options = {}) {
       listeners.add(listener);
       listener(snapshot());
       return () => listeners.delete(listener);
+    },
+    dispose() {
+      clearTimeout(persistenceTimer);
+      clearTimeout(diagnosticsTimer);
+      clearInterval(diagnosticsHeartbeatTimer);
+      listeners.clear();
+      if (globalThis.fetch === meteredFetch) globalThis.fetch = previousFetch;
     }
   };
 }

@@ -57,18 +57,27 @@ async function withDeadline(work, timeoutMs) {
 
 export async function fetchWeeklyChannelVideos({
   channelId, parseFeed, fetchImpl = fetch, fetchPage = fetchYoutubeChannelVideosPage,
-  now = Date.now(), timeoutMs = 15000, maxPages = 10
+  now = Date.now(), timeoutMs = 15000, maxPages = 10, shouldFetchYoutube = () => true
 }) {
+  let rssVideos = [];
+  let rssError = null;
   const youtubeVideos = [];
-  const [rss, youtube] = await Promise.allSettled([
-    withDeadline(async (signal) => {
+  try {
+    rssVideos = await withDeadline(async (signal) => {
       const response = await fetchImpl(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`, {
         cache: "no-store", signal
       });
       if (!response.ok) throw new Error(`RSS request failed: HTTP ${response.status}`);
       return parseFeed(await response.text());
-    }, timeoutMs),
-    (async () => {
+    }, timeoutMs);
+  } catch (error) {
+    rssError = error;
+  }
+
+  const youtubeChecked = Boolean(rssError) || await shouldFetchYoutube(rssVideos);
+  let youtubeError = null;
+  if (youtubeChecked) {
+    try {
       let continuation = "";
       const seenTokens = new Set();
       for (let index = 0; index < maxPages; index++) {
@@ -82,19 +91,24 @@ export async function fetchWeeklyChannelVideos({
         // An entirely older page establishes the week boundary, even if a recent
         // upload was pinned ahead of older videos on the previous page.
         if (!continuation || (datedVideos.length > 0
-          && datedVideos.every((video) => Date.parse(video.published) < now - WEEK_MS))) return;
+          && datedVideos.every((video) => Date.parse(video.published) < now - WEEK_MS))) break;
         if (seenTokens.has(continuation)) throw new Error("YouTube repeated a video page");
         seenTokens.add(continuation);
+        if (index === maxPages - 1) throw new Error("The weekly video check reached its page limit");
       }
-      throw new Error("The weekly video check reached its page limit");
-    })()
-  ]);
-  if (rss.status === "rejected" && youtube.status === "rejected" && !youtubeVideos.length) {
-    throw new AggregateError([rss.reason, youtube.reason], "Neither RSS nor YouTube videos could be checked");
+    } catch (error) {
+      youtubeError = error;
+    }
+  }
+  if (rssError && youtubeError && !youtubeVideos.length) {
+    throw new AggregateError([rssError, youtubeError], "Neither RSS nor YouTube videos could be checked");
   }
   return {
-    rssVideos: rss.status === "fulfilled" ? rss.value : [],
+    rssVideos,
     youtubeVideos,
-    complete: rss.status === "fulfilled" && youtube.status === "fulfilled"
+    rssSucceeded: !rssError,
+    youtubeChecked,
+    youtubeSucceeded: youtubeChecked && !youtubeError,
+    complete: !rssError && (!youtubeChecked || !youtubeError)
   };
 }

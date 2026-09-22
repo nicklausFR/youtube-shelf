@@ -93,6 +93,28 @@ const definition = name => {
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf("\n}\n", start) + 2);
 };
+// Titles already supplied by RSS/Innertube must not create one request per card.
+{
+  let titleRequests = 0;
+  const titleHarness = {
+    youtubeTitleLanguage: "original",
+    youtubeOriginalTitle: async () => { titleRequests++; return "Recovered title"; },
+    youtubeAutomaticTitle: async () => { titleRequests++; return "Recovered title"; },
+    activeVideoId: "",
+    document: { title: "" },
+    channelTitleEl: { textContent: "" },
+    updateVideoHoverDetails() {}
+  };
+  vm.createContext(titleHarness);
+  vm.runInContext(definition("restorePreferredYoutubeTitle"), titleHarness);
+  const titleElement = { textContent: "", closest: () => null };
+  titleHarness.restorePreferredYoutubeTitle({ id, title: "Feed title" }, titleElement);
+  assert.equal(titleRequests, 0);
+  titleHarness.restorePreferredYoutubeTitle({ id, title: "" }, titleElement);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(titleRequests, 1);
+  assert.equal(titleElement.textContent, "Recovered title");
+}
 let renders = 0;
 const harness = {
   allChannels: [{ id: "channel", feedVideos: [
@@ -146,6 +168,7 @@ Object.assign(harness, {
   videosEl: {}, sortVideosForDisplay: videos => videos,
   createVideoCard: video => video,
   createStoredVideoGroup: members => ({ members }),
+  resetYoutubeMetadataObserver() {},
   setActiveVideoButton() {}, syncVideoLayoutAvailability() {}
 });
 for (const name of ["renderVideos", "renderStoredVideoResults"]) vm.runInContext(definition(name), harness);

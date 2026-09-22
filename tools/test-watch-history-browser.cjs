@@ -22,7 +22,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || "playwright")
           id: "session-new",
           sessionId: "session-new",
           videoId: "abcdefghijk",
-          title: "Repeated video",
+          title: "abcdefghijk",
           channel: "Test channel",
           startedAt: "2026-09-11T11:00:00.000Z",
           updatedAt: "2026-09-11T11:00:30.000Z",
@@ -35,7 +35,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || "playwright")
           id: "session-old",
           sessionId: "session-old",
           videoId: "abcdefghijk",
-          title: "Repeated video",
+          title: "abcdefghijk",
           channel: "Test channel",
           startedAt: "2026-09-11T10:00:00.000Z",
           updatedAt: "2026-09-11T10:00:20.000Z",
@@ -93,7 +93,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || "playwright")
     ]);
     const historyCardHeight = await page.locator(".historyVideos .video").first().evaluate((card) => card.getBoundingClientRect().height);
     const historyThumbnailHeight = await page.locator(".historyVideos .thumbFrame").first().evaluate((thumb) => thumb.getBoundingClientRect().height);
-    assert.ok(historyCardHeight <= 112, `history cards keep the compact list height (received ${historyCardHeight}px)`);
+    assert.equal(historyCardHeight, 134, "history cards use the shared fixed video-card height");
     assert.equal(historyThumbnailHeight, 84, "history thumbnails use the same stable compact height as other video lists");
 
     await page.locator("#watchHistoryTab").click({ button: "right" });

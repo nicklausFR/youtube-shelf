@@ -3,7 +3,7 @@ import { synchronizableConfig } from "./sync-schema.js";
 // Only derived channel data belongs here. The authenticated server remains the
 // authority for subscriptions, favorites and other user edits.
 const FIELDS = ["feedVideos", "feedVideoCount", "feedLatestPublished",
-  "feedLatestTitle", "feedCheckedAt", "channelVideoCount"];
+  "feedLatestTitle", "feedCheckedAt", "feedInnertubeCheckedAt", "feedRetryAfter", "channelVideoCount"];
 
 export function createWebFeedCache({ databaseName = "youtube-shelf-web-feeds" } = {}) {
   async function transaction(mode, work) {

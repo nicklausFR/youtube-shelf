@@ -1,8 +1,13 @@
 const CACHE_KEY = "youtubeChannelShelfShortsCache";
 const SHORT_CACHE_AGE = 7 * 24 * 60 * 60 * 1000;
-const RESTRICTION_CACHE_AGE = 5 * 60 * 1000;
+const PUBLIC_RESTRICTION_CACHE_AGE = 24 * 60 * 60 * 1000;
+const RESTRICTED_CACHE_AGE = 6 * 60 * 60 * 1000;
 const VALID_ID = /^[a-zA-Z0-9_-]{11}$/;
 const VALID_RESTRICTIONS = new Set(["", "private", "members"]);
+
+function restrictionCacheAge(value) {
+  return value === "" ? PUBLIC_RESTRICTION_CACHE_AGE : RESTRICTED_CACHE_AGE;
+}
 
 function jsonObjectAfter(html, marker) {
   const markerIndex = html.indexOf(marker);
@@ -86,7 +91,8 @@ export function createYoutubeShortsLookup({ fetchImpl = fetch, storage, now = Da
   const isRecent = (timestamp, maxAge) => Number.isFinite(Number(timestamp)) && now() - Number(timestamp) < maxAge;
   const cache = new Map(Object.entries(stored || {}).filter(([id, item]) => VALID_ID.test(id)
     && ((typeof item?.isShort === "boolean" && isRecent(item.shortCheckedAt ?? item.checkedAt, SHORT_CACHE_AGE))
-      || (VALID_RESTRICTIONS.has(item?.restriction) && isRecent(item.restrictionCheckedAt, RESTRICTION_CACHE_AGE)))));
+      || (VALID_RESTRICTIONS.has(item?.restriction)
+        && isRecent(item.restrictionCheckedAt, restrictionCacheAge(item.restriction))))));
   const requests = new Map();
   const queue = [];
   let running = 0;
@@ -100,10 +106,10 @@ export function createYoutubeShortsLookup({ fetchImpl = fetch, storage, now = Da
 
   function restriction(video) {
     if (VALID_RESTRICTIONS.has(video?.restriction)
-      && isRecent(video.restrictionCheckedAt, RESTRICTION_CACHE_AGE)) return video.restriction;
+      && isRecent(video.restrictionCheckedAt, restrictionCacheAge(video.restriction))) return video.restriction;
     const id = typeof video === "string" ? video : video?.id;
     const item = cache.get(id);
-    return item && isRecent(item.restrictionCheckedAt, RESTRICTION_CACHE_AGE)
+    return item && isRecent(item.restrictionCheckedAt, restrictionCacheAge(item.restriction))
       && VALID_RESTRICTIONS.has(item.restriction)
       ? item.restriction
       : undefined;
@@ -153,7 +159,7 @@ export function createYoutubeShortsLookup({ fetchImpl = fetch, storage, now = Da
         finally { clearTimeout(timer); }
       })().then((result) => {
         const cacheAge = VALID_RESTRICTIONS.has(result.restriction)
-          ? RESTRICTION_CACHE_AGE
+          ? restrictionCacheAge(result.restriction)
           : typeof result.isShort === "boolean" ? SHORT_CACHE_AGE : 60000;
         requests.set(id, { promise: Promise.resolve(result), expiresAt: now() + cacheAge });
         resolve(result);

@@ -6,6 +6,8 @@ export function synchronizableConfig(value = {}) {
       feedLatestPublished: _feedLatestPublished,
       feedLatestTitle: _feedLatestTitle,
       feedCheckedAt: _feedCheckedAt,
+      feedInnertubeCheckedAt: _feedInnertubeCheckedAt,
+      feedRetryAfter: _feedRetryAfter,
       channelVideoCount: _channelVideoCount,
       ...content
     } = channel || {};

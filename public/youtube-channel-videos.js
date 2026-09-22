@@ -10,7 +10,7 @@ const WEB_CLIENT_ID = "1";
 const WEB_CLIENT_VERSION_FALLBACK = "2.20260120.01.00";
 const VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA";
 const VIDEO_SORTS = new Set(["latest", "popular", "oldest"]);
-const YOUTUBE_PAGE_ATTEMPTS = 3;
+const YOUTUBE_PAGE_ATTEMPTS = 2;
 
 let cachedClientVersion = "";
 
@@ -80,7 +80,7 @@ function videoFromRenderer(renderer) {
     published: relativeDateToIso(publishedText),
     publishedText,
     duration,
-    ...(rendererIsShort(renderer) ? { isShort: true } : {}),
+    isShort: rendererIsShort(renderer),
     restriction,
     restrictionCheckedAt: Date.now(),
     viewCountText: textFrom(renderer.viewCountText) || textFrom(renderer.shortViewCountText),
@@ -111,7 +111,7 @@ function videoFromLockup(lockup) {
     published: relativeDateToIso(publishedText),
     publishedText,
     duration,
-    ...(rendererIsShort(lockup) ? { isShort: true } : {}),
+    isShort: rendererIsShort(lockup),
     restriction,
     restrictionCheckedAt: Date.now(),
     viewCountText: metadataStrings.find((value) => /views?|watching/i.test(value)) || "",
@@ -251,7 +251,11 @@ async function postBrowse(fetchImpl, body, clientVersion) {
     },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(`YouTube browse request failed: HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`YouTube browse request failed: HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   const data = await response.json();
   if (data?.error) throw new Error(data.error.message || "YouTube browse request failed");
   return data;
@@ -320,6 +324,7 @@ export async function fetchYoutubeChannelVideosPage(options = {}) {
     } catch (error) {
       if (error?.name === "AbortError") throw error;
       lastError = error;
+      if ([403, 429].includes(error?.status)) break;
       if (attempt < YOUTUBE_PAGE_ATTEMPTS) cachedClientVersion = "";
     }
   }

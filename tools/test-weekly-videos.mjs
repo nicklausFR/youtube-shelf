@@ -11,6 +11,20 @@ const defaults = {
   channelId: "UCqoAEDirJPjEUFcF2FklnBA", parseFeed: JSON.parse, now,
   fetchImpl: async () => ({ ok: true, text: async () => JSON.stringify([telescope]) })
 };
+// An unchanged RSS poll can skip Innertube entirely; the app schedules a
+// separate safety pass for content that never appears in RSS.
+{
+  let pages = 0;
+  const result = await fetchWeeklyChannelVideos({
+    ...defaults,
+    shouldFetchYoutube: () => false,
+    fetchPage: async () => { pages++; return { videos: [], continuation: "" }; }
+  });
+  assert.equal(pages, 0);
+  assert.equal(result.rssSucceeded, true);
+  assert.equal(result.youtubeChecked, false);
+  assert.equal(result.complete, true);
+}
 // Reproduce the user's discrepancy: forced RSS still stops at Telescope NASA,
 // while the channel page includes Tableau periodique. The weekly list must include both.
 {

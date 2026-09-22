@@ -17,6 +17,7 @@ const definition = source.slice(start, source.indexOf('\nfunction createVideoCar
         const discoveredSeriesVideos = new Map(); let cardSeriesAnnotations;
         const seriesCatalog = () => Array.from({length:160}, (_, i) => ({ id:'video'+i, title:'Episode title | S8, EP'+(i+1), channelId:'creator', seriesId:'season8', seriesPosition:i+1 }));
         const annotateVideoSeries = videos => videos;
+        const isBrowsableYoutubePlaylistId = () => false;
         const uiMessage = key => key;
         const applyWatchLaterButtonProgress = () => {};
         const fetchYoutubeChannelVideosPage = async () => ({videos:[], continuation:''});
